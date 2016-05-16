@@ -1,0 +1,17 @@
+output/
+data/
+*.tab
+*.gff
+*.gff3
+*.fa
+*.faa
+*.fna
+*.fasta
+
+# latex temporary files and folders
+cache/
+figure/
+*.aux
+*.log
+*.pdf
+*.tex

@@ -1,0 +1,20 @@
+Fagin
+=====
+
+Classify genes by age, assess quality of classifications, visualize results
+
+Initial Steps
+=============
+
+ 1. Acquire focal species protein sequences
+
+ 1. Acquire outgroup protein sequences
+
+ 1. Umasked blastp all focal species proteins against all outgroup sequences
+
+ 1. Stratify into age groups by absolute e-value threshold
+
+Additional Steps
+================
+
+ 1. Build species distance tree for all represented species

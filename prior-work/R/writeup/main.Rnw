@@ -1,0 +1,198 @@
+\documentclass{article}
+\usepackage{graphicx}
+\usepackage{fullpage}
+\title{Fagin Report}
+\begin{document}
+
+
+\maketitle
+
+\section{Fagin - an orphan gene investigator}
+
+
+
+% ============================================================================
+% Import libraries
+<<echo=FALSE, message=FALSE>>=
+require(ggplot2)
+require(intervals)
+require(plyr)
+opts_chunk$set(echo=FALSE)
+
+# REMOVE THIS IN PRODUCTION CODE
+args <- list(query_gff = '/home/rnz/Dropbox/git/fagin/data/genes.tab',
+             synteny = '/home/rnz/Dropbox/git/fagin/data/syn.tab',
+             strata = '/home/rnz/Dropbox/git/fagin/data/strata-loci.tab',
+             nstring = '/home/rnz/Dropbox/git/fagin/data/Arabidopsis_lyrata.N-string.tab',
+             home = '/home/rnz/Dropbox/git/fagin')
+figdir <- file.path(args$home, 'R', 'writeup', 'figure')
+@
+ 
+
+
+\section{Summaries of input data}
+% ============================================================================
+% Load all input data
+<<cache=TRUE>>=
+source(file.path(args$home, 'R', 'themes.R'))
+source(file.path(args$home, 'R', 'loadData.R'))
+syn <- LoadSyntenyMap(args$synteny)
+gff <- LoadQueryGff(args$query_gff)
+strata <- LoadStrata(args$strata)
+nstring <- LoadNString(args$nstring)
+@
+
+
+\subsection{Syntenic ouput of SatsumaSynteny}
+<<>>=
+head(syn)
+ddply(syn, 'qchr', summarize, N.synteny.blocks=length(qchr))
+@
+
+
+\subsection{Gene feature format file for focal species}
+<<>>=
+head(gff)
+ddply(gff, 'chr', summarize, N.genes=length(chr))
+@
+
+
+\subsection{Phylostrata file}
+<<>>=
+head(strata)
+ddply(strata, c('ps', 'name'), summarize, N.genes=length(ps))
+@
+
+
+\subsection{N-string file}
+<<>>=
+head(nstring)
+@
+
+
+
+\section{Results}
+
+% ============================================================================
+% Build main syntenic data.frame
+%  qseqid | tarid | chr | qstart | qend | tchr | tstart | tend | pident | strand | queid | ps | name | tlen | qlen 
+<<cache=TRUE, message=FALSE>>=
+source(file.path(args$home, 'R', 'build_gene2int.R'))
+gint <- Build_Gene2Int(syn, gff, strata)
+@
+
+
+\subsection{Syntenic gaps}
+% ============================================================================
+<<cache=TRUE, message=FALSE>>=
+source(file.path(args$home, 'R', 'testSyntenicGaps.R'))
+synteny.gaps <- TestSyntenyGaps(syn, nstring)
+query.gaps <- TestQueryGaps(gint)
+@
+
+\begin{figure}[!hbpt]
+<<fig.width=8, fig.height=8>>=
+synteny.gaps
+@
+\caption{In black: missing regions on the target between syntenic blocks. In
+red: strings of N's, bases that have not been correctly sequenced}
+\end{figure}
+
+\begin{figure}[!hbpt]
+<<fig.width=8, fig.height=8>>=
+query.gaps
+@
+\end{figure}
+
+\subsection{Gap biases}
+% ============================================================================
+<<cache=TRUE, warning=FALSE, message=FALSE>>=
+source(file.path(args$home, 'R', 'testGapBias.R'))
+gap.bias <- SimulateGapBias(syn, gff, strata, k=5)
+@
+
+\begin{figure}[!hbpt]
+<<>>=
+PlotGapBias(gap.bias)
+@
+ \end{figure}
+
+% ============================================================================
+<<>>=
+source(file.path(args$home, 'R', 'testIntergenicDistance.R'))
+@
+
+<<intergenitDistance, cache=TRUE>>=
+intdat <- TestIntergenicDistance(gff, strata)
+@
+
+% \begin{figure}[!hbpt]
+% <<p1, fig.width=8, fig.height=8>>=
+% source('../testIntergenicDistance.R')
+% PlotIntergenicDistance.chrFacet(intdat)
+% @
+% \end{figure}
+% 
+%  
+% \begin{figure}[!hbpt]
+% <<p1, fig.width=6, fig.height=6>>=
+% PlotIntergenicDistance.psChr(intdat)
+% @
+% \end{figure}
+% 
+% \begin{figure}[!hbpt]
+% <<p2, fig.width=6, fig.height=6>>=
+% PlotIntergenicDistance.psFacet(intdat)
+% @
+% \end{figure}
+% 
+
+\subsection{Are younger genes more likely to overlap older genes?}
+
+\begin{figure}[!hbpt]
+<<p3, fig.width=4, fig.height=4>>=
+minsize=500
+PlotIntergenicDistance.overlaps(intdat, minsize)
+@
+\caption{The log2 ratios of the observed overlaps between genes to the
+expected. A lograt of 1 indicates genes from the two strata overlap twice as
+freqently as expected. Only strata with at least \Sexpr{minsize} genes are
+included.}
+\end{figure}
+
+\begin{figure}[!hbpt]
+<<p4, fig.width=3, fig.height=3>>=
+PlotIntergenicDistance.overlaps_freq(intdat)
+@
+\caption{The number of genes that overlap other genes in each phylostrata.}
+\end{figure}
+
+There may be a preference, but these images alone are inconclusive. Young genes
+may be less likely to overlap eachother, however this could easily be an
+artifact of their shorter sequences and paucity of introns.
+
+
+\subsection{Locations of missing genes}
+% ============================================================================
+% Assess the locations of gaps in synteny and the genes residing in the gaps
+% Plot a giant pdf containing synteny visuals for all genes inbetween syntenic
+% blocks 
+<<cache=TRUE>>=
+source(file.path(args$home, 'R', 'findMissingGenes.R'))
+gapped <- BindGaps(gint, syn)
+# PlotAllMissing(gapped, gint, file=file.path(args$home, 'output', 'allmissing.pdf')) 
+@
+
+
+% ============================================================================
+<<>>=
+write.table(
+    gint,
+    quote=FALSE,
+    file=file.path(args$home, 'R', 'gene2int_map.tab'),
+    sep="\t",
+    col.names=FALSE
+)
+@
+
+\end{document}

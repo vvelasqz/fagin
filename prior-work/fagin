@@ -1,0 +1,54 @@
+#!/usr/bin/env Rscript
+
+require(ggplot2)
+require(intervals)
+require(knitr)
+
+suppressPackageStartupMessages(library("argparse"))
+
+version <- '0.0.0'
+
+parser <- ArgumentParser(
+  formatter_class='argparse.RawTextHelpFormatter',
+  description='Discover and categorize orphan genes',
+  usage='fagin [options]')
+
+parser$add_argument(
+  '-v', '--version',
+  help="show program's version number and exit",
+  action='store_true',
+  default=FALSE)
+
+parser$add_argument(
+  '--query-gff',
+  help='gff formated gene models for the query species')
+
+parser$add_argument(
+  '--synteny',
+  help='output tabular output from SatsumaSynteny (query versus target)')
+
+parser$add_argument(
+  '--strata',
+  help='phylostrata table (level | locus | name)')
+
+parser$add_argument(
+  '--home',
+  help='the path to the home directory (the working directory, by default)',
+  default=getwd()
+)
+
+parser$add_argument(
+    '--nstring',
+    help='tab-delimited file representing chr, start, and length of N repeats in target genome')
+
+args <- parser$parse_args()
+
+if(args$version){
+    cat(sprintf("fagin v%s\n", version))
+}
+
+dir.create('output/writeup', showWarnings=FALSE, recursive=TRUE)
+
+setwd('R/writeup')
+knit2pdf('main.Rnw')
+file.copy('main.pdf', '../../output/results.pdf')

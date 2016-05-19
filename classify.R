@@ -49,6 +49,18 @@ if(length(c(args$tree, args$focal_species, args$sequences)) != 3){
   parser$print_help()
 }
 
+gene_is_deleted <- function(){ }
+
+search_interval_has_match <- function(){ }
+
+search_interval_contains_missing_section <- function(){ }
+
+matches_known_gene <- function(){ }
+
+matches_transcript_orf <- function(){ }
+
+matches_possible_model <- function(){ }
+
 #' Load a multi-sequence fasta file
 #'
 #' Within the context of Cadmium, this function will be used to load the search
@@ -58,6 +70,25 @@ if(length(c(args$tree, args$focal_species, args$sequences)) != 3){
 #' @param filename fasta file name
 #' @return TODO - what kind of object is this?
 load_fasta <- function(filename){ }
+
+#' Load all data needed for each target species
+#'
+#' The required inputs are
+#' 1. A table of DNA search intervals containing
+#'    1. query name
+#'    2. query chromosome
+#'    3. query start
+#'    4. query stop
+#'    5. target chromosome
+#'    6. target start
+#'    7. target stop
+#'    8. target DNA sequence
+#' 2. GFF file for target which includes all target gene models and transcripts
+load_targets <- function(target_table_file, gff_file){ }
+
+
+#' Load all query data
+load_queries <- function(query_CDS_file, query_gene_file, query_gff){ }
 
 
 #' Classify matches of the query to a single target sequence
@@ -74,7 +105,32 @@ load_fasta <- function(filename){ }
 #' @param query query sequence object
 #' @param target search interval (sequence object)
 #' @return desc
-search_sequence_for_hit <- function(query, target){ }
+search_sequence_for_hit <- function(query, target){
+  if(gene_is_deleted()){
+    return('deleted') 
+  }
+  if(search_interval_has_match()){
+    if(matches_known_gene()){
+      return('genic_known_gene')
+    }
+    if(matches_transcript_orf()){
+      return('genic_transcript_orf')
+    }
+    if(matches_genomic_orf()){
+      return('genic_genomic_orf')
+    }
+    if(matches_possible_model()){
+      return('genic_possible_model')
+    }
+    return('non-genic')
+  } else {
+    if(search_interval_contains_missing_section()){
+      return('unknown_assembly_gap')
+    } else {
+      return('unknown_matchless')
+    }
+  }
+}
 
 
 #' Classify each search interval and merge results into leaf label
@@ -85,7 +141,15 @@ search_sequence_for_hit <- function(query, target){ }
 #' @param query query sequence object
 #' @param set of target search interval (sequence objects)
 #' @return desc
-label_leaf <- function(query, search_intervals){ }
+label_leaf <- function(query, search_intervals){
+  labels <- lapply(search_intervals, function(x) search_sequence_for_hit(query, x))
+
+  # --------------------------------------------------------
+  # TODO Intergrate labels returned for each search interval
+  # --------------------------------------------------------
+
+  label
+}
 
 
 #' Classify a query gene given a tree and set of search intervals
@@ -95,9 +159,24 @@ label_leaf <- function(query, search_intervals){ }
 #' is non-genic, the gene is classified as a de novo gene arising along branch
 #' k. Otherwise it is classified as a gene of unknown origin.
 #'
-#' @param query query sequence object
+#' @param query list of query sequence objects
 #' @param targets a list of search interval sets (each of list of sequence objects)
 #' @param tree a phylogenetic tree describing the relationship between the
 #'             focal species and all target species
 #' @return class of the gene
-classify_gene <- function(query, targets, tree) { }
+classify_gene <- function(query, targets, tree) {
+  leaf_labels <- list()
+  for(species in names(targets)){
+    leaf_labels[[species]] <- label_leaf(query, targets[[species]])
+  }
+
+  # --------------------
+  # TODO Reconcile leafs
+  # --------------------
+  
+  orphan_class
+}
+
+classify_genes <- function(queries, targets, tree) {
+  lapply(queries, function(q) classify_gene(query[[q]], targets[[q]], tree))
+}

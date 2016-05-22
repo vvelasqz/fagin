@@ -49,6 +49,25 @@ if(length(c(args$tree, args$focal_species, args$sequences)) != 3){
   parser$print_help()
 }
 
+
+#' Compare a protein query sequence to set of protein target sequences
+#' 
+#' @export
+#' @param qfile Filename of query protein sequence fasta file (one entry)
+#' @param tfile Filename of target protein sequence fasta file (multiple entries)
+#' @return PairwiseAlignmentsSingleSubject
+get_match <- function(qfile="sample-data/AT4G25386/thal.faa", tfile="sample-data/AT4G25386/lyr.faa"){
+  require("Biostrings", quiet=TRUE)
+  data(BLOSUM80)
+  qseq <- readAAStringSet(qfile)
+  tseq <- readAAStringSet(tfile)
+  # A PairwiseAlignmentsSingleSubject object
+  alm <- pairwiseAlignment(tseq, qseq, substitutionMatrix=BLOSUM80)
+  # A good hit should be a high positive number
+  besthit <- max(score(alm))
+  alm[which.max(score(alm))]
+}
+
 gene_is_deleted <- function(){ }
 
 search_interval_has_match <- function(){ }

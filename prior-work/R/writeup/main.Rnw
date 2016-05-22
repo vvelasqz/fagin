@@ -20,11 +20,11 @@ require(plyr)
 opts_chunk$set(echo=FALSE)
 
 # REMOVE THIS IN PRODUCTION CODE
-args <- list(query_gff = '/home/rnz/Dropbox/git/fagin/data/genes.tab',
-             synteny = '/home/rnz/Dropbox/git/fagin/data/syn.tab',
-             strata = '/home/rnz/Dropbox/git/fagin/data/strata-loci.tab',
-             nstring = '/home/rnz/Dropbox/git/fagin/data/Arabidopsis_lyrata.N-string.tab',
-             home = '/home/rnz/Dropbox/git/fagin')
+args <- list(query_gff = '~/src/git/cadmium/prior-work/data/genes.tab',
+             synteny = '~/src/git/cadmium/prior-work/data/syn.tab',
+             strata = '~/src/git/cadmium/prior-work/data/strata-loci.tab',
+             nstring = '~/src/git/cadmium/prior-work/data/Arabidopsis_lyrata.N-string.tab',
+             home = '~/src/git/cadmium/prior-work')
 figdir <- file.path(args$home, 'R', 'writeup', 'figure')
 @
  

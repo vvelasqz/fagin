@@ -49,18 +49,22 @@ if(length(c(args$tree, args$focal_species, args$sequences)) != 3){
   parser$print_help()
 }
 
+# Requires Biostrings from bioconductor, to install this run the following
+# in an R session:
+# 
+# source("https://bioconductor.org/biocLite.R")
+# biocLite("Biostrings")
+# require("Biostrings", quiet=TRUE)
+
 
 #' Compare a protein query sequence to set of protein target sequences
-#' 
+#'
 #' @export
 #' @param qfile Filename of query protein sequence fasta file (one entry)
 #' @param tfile Filename of target protein sequence fasta file (multiple entries)
 #' @return PairwiseAlignmentsSingleSubject
-get_match <- function(qfile="sample-data/AT4G25386/thal.faa", tfile="sample-data/AT4G25386/lyr.faa"){
-  require("Biostrings", quiet=TRUE)
+get_match <- function(tseq, qseq){
   data(BLOSUM80)
-  qseq <- readAAStringSet(qfile)
-  tseq <- readAAStringSet(tfile)
   # A PairwiseAlignmentsSingleSubject object
   alm <- pairwiseAlignment(tseq, qseq, substitutionMatrix=BLOSUM80)
   # A good hit should be a high positive number
@@ -68,17 +72,17 @@ get_match <- function(qfile="sample-data/AT4G25386/thal.faa", tfile="sample-data
   alm[which.max(score(alm))]
 }
 
-gene_is_deleted <- function(){ }
+gene_is_deleted <- function(){ FALSE }
 
-search_interval_has_match <- function(){ }
+search_interval_has_match <- function(){ FALSE }
 
-search_interval_contains_missing_section <- function(){ }
+search_interval_contains_missing_section <- function(){ FALSE }
 
-matches_known_gene <- function(){ }
+matches_known_gene <- function(){ FALSE }
 
-matches_transcript_orf <- function(){ }
+matches_transcript_orf <- function(){ FALSE }
 
-matches_possible_model <- function(){ }
+matches_possible_model <- function(){ FALSE }
 
 #' Load a multi-sequence fasta file
 #'
@@ -167,7 +171,7 @@ label_leaf <- function(query, search_intervals){
   # TODO Intergrate labels returned for each search interval
   # --------------------------------------------------------
 
-  label
+  label[[1]]
 }
 
 
@@ -193,9 +197,29 @@ classify_gene <- function(query, targets, tree) {
   # TODO Reconcile leafs
   # --------------------
   
+  orphan_class <- leaf_labels[[1]]
   orphan_class
 }
 
-classify_genes <- function(queries, targets, tree) {
-  lapply(queries, function(q) classify_gene(query[[q]], targets[[q]], tree))
+load_query <- function(aafile="sample-data/AT4G25386/thal.faa"){
+  query = list()
+  query$aa <- readAAStringSet(aafile)
+  query
 }
+
+load_target <- function(aafile="sample-data/AT4G25386/lyr.faa"){
+  target = list()
+  target[['Arabidipsis_lyrata']] = list()
+  target[['Arabidopsis_lyrata']][[1]]$aa <- readAAStringSet(aafile)
+  target
+}
+
+classify_genes <- function(queries, targets, tree) {
+  # TODO extend to actually do multiple sequences
+  # lapply(queries, function(q) classify_gene(query[[q]], targets[[q]], tree))
+  query = load_query()
+  target = load_target()
+  classify_gene(query, target, NA) 
+}
+
+classify_genes(NA, NA, NA)

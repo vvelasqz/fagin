@@ -54,7 +54,7 @@ if(length(c(args$tree, args$focal_species, args$sequences)) != 3){
 # 
 # source("https://bioconductor.org/biocLite.R")
 # biocLite("Biostrings")
-# require("Biostrings", quiet=TRUE)
+require("Biostrings", quietly=TRUE)
 
 
 #' Compare a protein query sequence to set of protein target sequences
@@ -63,7 +63,7 @@ if(length(c(args$tree, args$focal_species, args$sequences)) != 3){
 #' @param qfile Filename of query protein sequence fasta file (one entry)
 #' @param tfile Filename of target protein sequence fasta file (multiple entries)
 #' @return PairwiseAlignmentsSingleSubject
-get_match <- function(tseq, qseq){
+get_match <- function(qseq, tseq){
   data(BLOSUM80)
   # A PairwiseAlignmentsSingleSubject object
   alm <- pairwiseAlignment(tseq, qseq, substitutionMatrix=BLOSUM80)
@@ -74,11 +74,15 @@ get_match <- function(tseq, qseq){
 
 gene_is_deleted <- function(){ FALSE }
 
-search_interval_has_match <- function(){ FALSE }
+search_interval_has_match <- function(hits){
+  max(score(hits)) > 1
+}
 
 search_interval_contains_missing_section <- function(){ FALSE }
 
 matches_known_gene <- function(){ FALSE }
+
+matches_genomic_orf <- function(){ FALSE }
 
 matches_transcript_orf <- function(){ FALSE }
 
@@ -129,10 +133,13 @@ load_queries <- function(query_CDS_file, query_gene_file, query_gff){ }
 #' @param target search interval (sequence object)
 #' @return desc
 search_sequence_for_hit <- function(query, target){
+
+  stopbound_hits <- get_match(query$aa, target$aa)
+
   if(gene_is_deleted()){
     return('deleted') 
   }
-  if(search_interval_has_match()){
+  if(search_interval_has_match(stopbound_hits)){
     if(matches_known_gene()){
       return('genic_known_gene')
     }
@@ -171,7 +178,7 @@ label_leaf <- function(query, search_intervals){
   # TODO Intergrate labels returned for each search interval
   # --------------------------------------------------------
 
-  label[[1]]
+  labels[[1]]
 }
 
 
@@ -187,10 +194,10 @@ label_leaf <- function(query, search_intervals){
 #' @param tree a phylogenetic tree describing the relationship between the
 #'             focal species and all target species
 #' @return class of the gene
-classify_gene <- function(query, targets, tree) {
+classify_gene <- function(query, target, tree) {
   leaf_labels <- list()
-  for(species in names(targets)){
-    leaf_labels[[species]] <- label_leaf(query, targets[[species]])
+  for(species in names(target)){
+    leaf_labels[[species]] <- label_leaf(query, target[[species]])
   }
 
   # --------------------
@@ -209,7 +216,8 @@ load_query <- function(aafile="sample-data/AT4G25386/thal.faa"){
 
 load_target <- function(aafile="sample-data/AT4G25386/lyr.faa"){
   target = list()
-  target[['Arabidipsis_lyrata']] = list()
+  target[['Arabidopsis_lyrata']] = list()
+  target[['Arabidopsis_lyrata']][[1]] = list()
   target[['Arabidopsis_lyrata']][[1]]$aa <- readAAStringSet(aafile)
   target
 }

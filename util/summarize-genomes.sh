@@ -1,3 +1,6 @@
+#!/usr/bin/env bash
+set -u
+
 usage (){
     echo "Generate summary files for a set of genomes"
     echo "REQUIRED ARGUMENTS"
@@ -24,6 +27,7 @@ done
 
 # input: set of full genomes
 scaflen=$odir/scaffold-lengths.tab
+echo -e "species\tscaffold\tlength" > $scaflen
 ls $idir/*fna | parallel "smof stat -q {} > $odir/{/}.tab "
 for j in $odir/*fna.tab
 do
@@ -31,4 +35,9 @@ do
     s=`basename $s`
     sed "s/^/$s\t/" $j
     rm $j
-done > $scaflen
+done >> $scaflen
+
+nlen=$odir/nstrings.tab
+echo -e "species\tscaffold\tstart\tstop" > $nlen
+ls $idir/*fna | parallel "smof grep -Poq --gff --gff-type {/.} 'N+' {}" |
+    awk 'BEGIN{FS="\t"; OFS="\t"} {print $3, $1, $4, $5}' >> $nlen

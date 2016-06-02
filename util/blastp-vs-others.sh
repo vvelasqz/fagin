@@ -45,7 +45,7 @@ do
         makeblastdb -dbtype prot -in $f -title $n -out $blastdb/$n
     fi
     blastp \
-        -query <(smof head -2 $idir/$focal_species.faa) \
+        -query $idir/$focal_species.faa \
         -db $blastdb/$n \
         -evalue '0.1' \
         -outfmt '6 qseqid sseqid evalue bitscore' \

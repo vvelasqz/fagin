@@ -54,7 +54,17 @@ if(length(c(args$tree, args$focal_species, args$sequences)) != 3){
 # 
 # source("https://bioconductor.org/biocLite.R")
 # biocLite("Biostrings")
-require("Biostrings", quietly=TRUE)
+# biocLite("ggbio")
+suppressPackageStartupMessages(require("Biostrings"))
+suppressPackageStartupMessages(require(ggbio))
+
+# Data tree is a little slow, particularly for node creation. Since
+# phylogenetic trees will be small, this will not be a major issue. But it is
+# better to create one tree once, and reset the values, then to recreate the
+# tree each time with the new values.
+# Here is a tutorial:
+# https://cran.r-project.org/web/packages/data.tree/vignettes/data.tree.html
+suppressPackageStartupMessages(require(data.tree))
 
 
 #' Compare a protein query sequence to set of protein target sequences
@@ -214,11 +224,15 @@ load_query <- function(aafile="sample-data/AT4G25386/thal.faa"){
   query
 }
 
-load_target <- function(aafile="sample-data/AT4G25386/lyr.faa"){
+load_target <- function(
+  aafile="sample-data/AT4G25386/lyr.faa",
+  dnafile="sample-data/AT4G25386/AT4G25386.lyrata.fna")
+{
   target = list()
   target[['Arabidopsis_lyrata']] = list()
   target[['Arabidopsis_lyrata']][[1]] = list()
   target[['Arabidopsis_lyrata']][[1]]$aa <- readAAStringSet(aafile)
+  target[['Arabidopsis_lyrata']][[1]]$dna <- readDNAStringSet(dnafile)
   target
 }
 

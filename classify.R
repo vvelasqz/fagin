@@ -56,7 +56,29 @@ if(length(c(args$tree, args$focal_species, args$sequences)) != 3){
 # biocLite("Biostrings")
 # biocLite("ggbio")
 suppressPackageStartupMessages(require("Biostrings"))
-suppressPackageStartupMessages(require(ggbio))
+suppressPackageStartupMessages(require("genomeIntervals"))
+
+# Potentially useful Bioconductor tools
+# - genomation - a toolkit for annotation and visualization of genomic data
+#   https://www.bioconductor.org/packages/release/bioc/vignettes/genomation/inst/doc/GenomationManual-knitr.html
+# - genomicRanges
+# - genomicFeatures
+# - genomicAlignments - 
+#   https://www.bioconductor.org/packages/release/bioc/vignettes/GenomicAlignments/inst/doc/GenomicAlignmentsIntroduction.pdf
+# - genomeIntervals - 
+#   https://www.bioconductor.org/packages/release/bioc/vignettes/genomeIntervals/inst/doc/genomeIntervals.pdf
+# - ggbio - visualization toolkit for genomics
+#   https://www.bioconductor.org/packages/release/bioc/vignettes/msa/inst/doc/msa.pdf
+# - msa - build and visualize multiple sequence alignments with MUSCLE or CLUSTALW
+#   https://www.bioconductor.org/packages/release/bioc/vignettes/msa/inst/doc/msa.pdf
+# - odseq - identify outlier sequences in MSAs that cause them to have low scores
+#   https://www.bioconductor.org/packages/release/bioc/vignettes/odseq/inst/doc/vignette.pdf
+# - motifStack - build and visualize motif LOGOS from MSAs
+#   https://www.bioconductor.org/packages/release/bioc/vignettes/motifStack/inst/doc/motifStack.pdf
+# Non-bioconductor tools
+# - data.tree
+#   https://cran.r-project.org/web/packages/data.tree/vignettes/data.tree.html
+
 
 # Data tree is a little slow, particularly for node creation. Since
 # phylogenetic trees will be small, this will not be a major issue. But it is

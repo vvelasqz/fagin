@@ -1,16 +1,23 @@
 #!/usr/bin/env bash
 set -u
 
+INPUT=input
+
 print-warning(){
-    echo -e '\e[1;31mERROR: '$1'\e[0m'
+    if [[ -t 2 ]]
+    then
+        echo -e '\e[1;31mERROR: '$1'\e[0m' >&2
+    else
+        echo $1 >&2
+    fi
 }
 
 print-description(){
-echo 'Check the input files and symlink them to a local directory'
+echo 'Check the input files and symlink them to a local directory'  >&2
 }
 
 usage-help(){
-cat << EOF
+cat << EOF >&2
 REQUIRED ARGUMENTS
   -s folder containing synteny maps
   -g folder containing GFF files
@@ -26,7 +33,7 @@ EOF
 }
 
 synteny-map-help(){
-cat << EOF
+cat << EOF >&2
 -s SYNDIR
 
   SYNDIR should be the name of directory containing one synteny map for each
@@ -61,7 +68,7 @@ EOF
 }
 
 gff-help () {
-cat << EOF
+cat << EOF >&2
 -g GFFDIR
 
   GFFDIR is a directory containing a GFF file for each species used in the
@@ -77,7 +84,7 @@ EOF
 }
 
 fna-help () {
-cat << EOF
+cat << EOF >&2
 -n FNADIR
 
   FNADIR is a directory containing a single genome sequence file for each
@@ -86,7 +93,7 @@ EOF
 }
 
 tree-help () {
-cat << EOF
+cat << EOF >&2
 -t TREE
 
   TREE is a newick format file specifying the topology of the species tree. It
@@ -102,7 +109,7 @@ EOF
 }
 
 focal-species-help () {
-cat << EOF
+cat << EOF >&2
 -f FOCAL_SPECIES
 
   FOCAL_SPECIES is the name of the one species whose orphans will be
@@ -115,7 +122,7 @@ EOF
 }
 
 trans-help () {
-cat << EOF
+cat << EOF >&2
 -r TRANSDIR
 
   TRANSDIR is a directory containing GFF files that specify which regions of
@@ -124,29 +131,29 @@ EOF
 }
 
 verbose-help (){
-    echo DESCRIPTION
-    echo ' ' `print-description`
-    echo
+    echo DESCRIPTION  >&2
+    echo ' ' `print-description`  >&2
+    echo >&2
     usage-help
-    echo 
-    echo ARGUMENT DETAILS
+    echo  >&2
+    echo ARGUMENT DETAILS >&2
     synteny-map-help
-    echo
+    echo >&2
     gff-help
-    echo
+    echo >&2
     fna-help
-    echo
+    echo >&2
     tree-help
-    echo
+    echo >&2
     focal-species-help
-    echo
+    echo >&2
     trans-help
     exit 0
 }
 
 usage (){
     print-description
-    echo
+    echo >&2
     usage-help
     exit 0
 }
@@ -162,17 +169,19 @@ while getopts "hHg:n:t:f:s:r:" opt; do
         H)
             verbose-help ;;
         g) 
-            gffdir=$OPTARG ;;
+            gffdir=${OPTARG%/} ;;
         n) 
-            fnadir=$OPTARG ;;
+            fnadir=${OPTARG%/} ;;
         t) 
             tree=$OPTARG ;;
         f) 
             focal_species=$OPTARG ;;
         s) 
-            syndir=$OPTARG ;;
+            syndir=${OPTARG%/} ;;
         r) 
-            transdir=$OPTARG ;;
+            transdir=${OPTARG%/} ;;
+        ?)
+            exit 1 ;;
     esac 
 done
 
@@ -181,48 +190,101 @@ if [[ -z $syndir ]]; then
     synteny-map-help
     exit 1
 fi
-
 if [[ -z $gffdir ]]; then
     print-warning 'missing argument -g GFFDIR'
     gff-help
     exit 1
 fi
-
 if [[ -z $fnadir ]]; then
-    print-warning 'missing argument -f FNADIR'
+    print-warning 'missing argument -n FNADIR'
     fna-help
     exit 1
 fi
-
 if [[ -z $tree ]]; then
     print-warning 'missing argument -t TREE'
     tree-help
     exit 1
 fi
-
 if [[ -z $focal_species ]]; then
     print-warning 'missing argument -f FOCAL_SPECIES'
     focal-species-help
     exit 1
 fi
 
-if [[ -z $transdir ]]; then
-    trans-help
+
+if [[ ! -d $syndir ]]; then
+    print-warning "cannot open synteny directory '$syndir'"
+    exit 1
+fi
+if [[ ! -d $gffdir ]]; then
+    print-warning "cannot open gff directory '$gffdir'"
+    exit 1
+fi
+if [[ ! -d $fnadir ]]; then
+    print-warning "cannot open genome directory '$fnadir'"
+    exit 1
+fi
+if [[ ! -r $tree ]]; then
+    print-warning "cannot open tree file '$tree'"
+    exit 1
+fi
+if [[ ! -z $transdir ]]; then
+    if [[ ! -d $transdir ]]; then
+        print-warning "cannot open transcript directory '$transdir'"
+        exit 1
+    fi
+fi
+
+if [[ ! -r $tree ]]; then
+    print-warning "Missing expected file $tree"
     exit 1
 fi
 
-# species=$(util/get-species-from-tree.R $tree)
-#
-# mkdir -p INPUT
-#
-# for s in $species; do
-#     gff=$species.gff
-#     fna=$species.fna
-#     syn=$focal_species.vs.$species.tab
-# done
+species=$(util/get-species-from-tree.R $tree)
 
-# TODO ensure every file contains these species
-# TODO symlink all these INPUT folder
-# TODO if not $syndir, build synteny maps (taking into account $focal_species
-##gff-version 3
-##annot-version TAIR10
+grep $focal_species <(echo $species) > /dev/null
+if [[ $? != 0 ]]; then
+    print-warning "Focal species $focal_species not in tree"
+    echo "The focal species must be one of the following:"
+    echo $species | tr ' ' '\n'
+    exit 1
+fi
+
+mkdir -p $INPUT/fna
+mkdir -p $INPUT/gff
+mkdir -p $INPUT/syn
+mkdir -p $INPUT/trans
+
+ln -sf $tree $INPUT/tree
+echo $focal_species > $INPUT/focal_species
+
+for s in $species; do
+    gff=$gffdir/$s.gff
+    fna=$fnadir/$s.fna
+    syn=$syndir/$focal_species.vs.$s.tab
+    trans=$transdir/$s.trans.gff
+    if [[ -r $gff ]]; then
+        ln -sf $gff $INPUT/gff/$s.gff
+    else
+        print-warning "Missing expected file $gff" 
+    fi
+
+    if [[ -r $fna   ]]; then
+        ln -sf $fna $INPUT/fna/$s.fna
+    else
+        print-warning "Missing expected file $fna" 
+    fi
+
+    if [[ $focal_species != $s ]]; then
+        if [[ -r $syn   ]]
+        then
+            ln -sf $syn $INPUT/syn/$focal_species.vs.$s.syn 
+        else
+            print-warning "Missing expected file $syn" 
+        fi
+    fi
+
+    if [[ -r $trans ]]; then
+        ln -sf $trans $INPUT/trans/$s.trans.gff
+    fi
+done

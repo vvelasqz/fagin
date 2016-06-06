@@ -58,6 +58,9 @@ if(length(c(args$tree, args$focal_species, args$sequences)) != 3){
 suppressPackageStartupMessages(require("Biostrings"))
 suppressPackageStartupMessages(require(ggbio))
 
+# I actually need this giant package only to read in the NEXUS tree
+suppressPackageStartupMessages(require(ape))
+
 # Data tree is a little slow, particularly for node creation. Since
 # phylogenetic trees will be small, this will not be a major issue. But it is
 # better to create one tree once, and reset the values, then to recreate the
@@ -218,7 +221,14 @@ classify_gene <- function(query, target, tree) {
   orphan_class
 }
 
-load_query <- function(aafile="sample-data/AT4G25386/thal.faa"){
+load_tree <- function(treefile='sample-data/brassicaceae.tree'){
+  read.tree(treefile)
+}
+
+load_query <- function(
+  aafile="sample-data/AT4G25386/thal.faa"
+)
+{
   query = list()
   query$aa <- readAAStringSet(aafile)
   query

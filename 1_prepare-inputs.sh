@@ -6,18 +6,18 @@ INPUT=input
 print-warning(){
     if [[ -t 2 ]]
     then
-        echo -e '\e[1;31mERROR: '$1'\e[0m' >&2
+        echo -e '\e[1;31mERROR: '$1'\e[0m'
     else
-        echo $1 >&2
+        echo $1
     fi
 }
 
 print-description(){
-echo 'Check the input files and symlink them to a local directory'  >&2
+echo 'Check the input files and symlink them to a local directory' 
 }
 
 usage-help(){
-cat << EOF >&2
+cat << EOF
 REQUIRED ARGUMENTS
   -s folder containing synteny maps
   -g folder containing GFF files
@@ -33,7 +33,7 @@ EOF
 }
 
 synteny-map-help(){
-cat << EOF >&2
+cat << EOF
 -s SYNDIR
 
   SYNDIR should be the name of directory containing one synteny map for each
@@ -68,7 +68,7 @@ EOF
 }
 
 gff-help () {
-cat << EOF >&2
+cat << EOF
 -g GFFDIR
 
   GFFDIR is a directory containing a GFF file for each species used in the
@@ -84,7 +84,7 @@ EOF
 }
 
 fna-help () {
-cat << EOF >&2
+cat << EOF
 -n FNADIR
 
   FNADIR is a directory containing a single genome sequence file for each
@@ -93,7 +93,7 @@ EOF
 }
 
 tree-help () {
-cat << EOF >&2
+cat << EOF
 -t TREE
 
   TREE is a newick format file specifying the topology of the species tree. It
@@ -109,7 +109,7 @@ EOF
 }
 
 focal-species-help () {
-cat << EOF >&2
+cat << EOF
 -f FOCAL_SPECIES
 
   FOCAL_SPECIES is the name of the one species whose orphans will be
@@ -122,7 +122,7 @@ EOF
 }
 
 trans-help () {
-cat << EOF >&2
+cat << EOF
 -r TRANSDIR
 
   TRANSDIR is a directory containing GFF files that specify which regions of
@@ -131,29 +131,29 @@ EOF
 }
 
 verbose-help (){
-    echo DESCRIPTION  >&2
-    echo ' ' `print-description`  >&2
-    echo >&2
+    echo DESCRIPTION 
+    echo ' ' `print-description` 
+    echo
     usage-help
-    echo  >&2
-    echo ARGUMENT DETAILS >&2
+    echo 
+    echo ARGUMENT DETAILS
     synteny-map-help
-    echo >&2
+    echo
     gff-help
-    echo >&2
+    echo
     fna-help
-    echo >&2
+    echo
     tree-help
-    echo >&2
+    echo
     focal-species-help
-    echo >&2
+    echo
     trans-help
     exit 0
 }
 
 usage (){
     print-description
-    echo >&2
+    echo
     usage-help
     exit 0
 }

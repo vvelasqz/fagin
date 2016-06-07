@@ -1,0 +1,75 @@
+\documentclass{article}
+\usepackage{amsmath}
+\usepackage{fullpage}
+\usepackage{longtable}
+\title{Genome Report}
+\author{Zebulun Arendsee}
+\begin{document}
+
+<<require, echo=FALSE, message=FALSE>>=
+  require(ggplot2)
+  require(dplyr)
+  require(ape)
+  require(magrittr)
+@
+
+\section{Species phylogeny}
+
+<<view-tree, echo=FALSE>>=
+tree <- read.tree('../input/tree')
+plot(tree)
+@
+
+\section{Genomic statistics}
+
+<<plot-scaffold-lengths, echo=FALSE, message=FALSE>>=
+scaflen <- read.table('../input/stat/scaffold-lengths.tab', header=TRUE)
+scaflen$idx <- as.numeric(scaflen$scaffold)
+ggplot(scaflen) +
+    geom_point(aes(x=idx, y=log(length)), size=0.2) +
+    facet_wrap(~species)
+@
+
+<<plot-nstring, echo=FALSE>>=
+nstring <- read.table('../input/stat/nstrings.tab', header=TRUE)
+nstring$length <- with(nstring, stop - start + 1)
+
+longscaf <- subset(scaflen, length > 1e6) %>% droplevels
+longscaf <- group_by(longscaf, species) %>%
+    mutate(idx=1:length(scaffold)) %>%
+    ungroup %>%
+    rename(scaffold_length = length)
+
+
+d <- merge(longscaf, nstring, by=c('species', 'scaffold'))
+
+ggplot(d) +
+    geom_segment(
+        aes(
+            y=idx,
+            yend=idx,
+            x=start,
+            xend=stop),
+        size=5) +
+    geom_segment(
+        aes(
+            y=idx,
+            yend=idx,
+            x=1,
+            xend=scaffold_length),
+        size=0.2) +
+    geom_text(
+        aes(
+            y=idx + 0.2,
+            x=scaffold_length,
+            label=scaffold),
+        hjust='left',
+        family='sans',
+        fontface='plain',
+        size=2) +
+    facet_wrap(~species, scale='free_y')
+@
+
+\section{Proteomic statistics}
+
+\end{document}

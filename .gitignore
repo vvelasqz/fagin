@@ -17,3 +17,5 @@ figure/
 *.log
 *.pdf
 *.tex
+*.fdb_latexmk
+*.fls

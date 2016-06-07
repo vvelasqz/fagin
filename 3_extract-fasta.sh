@@ -12,6 +12,7 @@ Extract
 REQUIRES:
     bedtools v2.23.0
     emboss transseq
+    smof
 EOF
     exit 0
 }
@@ -23,7 +24,7 @@ while getopts "h" opt; do
     esac 
 done
 
-species=$(util/get-species-from-tree.R $tree)
+species=$(util/get-species-from-tree.R input/tree)
 
 mkdir -p input/faa
 for s in $species
@@ -38,10 +39,11 @@ do
             -bed /dev/stdin      \
             -fo /dev/stdout      \
             -name |
-        awk '$1 ~ /^>/ && $1 in seqids { next }; {seqids[$1]++; print}' |
-        smof clean -x > x
-    cat <(smof grep '+' x) <(smof grep '-' x | smof reverse -c) | 
-        transeq -filter > input/faa/$s.faa
+        awk '$1 ~ /^>/ && $1 in seqids { next }; {seqids[$1]++; print}' > x
+    cat <(smof grep ' +' x) <(smof grep ' -' x | revseq -filter) | 
+        transeq -filter |
+        sed '/>/s/_[0-9]\+//' |
+        smof clean -sux > input/faa/$s.faa
     rm x
 done
 

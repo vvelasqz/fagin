@@ -1,6 +1,7 @@
 input/
 output/
 data/
+zzz/
 *.tab
 *.gff
 *.gff3

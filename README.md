@@ -2,7 +2,7 @@
 
 # Input
 
- For information on inputs, call `1\_prepare-inputs.sh -H`
+ For information on inputs, call `1_prepare-inputs.sh -H`
 
  In short, the following is required
 

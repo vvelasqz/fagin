@@ -40,6 +40,10 @@ make-header () {
     echo -e "$(tr ' ' '\t' <<< $@)"
 }
 
+scaflen=$odir/scaffold-lengths.tab
+nstring=$odir/nstrings.tab
+nuccomp=$odir/kb-composition.tab
+
 # Find lengths of all scaffolds in the genome file (for a fully assembled
 # genome, scaffolds will correspond to chromosomes)
 #
@@ -48,8 +52,7 @@ make-header () {
 # 2. scaffold name
 # 3. scaffold length 
 write-scaffold-lengths () {
-    scaflen=$odir/scaffold-lengths.tab
-    make-header 'species scaffold length' > $scaflen
+    make-header 'species scaffold length'
     ls $idir/*fna | parallel "smof stat -q {} > $odir/{/}.tab "
     for j in $odir/*fna.tab
     do
@@ -57,7 +60,7 @@ write-scaffold-lengths () {
         s=${s##*/}
         sed "s/^/$s\t/" $j
         rm $j
-    done >> $scaflen
+    done
 }
 
 # Find positions of runs of unknown bases
@@ -68,11 +71,36 @@ write-scaffold-lengths () {
 # 3. n-string start
 # 4. n-string stop
 write-nstrings () {
-    nlen=$odir/nstrings.tab
-    make-header 'species scaffold start stop' > $nlen
+    make-header 'species scaffold start stop'
     ls $idir/*fna | parallel "smof grep -Poq --gff --gff-type {/.} 'N+' {}" |
-        awk 'BEGIN{FS="\t"; OFS="\t"} {print $3, $1, $4, $5}' >> $nlen
+        awk 'BEGIN{FS="\t"; OFS="\t"} {print $3, $1, $4, $5}'
 }
 
-write-scaffold-lengths
-write-nstrings
+write-nucleotide-composition () {
+    [[ -r $scaflen ]] || write-scaffold-lengths
+    for j in $idir/*.fna
+    do
+        s=${j%.fna}
+        s=${s##*/}
+        bedtools random \
+            -l 1000 \
+            -n 10000 \
+            -seed 123456 \
+            -g <(awk -v s=$s -v OFS="\t" '$1 == s {print $2,$3}' $scaflen) |
+        bedtools getfasta \
+            -s \
+            -fi $j \
+            -bed /dev/stdin \
+            -fo /dev/stdout |
+        sed -r "s/>([^:]+):([0-9]+)-[0-9]+\((.)\)/>$s:\1:\2:\3/"
+    done |
+        smof clean -xru -t n |
+        smof stat -qc |
+        tr ':' "\t" |
+        # Expand header to accomadate the added columns
+        sed "1s/seqid/species\tscaffold\tstart\tstrand/"
+}
+
+write-scaffold-lengths > $scaflen
+write-nstrings > $nstring
+write-nucleotide-composition > $nuccomp

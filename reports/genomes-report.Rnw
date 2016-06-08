@@ -70,6 +70,17 @@ ggplot(d) +
     facet_wrap(~species, scale='free_y')
 @
 
+<<plot-gc, echo=FALSE>>=
+kbcomp <- read.table('../input/stat/kb-composition.tab', header=TRUE)
+kbcomp <- subset(kbcomp, N == 0)
+kbcomp$GC <- with(kbcomp, (C + G) / (A + C + G + T))
+ggplot(kbcomp) +
+    geom_boxplot(aes(x=species, y=GC), width=0.2) +
+    geom_violin(aes(x=species, y=GC), alpha=0.3) +
+    ggtitle('GC content of 10000 random 1kb intervals') +
+    ylab('G+C Proportion')
+@
+
 \section{Proteomic statistics}
 
 \end{document}

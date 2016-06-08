@@ -1,7 +1,7 @@
 input/
 output/
 data/
-zzz/
+db/
 *.tab
 *.gff
 *.gff3
@@ -9,6 +9,9 @@ zzz/
 *.faa
 *.fna
 *.fasta
+
+# My personal temporary files
+z*
 
 # latex temporary files and folders
 cache/

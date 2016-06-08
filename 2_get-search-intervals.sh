@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+set -u
 
 usage (){
 cat << EOF >&2
@@ -10,9 +11,10 @@ EOF
     exit 0
 }
 
-# print help with no arguments
-[[ $# -eq 0 ]] && usage
-
+focal_species=$(cat input/focal_species)
+species=$(util/get-species-from-tree.R input/tree)
+syndir=input/syn
+gffdir=input/gff
 while getopts "h" opt; do
     case $opt in
         h)
@@ -20,4 +22,16 @@ while getopts "h" opt; do
     esac 
 done
 
-# TODO - for each syntenic pair, run through Synder
+mapdir=input/maps
+mkdir -p input/maps/db
+
+for s in $species
+do
+    if [[ $s != $focal_species ]]
+    then
+        db=$mapdir/db/${focal_species}_$s.txt
+        map=$mapdir/$focal_species.vs.$s.map.tab
+        synder -d $syndir/$focal_species.vs.$s.syn $focal_species $s $mapdir/db
+        synder -i $gffdir/$focal_species.gff -s $db -c contig > $map
+    fi
+done

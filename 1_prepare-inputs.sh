@@ -63,7 +63,7 @@ cat << EOF
   A synteny map like this can be created using a whole genome synteny program,
   such as Satsuma (highly recommended). Building a single synteny map requires
   hundreds of CPU hours, so it is best done on a cluster. An example PBS script
-  is provided, see util/satsuma.pbs.
+  is provided, see src/satsuma.pbs.
 EOF
 }
 
@@ -240,7 +240,7 @@ if [[ ! -r $tree ]]; then
     exit 1
 fi
 
-species=$(util/get-species-from-tree.R $tree)
+species=$(src/get-species-from-tree.R $tree)
 
 grep $focal_species <(echo $species) > /dev/null
 if [[ $? != 0 ]]; then

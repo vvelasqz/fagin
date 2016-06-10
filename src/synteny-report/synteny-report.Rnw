@@ -1,0 +1,96 @@
+\documentclass{article}
+\usepackage{graphicx}
+\usepackage{fullpage}
+\title{Synteny Report}
+\begin{document}
+
+\maketitle
+
+\section{Data input}
+% ============================================================================
+% Import libraries
+<<echo=FALSE, message=FALSE>>=
+require(ggplot2)
+require(intervals)
+require(plyr)
+require(magrittr)
+require(xtable)
+source('R/findMissingGenes.R')
+source('R/testSyntenicGaps.R')
+source('R/build_gene2int.R')
+source('R/loadData.R')
+opts_chunk$set(echo=FALSE)
+
+# REMOVE THIS IN PRODUCTION CODE
+args <- list(
+    query_gff = '~/src/git/cadmium/input/gff/Arabidopsis_thaliana.gff',
+    synteny   = '~/src/git/cadmium/input/syn/Arabidopsis_thaliana.vs.Arabidopsis_lyrata.syn',
+    nstring   = '~/src/git/cadmium/input/stat/nstrings.tab'
+)
+@
+ 
+\section{Summaries of input data}
+% ============================================================================
+% Load all input data
+<<cache=TRUE>>=
+syn <- LoadSyntenyMap(args$synteny)
+gff <- LoadQueryGff(args$query_gff)
+nstring <- LoadNString(args$nstring)
+@
+
+
+\subsection{Syntenic ouput of SatsumaSynteny}
+<<results='asis'>>=
+head(syn) %>% xtable
+ddply(syn, 'qchr', summarize, N.synteny.blocks=length(qchr)) %>% xtable
+@
+
+
+\subsection{Gene feature format file for focal species}
+<<results='asis'>>=
+head(gff) %>% xtable
+ddply(gff, 'chr', summarize, mRNAs=length(chr)) %>% xtable
+@
+
+
+\subsection{N-string file}
+<<results='asis'>>=
+head(nstring) %>% xtable
+@
+
+\section{Results}
+% ============================================================================
+% Build main syntenic data.frame
+<<cache=TRUE, message=FALSE>>=
+# TODO continue from here
+if(file.exists('gene2int_map.tab')){
+    gint <- read.delim('gene2int_map.tab')
+} else {
+    gint <- Build_Gene2Int(syn, gff)
+}
+@
+
+
+\subsection{Syntenic gaps}
+% ============================================================================
+\begin{figure}[!hbpt]
+<<fig.width=8, fig.height=8>>=
+TestSyntenyGaps(syn, nstring)
+@
+\caption{In black: missing regions on the target between syntenic blocks. In
+    red: strings of N's, bases that have not been correctly sequenced}
+\end{figure}
+
+% ============================================================================
+<<>>=
+write.table(
+    gint,
+    file='gene2int_map.tab',
+    sep="\t",
+    quote=FALSE,
+    col.names=TRUE,
+    row.names=FALSE
+)
+@
+
+\end{document}

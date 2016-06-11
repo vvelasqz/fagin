@@ -10,6 +10,10 @@ db/
 *.fna
 *.fasta
 
+**/.ropeproject/
+
+# systemic specific scripts
+util/prep-araport11.sh
 util/prepare-data.sh
 
 # My personal temporary files

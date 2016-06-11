@@ -24,7 +24,7 @@ while getopts "h" opt; do
     esac 
 done
 
-species=$(util/get-species-from-tree.R input/tree)
+species=$(src/get-species-from-tree.R input/tree)
 
 mkdir -p input/faa
 for s in $species

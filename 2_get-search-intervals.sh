@@ -12,7 +12,7 @@ EOF
 }
 
 focal_species=$(cat input/focal_species)
-species=$(util/get-species-from-tree.R input/tree)
+species=$(src/get-species-from-tree.R input/tree)
 syndir=input/syn
 gffdir=input/gff
 while getopts "h" opt; do

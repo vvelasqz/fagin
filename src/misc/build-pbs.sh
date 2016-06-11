@@ -2,10 +2,11 @@
 
 # -------------------------------------------------------------------
 # Prepare a PBS file for submission to a cluster
+#
 # Example:
-# $ bash satsuma.pbs melanogaster simulans
-# Where the folder data/ must contain the genomic fasta files melanogaster.fna and
-# melanogaster.fna
+# $ bash build-pbs.sh melanogaster simulans
+# Where the genomic fasta files data/melanogaster.fna and data/simulans.fna
+# must exist.
 # -------------------------------------------------------------------
 
 set -u

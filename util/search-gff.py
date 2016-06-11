@@ -64,13 +64,25 @@ if __name__ == '__main__':
             continue
         terms = line.strip().split('\t')
         chrid = terms[0]
-        feat = terms[2]
-        g1 = max(0, int(terms[3]) - args.left_flank)
-        g2 = int(terms[4]) + args.right_flank
+        feat  = terms[2]
+        start = int(terms[3])
+        stop  = int(terms[4])
         seqid = terms[8]
+        g1 = max(0, start - args.left_flank)
+        g2 = stop + args.right_flank
         if args.feature and not args.feature == feat:
             continue
-        print('>>>|%s|%s|%s|%s|%s' % (chrid, feat, str(g1), str(g2), seqid))
+        entries = []
         for s1, s2, synline in syn[chrid]:
             if g1 <= s2 and g2 >= s1:
-                print("(%s,%s) " % (s1 - g1 + args.left_flank, s2 - g1 - args.right_flank) + synline)
+                rel_lo = s1 - start
+                rel_hi = s2 - start
+                if rel_hi > 0 and rel_lo < (stop - start):
+                    overlaps = '$'
+                else:
+                    overlaps = ''
+                out = "(%s,%s)%s " % (rel_lo, rel_hi, overlaps) + synline
+                entries.append((rel_lo, out))
+        print('>>>|%s|%s|%s|%s|%s' % (chrid, feat, str(g1), str(g2), seqid))
+        for pos, line in sorted(entries):
+            print(line)

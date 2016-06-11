@@ -10,6 +10,8 @@ db/
 *.fna
 *.fasta
 
+util/prepare-data.sh
+
 # My personal temporary files
 z*
 

@@ -46,5 +46,3 @@ do
         smof clean -sux > input/faa/$s.faa
     rm x
 done
-
-# TODO - get nucleotide sequences for all search intervals

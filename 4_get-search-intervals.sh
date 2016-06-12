@@ -5,6 +5,10 @@ usage (){
 cat << EOF >&2
 Run focal species and target synteny maps through Synder to get search intervals
 
+Output is written into the folder input/maps
+
+Files are formated as: [query species].vs.[target species].map.tab
+
 REQUIRES:
     synder
 EOF
@@ -31,7 +35,12 @@ do
     then
         db=$mapdir/db/${focal_species}_$s.txt
         map=$mapdir/$focal_species.vs.$s.map.tab
-        synder -d $syndir/$focal_species.vs.$s.syn $focal_species $s $mapdir/db
+        if [[ ! -r $db ]]
+        then
+            # Build synder database
+            synder -d $syndir/$focal_species.vs.$s.syn $focal_species $s $mapdir/db
+        fi
+        # # Find target-side search intervals for each entry in the input query gff
         # synder -i $gffdir/$focal_species.gff -s $db -c contig > $map
     fi
 done

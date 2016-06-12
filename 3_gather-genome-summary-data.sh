@@ -5,6 +5,15 @@ usage (){
 cat << EOF
 Generate summary files for a set of genomes
 
+Creates the following files in the input/stat folder
+
+1. scaffold-lengths.tab - records the length of each assembled scaffold
+   [ species | scaffold | length ]
+2. nstrings.tab - records positions of strings of N in assembly
+   [ species | scaffold | start | stop ]
+3. kb-composition.tab - records base composition of 10000 random 1000-base samples
+   [ species | scaffold | strand | A | C | G | T | N ]  # order may vary
+
 OPTIONAL ARGUMENTS
   -i Input directory for genome sequences (default: input/fna)
   -o Output directory (default: input/stat)

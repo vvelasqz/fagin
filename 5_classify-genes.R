@@ -37,6 +37,11 @@ parser$add_argument(
   nargs='+' 
 )
 
+parser$add_argument(
+  '-i' , '--search-interval',
+  help='Search interval file (output of Synder)'
+)
+
 args <- parser$parse_args()
 
 if(args$version){
@@ -92,6 +97,19 @@ suppressPackageStartupMessages(require(ape))
 suppressPackageStartupMessages(require(data.tree))
 
 
+find.scrambled <- function(si){
+  require(dplyr)
+  require(magrittr)
+  group_by(si, gene) %>%
+    mutate(n.si=length(gene)) %>%
+    mutate(scrambled=any(flag != 0)) %>%
+    ungroup %>%
+    subset(scrambled) %$%
+    gene %>%
+    as.character %>%
+    unique
+}
+
 #' Compare a protein query sequence to set of protein target sequences
 #'
 #' @export
@@ -122,36 +140,6 @@ matches_genomic_orf <- function(){ FALSE }
 matches_transcript_orf <- function(){ FALSE }
 
 matches_possible_model <- function(){ FALSE }
-
-#' Load a multi-sequence fasta file
-#'
-#' Within the context of Cadmium, this function will be used to load the search
-#' intervals for a single query against a set of target species. There may be
-#' multiple intervals per target species.
-#' 
-#' @param filename fasta file name
-#' @return TODO - what kind of object is this?
-load_fasta <- function(filename){ }
-
-#' Load all data needed for each target species
-#'
-#' The required inputs are
-#' 1. A table of DNA search intervals containing
-#'    1. query name
-#'    2. query chromosome
-#'    3. query start
-#'    4. query stop
-#'    5. target chromosome
-#'    6. target start
-#'    7. target stop
-#'    8. target DNA sequence
-#' 2. GFF file for target which includes all target gene models and transcripts
-load_targets <- function(target_table_file, gff_file){ }
-
-
-#' Load all query data
-load_queries <- function(query_CDS_file, query_gene_file, query_gff){ }
-
 
 #' Classify matches of the query to a single target sequence
 #'
@@ -238,7 +226,7 @@ classify_gene <- function(query, target, tree) {
   # --------------------
   # TODO Reconcile leafs
   # --------------------
-  
+
   orphan_class <- leaf_labels[[1]]
   orphan_class
 }
@@ -247,8 +235,18 @@ load_tree <- function(treefile='sample-data/brassicaceae.tree'){
   read.tree(treefile)
 }
 
+#' Load all data required for classification on the query (focal species) side
+#'
+#' This data includes:
+#' 1. The protein sequence for each gene
+#' 2. The focal species GFF
+#'
+#' @param aafile Protein sequence for each gene
+#' @param gfffile Full species GFF file
+#' @return list of query data
 load_query <- function(
-  aafile="sample-data/AT4G25386/thal.faa"
+  aafile="input/faa/Arabidopsis_thaliana.faa"
+  gfffile="input/gff/Arabidopsis_thaliana.gff"
 )
 {
   query = list()
@@ -256,15 +254,34 @@ load_query <- function(
   query
 }
 
+
+#' Load all data required for processing a single target species
+#'
+#' Input data includes:
+#' 1. amino acid sequences
+#' 2. GFF file for target which includes all target gene models and transcripts
+#' 3. search interval file
+#' 4. nucleotide sequence filename (but won't load full data)
+#'
+#' @param aafile
+#' @return gfffile
+#' @return sifile search interval file
+#' @return fnafile
 load_target <- function(
-  aafile="sample-data/AT4G25386/lyr.faa",
-  dnafile="sample-data/AT4G25386/AT4G25386.lyrata.fna")
+  aafile="input/faa/Arabidopsis_lyrata.faa",
+  dnafile="input/fna/Arabidopsis_lyrata.fna",
+  sifile="input/si/Arabidopsis_thaliana.vs.Arabidopsis_lyrata.si.txt",
+  gfffile="input/gff/Arabidopsis_lyrata.gff"
+)
 {
   target = list()
-  target[['Arabidopsis_lyrata']] = list()
-  target[['Arabidopsis_lyrata']][[1]] = list()
-  target[['Arabidopsis_lyrata']][[1]]$aa <- readAAStringSet(aafile)
-  target[['Arabidopsis_lyrata']][[1]]$dna <- readDNAStringSet(dnafile)
+  target$aa <- readAAStringSet(aafile)
+  target$dna.file <- dnafile
+  target$si <- read.table(sifile)
+  names(target$si) <- c('species', 'gene', 'tchrid', 'start', 'stop', 'flag')
+  target$gff <- read.table(gfffile, sep="\t")
+  stopifnot(ncol(target$gff) == 9)
+  names(target$gff) <- c('chrid', 'source', 'feature', 'start', 'end', 'score', 'strand', 'phase', 'seqid')
   target
 }
 
@@ -275,5 +292,3 @@ classify_genes <- function(queries, targets, tree) {
   target = load_target()
   classify_gene(query, target, NA) 
 }
-
-classify_genes(NA, NA, NA)

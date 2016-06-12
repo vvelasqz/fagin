@@ -32,6 +32,6 @@ do
         db=$mapdir/db/${focal_species}_$s.txt
         map=$mapdir/$focal_species.vs.$s.map.tab
         synder -d $syndir/$focal_species.vs.$s.syn $focal_species $s $mapdir/db
-        synder -i $gffdir/$focal_species.gff -s $db -c contig > $map
+        # synder -i $gffdir/$focal_species.gff -s $db -c contig > $map
     fi
 done

@@ -1,6 +1,6 @@
-TARGET=genomes-report
+TARGET=report
 
-${TARGET}.pdf: ${TARGET}.Rnw
+${TARGET}.pdf: ${TARGET}.Rnw sections/*.Rnw
 	Rscript -e "library(knitr); knit('${TARGET}.Rnw')"
 	latexmk -pdf ${TARGET}.tex
 

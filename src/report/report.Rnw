@@ -1,0 +1,50 @@
+\documentclass{article}
+\usepackage{graphicx}
+\usepackage{fullpage}
+\usepackage{wrapfig}
+\usepackage{color}
+\usepackage{hyperref}
+\hypersetup{
+    colorlinks,
+    citecolor=blue,
+    filecolor=blue,
+    linkcolor=blue,
+    urlcolor=blue
+}
+
+% Prevent floats from crossing section or subsection boundaries
+\usepackage[section]{placeins}
+% Credit for this voodoo goes to Heiko Oberdiek
+\makeatletter
+\AtBeginDocument{%
+  \expandafter\renewcommand\expandafter\subsection\expandafter{%
+    \expandafter\@fb@secFB\subsection
+  }%
+}
+\makeatother
+
+\title{Report}
+\begin{document}
+
+\maketitle
+
+\section{Introduction}
+
+\input{sections/introduction}
+
+\section{Input data}
+
+<<input, child='sections/input.Rnw'>>=
+@
+
+\section{Syntenic results}
+
+<<synteny, child='sections/synteny.Rnw'>>=
+@
+
+\section{Classification results}
+
+<<classification, child='sections/classification.Rnw'>>=
+@
+
+\end{document}

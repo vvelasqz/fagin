@@ -1,12 +1,4 @@
-\documentclass{article}
-\usepackage{graphicx}
-\usepackage{fullpage}
-\title{Synteny Report}
-\begin{document}
-
-\maketitle
-
-\section{Data input}
+\subsection{Data input}
 % ============================================================================
 % Import libraries
 <<echo=FALSE, message=FALSE>>=
@@ -29,20 +21,13 @@ args <- list(
 )
 @
  
-\section{Summaries of input data}
+\subsection{Summaries of input data}
 % ============================================================================
 % Load all input data
 <<cache=TRUE>>=
 syn <- LoadSyntenyMap(args$synteny)
 gff <- LoadQueryGff(args$query_gff)
 nstring <- LoadNString(args$nstring)
-@
-
-
-\subsection{Syntenic ouput of SatsumaSynteny}
-<<results='asis'>>=
-head(syn) %>% xtable
-ddply(syn, 'qchr', summarize, N.synteny.blocks=length(qchr)) %>% xtable
 @
 
 
@@ -58,7 +43,12 @@ ddply(gff, 'chr', summarize, mRNAs=length(chr)) %>% xtable
 head(nstring) %>% xtable
 @
 
-\section{Results}
+\subsection{Syntenic ouput of SatsumaSynteny}
+<<results='asis'>>=
+head(syn) %>% xtable
+ddply(syn, 'qchr', summarize, N.synteny.blocks=length(qchr)) %>% xtable
+@
+
 % ============================================================================
 % Build main syntenic data.frame
 <<cache=TRUE, message=FALSE>>=
@@ -71,7 +61,6 @@ if(file.exists('gene2int_map.tab')){
 @
 
 
-\subsection{Syntenic gaps}
 % ============================================================================
 \begin{figure}[!hbpt]
 <<fig.width=8, fig.height=8>>=

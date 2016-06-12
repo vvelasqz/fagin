@@ -1,14 +1,3 @@
-\documentclass{article}
-\usepackage{amsmath}
-\usepackage{fullpage}
-\usepackage{longtable}
-\usepackage[section]{placeins}
-\title{Genome Report}
-\author{Zebulun Arendsee}
-\begin{document}
-
-\maketitle
-
 <<require, echo=FALSE, message=FALSE>>=
   require(ggplot2)
   require(dplyr)
@@ -17,19 +6,28 @@
   require(scales)
 @
 
-\section{Species phylogeny}
+<<echo=FALSE>>=
+args <- list(
+    scaffile='~/src/git/cadmium/input/stat/scaffold-lengths.tab',
+    nstringfile='~/src/git/cadmium/input/stat/nstrings.tab',
+    kbcompfile='~/src/git/cadmium/input/stat/kb-composition.tab',
+    treefile='~/src/git/cadmium/input/tree'
+)
+@
+
+\subsection{Species phylogeny}
 
 <<view-tree, echo=FALSE>>=
-tree <- read.tree('../input/tree')
+tree <- read.tree(args$treefile)
 plot(tree)
 @
 
-\section{Genomic statistics}
+\subsection{Genomic statistics}
 
 \begin{figure}
     \center
 <<plot-scaffold-lengths, echo=FALSE, message=FALSE, cache=TRUE>>=
-scaflen <- read.table('../input/stat/scaffold-lengths.tab', header=TRUE)
+scaflen <- read.table(args$scaffile, header=TRUE)
 scaflen <- group_by(scaflen, species) %>%
     arrange(-length) %>%
     mutate(idx=1:length(scaffold)) %>%
@@ -50,7 +48,7 @@ ggplot(scaflen) +
     \center
 <<echo=FALSE, cache=TRUE, fig.width=7, fig.height=6>>=
 scaflen$chrid <- factor(scaflen$idx)
-scaflen_chr <- subset(scaflen, length > 10^7)
+scaflen_chr <- subset(scaflen, length > 10^7) %>% droplevels
 ggplot(scaflen_chr) +
     geom_path(aes(x=chrid, y=length, group=species)) +
     geom_point(aes(x=chrid, y=length, color=species), size=4) +
@@ -64,32 +62,31 @@ ggplot(scaflen_chr) +
     \caption{Lengths of scaffolds greater than 10 Mb. Sorted by size.}
 \end{figure}
 
-<<plot-nstring, echo=FALSE, cache=TRUE>>=
-nstring <- read.table('../input/stat/nstrings.tab', header=TRUE)
+<<plot-nstring, echo=TRUE, cache=TRUE>>=
+nstring <- read.table(args$nstringfile, header=TRUE)
 nstring$length <- with(nstring, stop - start + 1)
 
-d <- rename(scaflen_chr, scaffold_length = length) %>%
+d <- dplyr::rename(scaflen_chr, scaffold_length = length) %>%
      merge(nstring, by=c('species', 'scaffold'))
-d$chrid <- as.numeric(d$chrid)
 
 nstring.g <- ggplot(d) +
     geom_segment(
         aes(
-            y=chrid,
-            yend=chrid,
+            y=idx,
+            yend=idx,
             x=start,
             xend=stop),
         size=5) +
     geom_segment(
         aes(
-            y=chrid,
-            yend=chrid,
+            y=idx,
+            yend=idx,
             x=1,
             xend=scaffold_length),
         size=0.2) +
     geom_text(
         aes(
-            y=chrid + 0.2,
+            y=idx + 0.2,
             x=scaffold_length,
             label=scaffold),
         hjust='left',
@@ -111,7 +108,7 @@ nstring.g
 \end{figure}
 
 <<plot-gc, echo=FALSE, cache=TRUE>>=
-kbcomp <- read.table('../input/stat/kb-composition.tab', header=TRUE)
+kbcomp <- read.table(args$kbcompfile, header=TRUE)
 kbcomp <- subset(kbcomp, N == 0)
 kbcomp$GC <- with(kbcomp, (C + G) / (A + C + G + T))
 kbcomp.g <- ggplot(kbcomp) +
@@ -128,6 +125,6 @@ kbcomp.g
 \end{figure}
 
 
-\section{Proteomic statistics}
+\subsection{Proteomic statistics}
 
 \end{document}

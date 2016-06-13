@@ -27,7 +27,7 @@ get-clean-gff | grep -f <(get-orphans) > input/orphans.gff
 
 mkdir -p input/si
 
-for s in Arabidopsis_lyrata Brassica_rapa
+for s in Arabidopsis_lyrata
 do
     out=input/si/Arabidopsis_thaliana.vs.$s.si.txt
     gff=input/orphans.gff

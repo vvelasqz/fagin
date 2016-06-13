@@ -9,7 +9,7 @@
 #' @param features The features from the GFF that should be retained (e.g. mRNA, gene, CDS)
 #' @return A data.frame with 9 columns
 #' 
-loadGFF <- function(gff.filename, features){
+LoadGFF <- function(gff.filename, features){
     g <- read.delim(gff.filename, comment.char="#", header=FALSE, stringsAsFactors=FALSE)
 
     stopifnot(ncol(g) == 9)
@@ -81,7 +81,7 @@ LoadNString <- function(nstring.file){
     return(g)
 }
 
-loadSearchIntervals <- function(sifile){
+LoadSearchIntervals <- function(sifile){
   require(magrittr)
   si <- read.table(sifile)
 
@@ -100,7 +100,7 @@ loadSearchIntervals <- function(sifile){
 #' 
 #' @param treefile A newick format tree filename
 #' @return A tree of class 'phylo'
-loadTree <- function(treefile='~/src/git/cadmium/input/tree'){
+LoadTree <- function(treefile='~/src/git/cadmium/input/tree'){
   require(ape)
   read.tree(treefile)
 }
@@ -110,7 +110,7 @@ loadTree <- function(treefile='~/src/git/cadmium/input/tree'){
 #' @param filename FASTA filename
 #' @param isAA TRUE for protein sequences, FALSE for DNA sequences
 #' @return desc
-loadFASTA <- function(filename, isAA=TRUE){
+LoadFASTA <- function(filename, isAA=TRUE){
   require(Biostrings)
   if(isAA){
     readAAStringSet(filename)
@@ -130,15 +130,15 @@ loadFASTA <- function(filename, isAA=TRUE){
 #' @param aafile Protein sequence for each gene
 #' @param gfffile Full species GFF file
 #' @return list of query data
-load_query <- function(
+LoadQuery <- function(
   aafile="~/src/git/cadmium/input/faa/Arabidopsis_thaliana.faa",
   gfffile="~/src/git/cadmium/input/gff/Arabidopsis_thaliana.gff"
 )
 {
   require(Biostrings)
   list(
-    aa  = loadFASTA(aafile),
-    gff = loadGFF(gfffile)
+    aa  = LoadFASTA(aafile),
+    gff = LoadGFF(gfffile)
   )
 }
 
@@ -155,7 +155,7 @@ load_query <- function(
 #' @return gfffile
 #' @return sifile search interval file
 #' @return fnafile
-load_target <- function(
+LoadTarget <- function(
   aafile="~/src/git/cadmium/input/faa/Arabidopsis_lyrata.faa",
   dnafile="~/src/git/cadmium/input/fna/Arabidopsis_lyrata.fna",
   sifile="~/src/git/cadmium/input/si/Arabidopsis_thaliana.vs.Arabidopsis_lyrata.si.txt",
@@ -163,9 +163,9 @@ load_target <- function(
 )
 {
   list(
-    aa       = loadFASTA(aafile),
+    aa       = LoadFASTA(aafile),
     dna.file = dnafile,
-    si       = loadSearchIntervals(sifile),
-    gff      = loadGFF(gfffile)
+    si       = LoadSearchIntervals(sifile),
+    gff      = LoadGFF(gfffile)
   )
 }

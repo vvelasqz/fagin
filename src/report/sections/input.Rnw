@@ -31,7 +31,6 @@ scaflen <- read.table(args$scaffile, header=TRUE)
 scaflen <- group_by(scaflen, species) %>%
     arrange(-length) %>%
     mutate(idx=1:length(scaffold)) %>%
-    ungroup %>%
     droplevels
 ggplot(scaflen) +
     geom_point(aes(x=idx, y=length), size=0.2) +
@@ -126,5 +125,3 @@ kbcomp.g
 
 
 \subsection{Proteomic statistics}
-
-\end{document}

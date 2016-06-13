@@ -1,1 +1,29 @@
-Some information on classification of the genes
+<<cache=TRUE, message=FALSE>>=
+source('~/src/git/cadmium/src/report/R/classification.R')
+source('~/src/git/cadmium/src/report/R/loadData.R')
+query <- LoadQuery()
+target <- LoadTarget()
+@
+
+<<>>=
+genelist <- target$si$gene %>% unique
+
+tgenes <- target$gff$qseqid %>% unique
+
+stopifnot(genelist %in% names(query$aa))
+stopifnot(tgenes %in% names(target$aa))
+
+query$aa <- query$aa[genelist]
+
+origins <- data.frame(
+    class=rep(NA, length(genelist))
+)
+row.names(origins) <- genelist
+
+origins[find.scrambled(target$si), 'class'] <- 'scrambled'
+
+nscrambled <- sum(origins$class == 'scrambled')
+@
+
+Of the \Sexpr{length(genelist)} input genes, \Sexpr{nscrambled} are considered
+to be syntenically scrambled.

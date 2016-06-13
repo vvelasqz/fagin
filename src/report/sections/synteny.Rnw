@@ -7,13 +7,13 @@ require(intervals)
 require(plyr)
 require(magrittr)
 require(xtable)
-source('R/findMissingGenes.R')
-source('R/testSyntenicGaps.R')
-source('R/build_gene2int.R')
-source('R/loadData.R')
+source('~/src/git/cadmium/src/report/R/findMissingGenes.R')
+source('~/src/git/cadmium/src/report/R/testSyntenicGaps.R')
+source('~/src/git/cadmium/src/report/R/build_gene2int.R')
+source('~/src/git/cadmium/src/report/R/loadData.R')
 opts_chunk$set(echo=FALSE)
 
-# REMOVE THIS IN PRODUCTION CODE
+# TODO REMOVE THIS IN PRODUCTION CODE
 args <- list(
     query_gff = '~/src/git/cadmium/input/gff/Arabidopsis_thaliana.gff',
     synteny   = '~/src/git/cadmium/input/syn/Arabidopsis_thaliana.vs.Arabidopsis_lyrata.syn',
@@ -26,7 +26,7 @@ args <- list(
 % Load all input data
 <<cache=TRUE>>=
 syn <- LoadSyntenyMap(args$synteny)
-gff <- LoadQueryGff(args$query_gff)
+gff <- LoadGFF(args$query_gff, features='mRNA')
 nstring <- LoadNString(args$nstring)
 @
 
@@ -34,7 +34,7 @@ nstring <- LoadNString(args$nstring)
 \subsection{Gene feature format file for focal species}
 <<results='asis'>>=
 head(gff) %>% xtable
-ddply(gff, 'chr', summarize, mRNAs=length(chr)) %>% xtable
+plyr::ddply(gff, 'chr', summarize, mRNAs=length(chr)) %>% xtable
 @
 
 
@@ -46,40 +46,37 @@ head(nstring) %>% xtable
 \subsection{Syntenic ouput of SatsumaSynteny}
 <<results='asis'>>=
 head(syn) %>% xtable
-ddply(syn, 'qchr', summarize, N.synteny.blocks=length(qchr)) %>% xtable
+plyr::ddply(syn, 'qchr', summarize, N.synteny.blocks=length(qchr)) %>% xtable
 @
-
-% ============================================================================
-% Build main syntenic data.frame
-<<cache=TRUE, message=FALSE>>=
-# TODO continue from here
-if(file.exists('gene2int_map.tab')){
-    gint <- read.delim('gene2int_map.tab')
-} else {
-    gint <- Build_Gene2Int(syn, gff)
-}
-@
-
 
 % ============================================================================
 \begin{figure}[!hbpt]
-<<fig.width=8, fig.height=8>>=
+<<fig.width=8, fig.height=8, cache=TRUE>>=
 TestSyntenyGaps(syn, nstring)
 @
 \caption{In black: missing regions on the target between syntenic blocks. In
     red: strings of N's, bases that have not been correctly sequenced}
 \end{figure}
 
-% ============================================================================
-<<>>=
-write.table(
-    gint,
-    file='gene2int_map.tab',
-    sep="\t",
-    quote=FALSE,
-    col.names=TRUE,
-    row.names=FALSE
-)
-@
+% % ============================================================================
+% % Build main syntenic data.frame
+% <<make-gint, cache=TRUE, message=FALSE>>=
+% # TODO continue from here
+% if(file.exists('gene2int_map.tab')){
+%     gint <- read.delim('gene2int_map.tab')
+% } else {
+%     gint <- Build_Gene2Int(syn=syn, gff=gff)
+% }
+% @
 
-\end{document}
+% % ============================================================================
+% <<>>=
+% write.table(
+%     gint,
+%     file='gene2int_map.tab',
+%     sep="\t",
+%     quote=FALSE,
+%     col.names=TRUE,
+%     row.names=FALSE
+% )
+% @

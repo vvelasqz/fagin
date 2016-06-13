@@ -3,3 +3,10 @@
 \BOOKMARK [2][-]{subsection.2.1}{Species phylogeny}{section.2}% 3
 \BOOKMARK [2][-]{subsection.2.2}{Genomic statistics}{section.2}% 4
 \BOOKMARK [2][-]{subsection.2.3}{Proteomic statistics}{section.2}% 5
+\BOOKMARK [1][-]{section.3}{Syntenic results}{}% 6
+\BOOKMARK [2][-]{subsection.3.1}{Data input}{section.3}% 7
+\BOOKMARK [2][-]{subsection.3.2}{Summaries of input data}{section.3}% 8
+\BOOKMARK [2][-]{subsection.3.3}{Gene feature format file for focal species}{section.3}% 9
+\BOOKMARK [2][-]{subsection.3.4}{N-string file}{section.3}% 10
+\BOOKMARK [2][-]{subsection.3.5}{Syntenic ouput of SatsumaSynteny}{section.3}% 11
+\BOOKMARK [1][-]{section.4}{Classification results}{}% 12

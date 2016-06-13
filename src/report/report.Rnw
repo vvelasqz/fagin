@@ -28,6 +28,8 @@
 
 \maketitle
 
+\tableofcontents
+
 \section{Introduction}
 
 \input{sections/introduction}

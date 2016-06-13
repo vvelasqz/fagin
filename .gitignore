@@ -28,3 +28,5 @@ figure/
 *.tex
 *.fdb_latexmk
 *.fls
+*.toc
+*.out

@@ -28,6 +28,34 @@
 
 \maketitle
 
+<<install.dependencies, echo=FALSE, message=FALSE>>=
+deps <- c(
+    "devtools",
+    "magrittr",
+    "ggplot2",
+    "plyr",
+    "dplyr",
+    "ape",
+    "scales",
+    "intervals",
+    "data.tree",
+    "xtable"
+)
+bio.deps <- c('Biostrings')
+chooseCRANmirror(ind=1)
+for (x in c(deps, bio.deps)) {
+    if(!require(x, character.only=TRUE, quietly=TRUE)){
+        if(x %in% bio.deps){
+            require(devtools)
+            source("https://bioconductor.org/biocLite.R")
+            biocLite(x)
+        } else {
+            install.packages(x)
+        }
+    }
+}
+@
+
 \tableofcontents
 
 \section{Introduction}

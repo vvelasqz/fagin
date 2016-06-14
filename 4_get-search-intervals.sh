@@ -34,13 +34,13 @@ do
     if [[ $s != $focal_species ]]
     then
         db=$mapdir/db/${focal_species}_$s.txt
-        map=$mapdir/$focal_species.vs.$s.map.tab
+        map=$mapdir/$focal_species.vs.$s.si.tab
         if [[ ! -r $db ]]
         then
             # Build synder database
             synder -d $syndir/$focal_species.vs.$s.syn $focal_species $s $mapdir/db
         fi
         # # Find target-side search intervals for each entry in the input query gff
-        # synder -i $gffdir/$focal_species.gff -s $db -c contig > $map
+        synder -i input/orphan.gff -s $db -c contig > $map
     fi
 done

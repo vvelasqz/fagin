@@ -16,14 +16,18 @@ stopifnot(tgenes %in% names(target$aa))
 query$aa <- query$aa[genelist]
 
 origins <- data.frame(
+    gene=genelist,
     class=rep(NA, length(genelist))
 )
-row.names(origins) <- genelist
+sflags <- summarize.flags(si)
 
-origins[find.scrambled(target$si), 'class'] <- 'scrambled'
+origins <- merge(origins, sflags)
 
-nscrambled <- sum(origins$class == 'scrambled')
+origins$orphan <- origins$gene %in% query$orphans
+
+nscrambled <- sum(origins$f0 > 0, na.rm=TRUE)
 @
 
-Of the \Sexpr{length(genelist)} input genes, \Sexpr{nscrambled} are considered
-to be syntenically scrambled.
+Of the \Sexpr{length(genelist)} input genes, \Sexpr{nscrambled}
+(\Sexpr{nscrambled / length(genelist)}\%) are considered to be syntenically
+scrambled.

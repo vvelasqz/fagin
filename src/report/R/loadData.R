@@ -14,7 +14,7 @@ LoadGFF <- function(gff.filename, features){
 
     stopifnot(ncol(g) == 9)
 
-    colnames(g) <- c('chr', 'source', 'type', 'qstart', 'qend', 'score', 'strand', 'phase', 'qseqid')
+    colnames(g) <- c('chr', 'source', 'type', 'qstart', 'qend', 'score', 'strand', 'phase', 'seqid')
     g <- g[order(g$chr, g$qstart), ]
 
     if(!missing(features)){
@@ -39,7 +39,7 @@ LoadGFF <- function(gff.filename, features){
 #  7. percent identity of match
 #  8. orientation
 LoadSyntenyMap <- function(synmap){
-    g <- read.table(synmap)
+    g <- read.table(synmap, stringsAsFactors=FALSE)
 
     stopifnot(ncol(g) == 8)
 
@@ -83,11 +83,11 @@ LoadNString <- function(nstring.file){
 
 LoadSearchIntervals <- function(sifile){
   require(magrittr)
-  si <- read.table(sifile)
+  si <- read.table(sifile, stringsAsFactors=FALSE)
 
   stopifnot(ncol(si) == 5)
 
-  names(si) <- c('gene', 'tchrid', 'start', 'stop', 'flag')
+  names(si) <- c('gene', 'chr', 'start', 'stop', 'flag')
   si$start <- gsub('\\.', NA, si$start) %>% as.numeric
   si$stop <- gsub('\\.', NA, si$stop) %>% as.numeric
 
@@ -132,14 +132,19 @@ LoadFASTA <- function(filename, isAA=TRUE){
 #' @return list of query data
 LoadQuery <- function(
   aafile="~/src/git/cadmium/input/faa/Arabidopsis_thaliana.faa",
-  gfffile="~/src/git/cadmium/input/gff/Arabidopsis_thaliana.gff"
+  gfffile="~/src/git/cadmium/input/gff/Arabidopsis_thaliana.gff",
+  orphanfile="~/src/git/cadmium/input/orphan-list.txt"
 )
 {
   require(Biostrings)
-  list(
-    aa  = LoadFASTA(aafile),
-    gff = LoadGFF(gfffile)
-  )
+  aa      <- LoadFASTA(aafile)
+  gff     <- LoadGFF(gfffile)
+  orphans <- read.table(orphanfile, stringsAsFactors=FALSE)[[1]]
+  # all orphans should be associated with a protein sequence
+  stopifnot(orphans %in% names(aa))
+  # all GFF seqids be associated with a protein sequence
+  stopifnot(gff$seqid %in% names(aa))
+  list(aa=aa, gff=gff, orphans=orphans)
 }
 
 
@@ -158,14 +163,21 @@ LoadQuery <- function(
 LoadTarget <- function(
   aafile="~/src/git/cadmium/input/faa/Arabidopsis_lyrata.faa",
   dnafile="~/src/git/cadmium/input/fna/Arabidopsis_lyrata.fna",
-  sifile="~/src/git/cadmium/input/si/Arabidopsis_thaliana.vs.Arabidopsis_lyrata.map.tab",
+  sifile="~/src/git/cadmium/input/maps/Arabidopsis_thaliana.vs.Arabidopsis_lyrata.map.tab",
   gfffile="~/src/git/cadmium/input/gff/Arabidopsis_lyrata.gff"
 )
 {
-  list(
-    aa       = LoadFASTA(aafile),
-    dna.file = dnafile,
-    si       = LoadSearchIntervals(sifile),
-    gff      = LoadGFF(gfffile)
-  )
+  aa       <-  LoadFASTA(aafile)
+  dna.file <-  dnafile
+  si       <-  LoadSearchIntervals(sifile)
+  gff      <-  LoadGFF(gfffile)
+
+  # all GFF seqids be associated with a protein sequence
+  all(gff$seqid %in% names(aa))
+
+  # the scaffolds in si and gff may vary, but they should be drawn from
+  # the same pool, so there should be more than 0 in common.
+  all(sum(si$chr %in% gff$chr) > 0)
+
+  list(aa=aa, dna.file=dna.file, si=si, gff=gff)
 }

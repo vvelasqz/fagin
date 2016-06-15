@@ -10,19 +10,18 @@ classify_genes <- function(queries, targets, tree) {
   classify_gene(query, target, NA) 
 }
 
-find.scrambled <- function(si){
+summarize.flags <- function(si){
   require(dplyr)
   require(magrittr)
-  group_by(si, gene) %>%
-    mutate(n.si=length(gene)) %>%
-    mutate(scrambled=any(flag != 0)) %>%
-    ungroup %>%
-    subset(scrambled) %$%
-    gene %>%
-    as.character %>%
-    unique
+  sflags <- group_by(si, gene) %>%
+    summarize(
+      f0=sum(flag == 0), 
+      f1=sum(flag == 1), 
+      f2=sum(flag == 2),
+      f3=sum(flag == 3)
+    ) %>%
+    as.data.frame
 }
-
 
 
 # ============================================================================

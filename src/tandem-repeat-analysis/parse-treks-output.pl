@@ -26,20 +26,34 @@ open(MSAOUT, ">", "$parser->msaout")
     or die "Can't open > $parser->msaout: $!";
 
 my $seqid;
-my $seqid_count;
+my $msa_count;
 while(<INPUT>){
-    if(/^>(\S+)/){
-        $seqid_count = 0; 
-        $seqid = $1;
-        next;
-    }
 
+    # Find proteins with no repeats found
     if(/not found.*>(\S+)/) {
         say TABOUT "$1\t0\t0\twhatever";
         next;
     }
 
-    # other parsers
+    # Parse out the sequence name of proteins with repeats
+    if(/^>(\S+)/){
+        # Number of MSA encountered so far under current seqid
+        $msa_count = 0; 
+        $seqid = $1;
+        next;
+    }
+
+    # Parser for extracting line of info for identified motif
+    if(/XXX/){
+        $msa_count++;
+        say TABOUT "$seqid\tXXX\tXXX\t....";
+        say MSAOUT ">$seqid";
+    }
+
+    # Parser for writing to MSA file
+    if(/XXX/){
+        say MSAOUT $1;
+    }
 }
 
 exit;

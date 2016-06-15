@@ -164,6 +164,7 @@ LoadTarget <- function(
   aafile="~/src/git/cadmium/input/faa/Arabidopsis_lyrata.faa",
   dnafile="~/src/git/cadmium/input/fna/Arabidopsis_lyrata.fna",
   sifile="~/src/git/cadmium/input/maps/Arabidopsis_thaliana.vs.Arabidopsis_lyrata.map.tab",
+  synfile="~/src/git/cadmium/input/syn/Arabidopsis_thaliana.vs.Arabidopsis_lyrata.syn",
   gfffile="~/src/git/cadmium/input/gff/Arabidopsis_lyrata.gff"
 )
 {
@@ -171,6 +172,7 @@ LoadTarget <- function(
   dna.file <-  dnafile
   si       <-  LoadSearchIntervals(sifile)
   gff      <-  LoadGFF(gfffile)
+  syn      <-  LoadSyntenyMap(synfile)
 
   # all GFF seqids be associated with a protein sequence
   all(gff$seqid %in% names(aa))
@@ -179,5 +181,8 @@ LoadTarget <- function(
   # the same pool, so there should be more than 0 in common.
   all(sum(si$chr %in% gff$chr) > 0)
 
-  list(aa=aa, dna.file=dna.file, si=si, gff=gff)
+  # The scaffolds in the search interval file must have come from the synteny file
+  all(si$chr %in% syn$tchr)
+
+  list(aa=aa, dna.file=dna.file, si=si, gff=gff, syn=syn)
 }

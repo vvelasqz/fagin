@@ -1,11 +1,18 @@
-<<cache=TRUE, message=FALSE>>=
+<<cache=FALSE, message=FALSE>>=
 source('~/src/git/cadmium/src/report/R/classification.R')
 source('~/src/git/cadmium/src/report/R/loadData.R')
+@
+
+<<cache=TRUE, message=FALSE>>=
 query <- LoadQuery()
 target <- LoadTarget()
 @
 
-<<>>=
+<<sflags, cache=TRUE>>=
+sflags <- summarize.flags(target$si)
+@
+
+<<cache=TRUE>>=
 genelist <- target$si$gene %>% unique
 
 tgenes <- target$gff$qseqid %>% unique
@@ -13,13 +20,20 @@ tgenes <- target$gff$qseqid %>% unique
 stopifnot(genelist %in% names(query$aa))
 stopifnot(tgenes %in% names(target$aa))
 
+# The pipeline builds the protein sequences from the GFF and genome files, so
+# the sequence ids in the faa and search interval files should be the same.  It
+# is perfectly plausible that some proteins are known from mRNAs but are not
+# placed in the genome (due to missing sequence, ambiguities or curator error).
+# It is also reasonable that the user might try to bypass my helpful protein
+# file preparations. They might try to slip in some of their own pet proteins.
+# I could accomadate them, but I choose not to. Indeed, I would die first:
+stopifnot(genelist %in% names(query$aa))
 query$aa <- query$aa[genelist]
 
 origins <- data.frame(
     gene=genelist,
     class=rep(NA, length(genelist))
 )
-sflags <- summarize.flags(si)
 
 origins <- merge(origins, sflags)
 
@@ -29,5 +43,5 @@ nscrambled <- sum(origins$f0 > 0, na.rm=TRUE)
 @
 
 Of the \Sexpr{length(genelist)} input genes, \Sexpr{nscrambled}
-(\Sexpr{nscrambled / length(genelist)}\%) are considered to be syntenically
+(\Sexpr{100 * (1 - nscrambled / length(genelist))}\% are considered to be syntenically
 scrambled.

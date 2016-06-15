@@ -60,7 +60,8 @@ for (x in c(deps, bio.deps)) {
 
 \section{Introduction}
 
-\input{sections/introduction}
+<<introduction, child='sections/introduction.Rnw'>>=
+@
 
 \section{Input data}
 

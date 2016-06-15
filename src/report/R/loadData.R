@@ -91,7 +91,7 @@ LoadSearchIntervals <- function(sifile){
   si$start <- gsub('\\.', NA, si$start) %>% as.numeric
   si$stop <- gsub('\\.', NA, si$stop) %>% as.numeric
 
-  stopifnot(any(si$start > si$stop))
+  stopifnot(with(si[complete.cases(si), ], start <= stop))
 
   si
 }
@@ -175,14 +175,14 @@ LoadTarget <- function(
   syn      <-  LoadSyntenyMap(synfile)
 
   # all GFF seqids be associated with a protein sequence
-  all(gff$seqid %in% names(aa))
+  stopifnot(gff$seqid %in% names(aa))
 
   # the scaffolds in si and gff may vary, but they should be drawn from
   # the same pool, so there should be more than 0 in common.
-  all(sum(si$chr %in% gff$chr) > 0)
+  stopifnot(sum(si$chr %in% gff$chr) > 0)
 
   # The scaffolds in the search interval file must have come from the synteny file
-  all(si$chr %in% syn$tchr)
+  stopifnot(si$chr %in% syn$tchr)
 
   list(aa=aa, dna.file=dna.file, si=si, gff=gff, syn=syn)
 }

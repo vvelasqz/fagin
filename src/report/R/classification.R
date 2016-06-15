@@ -13,7 +13,7 @@ classify_genes <- function(queries, targets, tree) {
 summarize.flags <- function(si){
   require(dplyr)
   require(magrittr)
-  sflags <- group_by(si, gene) %>%
+  group_by(si, gene) %>%
     summarize(
       f0=sum(flag == 0), 
       f1=sum(flag == 1), 

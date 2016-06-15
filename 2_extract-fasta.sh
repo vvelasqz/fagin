@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+source cadmium.cfg
+
 usage (){
 cat << EOF >&2
 Arguments
@@ -24,9 +26,9 @@ while getopts "h" opt; do
     esac 
 done
 
-species=$(src/get-species-from-tree.R input/tree)
+species=$(cat $INPUT/species)
 
-mkdir -p input/faa
+mkdir -p $INPUT/faa
 for s in $species
 do
     cat input/gff/$s.gff |

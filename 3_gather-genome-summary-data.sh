@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -u
 
+source cadmium.cfg
+
 usage (){
 cat << EOF
 Generate summary files for a set of genomes
@@ -28,8 +30,8 @@ EOF
     exit 0
 }
 
-idir=input/fna
-odir=input/stat
+idir=$INPUT/fna
+odir=$INPUT/stat
 while getopts "hi:o:" opt; do
     case $opt in
         h)

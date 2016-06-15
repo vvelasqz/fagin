@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -u
 
+source cadmium.cfg
+
 usage (){
 cat << EOF >&2
 Run focal species and target synteny maps through Synder to get search intervals
@@ -15,10 +17,9 @@ EOF
     exit 0
 }
 
-focal_species=$(cat input/focal_species)
-species=$(src/get-species-from-tree.R input/tree)
-syndir=input/syn
-gffdir=input/gff
+species=$(cat $INPUT/species)
+syndir=$INPUT/syn
+gffdir=$INPUT/gff
 while getopts "h" opt; do
     case $opt in
         h)
@@ -26,21 +27,21 @@ while getopts "h" opt; do
     esac 
 done
 
-mapdir=input/maps
-mkdir -p input/maps/db
+mapdir=$INPUT/maps
+mkdir -p $INPUT/maps/db
 
 for s in $species
 do
-    if [[ $s != $focal_species ]]
+    if [[ $s != $FOCAL_SPECIES ]]
     then
-        db=$mapdir/db/${focal_species}_$s.txt
-        map=$mapdir/$focal_species.vs.$s.map.tab
+        db=$mapdir/db/${FOCAL_SPECIES}_$s.txt
+        map=$mapdir/$FOCAL_SPECIES.vs.$s.map.tab
         if [[ ! -r $db ]]
         then
             # Build synder database
-            synder -d $syndir/$focal_species.vs.$s.syn $focal_species $s $mapdir/db
+            synder -d $syndir/$FOCAL_SPECIES.vs.$s.syn $FOCAL_SPECIES $s $mapdir/db
         fi
-        # # Find target-side search intervals for each entry in the input query gff
-        # synder -i $gffdir/$focal_species.gff -s $db -c contig > $map
+        # # Find target-side search interval for entries in the input query gff
+        synder -i $INPUT/search.gff -s $db -c search > $map
     fi
 done

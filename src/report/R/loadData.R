@@ -158,7 +158,7 @@ LoadQuery <- function(
 LoadTarget <- function(
   aafile="~/src/git/cadmium/input/faa/Arabidopsis_lyrata.faa",
   dnafile="~/src/git/cadmium/input/fna/Arabidopsis_lyrata.fna",
-  sifile="~/src/git/cadmium/input/si/Arabidopsis_thaliana.vs.Arabidopsis_lyrata.si.txt",
+  sifile="~/src/git/cadmium/input/si/Arabidopsis_thaliana.vs.Arabidopsis_lyrata.map.tab",
   gfffile="~/src/git/cadmium/input/gff/Arabidopsis_lyrata.gff"
 )
 {

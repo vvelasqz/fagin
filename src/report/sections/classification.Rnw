@@ -1,11 +1,18 @@
-<<cache=TRUE, message=FALSE>>=
+<<cache=FALSE, message=FALSE>>=
 source('~/src/git/cadmium/src/report/R/classification.R')
 source('~/src/git/cadmium/src/report/R/loadData.R')
+@
+
+<<cache=TRUE, message=FALSE>>=
 query <- LoadQuery()
 target <- LoadTarget()
 @
 
-<<>>=
+<<sflags, cache=TRUE>>=
+sflags <- summarize.flags(target$si)
+@
+
+<<cache=TRUE>>=
 genelist <- target$si$gene %>% unique
 
 tgenes <- target$gff$qseqid %>% unique
@@ -13,21 +20,51 @@ tgenes <- target$gff$qseqid %>% unique
 stopifnot(genelist %in% names(query$aa))
 stopifnot(tgenes %in% names(target$aa))
 
+# The pipeline builds the protein sequences from the GFF and genome files, so
+# the sequence ids in the faa and search interval files should be the same.  It
+# is perfectly plausible that some proteins are known from mRNAs but are not
+# placed in the genome (due to missing sequence, ambiguities or curator error).
+# It is also reasonable that the user might try to bypass my helpful protein
+# file preparations. They might try to slip in some of their own pet proteins.
+# I could accomadate them, but I choose not to. Indeed, I would die first:
+stopifnot(genelist %in% names(query$aa))
 query$aa <- query$aa[genelist]
 
 origins <- data.frame(
     gene=genelist,
     class=rep(NA, length(genelist))
 )
-sflags <- summarize.flags(si)
 
 origins <- merge(origins, sflags)
 
 origins$orphan <- origins$gene %in% query$orphans
 
-nscrambled <- sum(origins$f0 > 0, na.rm=TRUE)
+origins$f0 <- origins$f0 > 0
+origins$f1 <- origins$f1 > 0
+origins$f2 <- origins$f2 > 0
+origins$f3 <- origins$f3 > 0
+
+old.count  <- sum(!origins$orphan)
+orp.count  <- sum( origins$orphan)
+tot.count  <- nrow(origins)
+old.all.f0 <- with(origins, sum( f0 & !f1 & !f2 & !f3 & !orphan ))
+orp.all.f0 <- with(origins, sum( f0 & !f1 & !f2 & !f3 &  orphan ))
+tot.all.f0 <- with(origins, sum( f0 & !f1 & !f2 & !f3           ))
+old.f0     <- with(origins, sum( f0 &                   !orphan ))
+orp.f0     <- with(origins, sum( f0 &                    orphan ))
+tot.f0     <- with(origins, sum( f0                             ))
 @
 
-Of the \Sexpr{length(genelist)} input genes, \Sexpr{nscrambled}
-(\Sexpr{nscrambled / length(genelist)}\%) are considered to be syntenically
-scrambled.
+\begin{table}[!ht]
+    \centering
+    \caption{Summary of syntenic contexts of genes.}
+    \label{tab:syntenic-context}
+    \begin{tabular}{l | l | l | l}
+    \hline
+    {}            & Non-Orphan         & Orphan             & Overall            \\ 
+    Gene count    & \Sexpr{old.count}  & \Sexpr{orp.count}  & \Sexpr{tot.count}  \\
+    All reliable  & \Sexpr{old.all.f0} & \Sexpr{orp.all.f0} & \Sexpr{tot.all.f0} \\
+    Some reliable & \Sexpr{old.f0}     & \Sexpr{orp.f0}     & \Sexpr{tot.f0}     \\
+    \hline
+    \end{tabular}
+\end{table}

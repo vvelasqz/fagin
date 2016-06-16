@@ -1,4 +1,4 @@
-<<require, echo=FALSE, message=FALSE>>=
+<<require, message=FALSE>>=
   require(ggplot2)
   require(dplyr)
   require(ape)
@@ -6,7 +6,7 @@
   require(scales)
 @
 
-<<echo=FALSE>>=
+<<>>=
 args <- list(
     scaffile='~/src/git/cadmium/input/stat/scaffold-lengths.tab',
     nstringfile='~/src/git/cadmium/input/stat/nstrings.tab',
@@ -17,7 +17,7 @@ args <- list(
 
 \subsection{Species phylogeny}
 
-<<view-tree, echo=FALSE>>=
+<<view-tree>>=
 tree <- read.tree(args$treefile)
 plot(tree)
 @
@@ -26,7 +26,7 @@ plot(tree)
 
 \begin{figure}
     \center
-<<plot-scaffold-lengths, echo=FALSE, message=FALSE, cache=TRUE>>=
+<<plot-scaffold-lengths, message=FALSE, cache=TRUE>>=
 scaflen <- read.table(args$scaffile, header=TRUE)
 scaflen <- group_by(scaflen, species) %>%
     arrange(-length) %>%
@@ -43,9 +43,11 @@ ggplot(scaflen) +
     \caption{\textbf{Scaffold lengths}. Sorted by length on x-axis.}
 \end{figure}
 
+
+
 \begin{figure}
     \center
-<<echo=FALSE, cache=TRUE, fig.width=7, fig.height=6>>=
+<<cache=TRUE, fig.width=7, fig.height=6>>=
 scaflen$chrid <- factor(scaflen$idx)
 scaflen_chr <- subset(scaflen, length > 10^7) %>% droplevels
 ggplot(scaflen_chr) +
@@ -61,7 +63,9 @@ ggplot(scaflen_chr) +
     \caption{Lengths of scaffolds greater than 10 Mb. Sorted by size.}
 \end{figure}
 
-<<plot-nstring, echo=TRUE, cache=TRUE>>=
+
+
+<<plot-nstring, cache=TRUE>>=
 nstring <- read.table(args$nstringfile, header=TRUE)
 nstring$length <- with(nstring, stop - start + 1)
 
@@ -96,7 +100,7 @@ nstring.g <- ggplot(d) +
 @
 \begin{figure}[!ht]
     \centering
-<<echo=FALSE>>=
+<<>>=
 nstring.g
 @
     \caption{\textbf{Strings of unknowns}. Most assemblies have certain regions
@@ -106,7 +110,7 @@ nstring.g
         number of N's. Only scaffolds with lengths greater than 10 Mb are shown.}
 \end{figure}
 
-<<plot-gc, echo=FALSE, cache=TRUE>>=
+<<plot-gc, cache=TRUE>>=
 kbcomp <- read.table(args$kbcompfile, header=TRUE)
 kbcomp <- subset(kbcomp, N == 0)
 kbcomp$GC <- with(kbcomp, (C + G) / (A + C + G + T))
@@ -117,7 +121,7 @@ kbcomp.g <- ggplot(kbcomp) +
 @
 \begin{figure}[!ht]
   \centering
-<<echo=FALSE>>=
+<<>>=
 kbcomp.g
 @
     \caption{\textbf{GC content of 10000 random 1kb intervals}. Any interval with 1 or more N's was ignored.}

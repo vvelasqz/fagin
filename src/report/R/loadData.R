@@ -85,13 +85,15 @@ LoadSearchIntervals <- function(sifile){
   require(magrittr)
   si <- read.table(sifile, stringsAsFactors=FALSE)
 
-  stopifnot(ncol(si) == 5)
+  stopifnot(ncol(si) == 8)
 
-  names(si) <- c('gene', 'chr', 'start', 'stop', 'flag')
-  si$start <- gsub('\\.', NA, si$start) %>% as.numeric
-  si$stop <- gsub('\\.', NA, si$stop) %>% as.numeric
+  names(si) <- c('gene', 'qchr', 'qstart', 'qstop', 'tchr', 'tstart', 'tstop', 'flag')
+  si$tstart <- gsub('\\.', NA, si$tstart) %>% as.numeric
+  si$tstop <- gsub('\\.', NA, si$tstop) %>% as.numeric
 
-  stopifnot(any(si$start > si$stop))
+  stopifnot(si$flag %in% 0:3)
+  stopifnot(si$qstart <= si$qstop)
+  stopifnot(with(si[complete.cases(si), ], tstart <= tstop))
 
   si
 }
@@ -175,14 +177,16 @@ LoadTarget <- function(
   syn      <-  LoadSyntenyMap(synfile)
 
   # all GFF seqids be associated with a protein sequence
-  all(gff$seqid %in% names(aa))
+  stopifnot(gff$seqid %in% names(aa))
 
   # the scaffolds in si and gff may vary, but they should be drawn from
   # the same pool, so there should be more than 0 in common.
-  all(sum(si$chr %in% gff$chr) > 0)
+  stopifnot(sum(si$tchr %in% gff$chr) > 0)
 
-  # The scaffolds in the search interval file must have come from the synteny file
-  all(si$chr %in% syn$tchr)
+  # The scaffolds in the search interval file must have come from the synteny
+  # file. The '.' character is needed for queries that have no known location, or
+  # where the scaffold they are on is ambiguous.
+  stopifnot(si$tchr %in% c(syn$tchr, '.'))
 
   list(aa=aa, dna.file=dna.file, si=si, gff=gff, syn=syn)
 }

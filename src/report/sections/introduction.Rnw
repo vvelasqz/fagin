@@ -1,0 +1,27 @@
+The Fagin pipeline receives input from the Synder, which uses a synteny
+framework to map genes in one genome to search intervals in another. Synder
+orders all input genes into one of three categories: 1) syntenically scrambled,
+2) unambiguously mapped to one or more search intervals (SIs), or 3) mapped to a
+mixture of scrambled and unambiguous regions. 
+
+The Fagin pipeline takes the set of SIs Synder emits and
+classifies each into one of 5 groups.
+
+\begin{description}
+  \item[Unknown]
+    \begin{description}
+      \item[Scrambled]   - Classified as scrambled by Synder
+      \item[Matchless]   - No match found within the SI
+      \item[Unassembled] - The SI contains a stretch of unknown residues which
+        could include the query gene
+    \end{description}
+  \item[Deleted]   - The SI is too small to contain the query interval
+  \item[Non-genic] - The SI contains a match to a region that cannot possibly be coding
+  \item[Genic]     - The query matches a gene (or possible gene) in the SI
+    \begin{description}
+      \item[Annotated gene] - Match to a gene annotated as coding in the target genome
+      \item[Transcript ORF] - Match to ORF on an mRNA transcribed from the SI
+      \item[Genomic ORF]    - Match to an ORF (mono-exonic) in the SI 
+      \item[Possible gene]  - Match a poly-exonic predicted model
+    \end{description}
+\end{description}

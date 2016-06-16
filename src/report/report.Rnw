@@ -29,6 +29,7 @@
 \maketitle
 
 <<install.dependencies, echo=FALSE, message=FALSE>>=
+opts_chunk$set(echo=FALSE)
 deps <- c(
     "devtools",
     "magrittr",
@@ -41,7 +42,7 @@ deps <- c(
     "data.tree",
     "xtable"
 )
-bio.deps <- c('Biostrings')
+bio.deps <- c('Biostrings', 'genomeIntervals')
 chooseCRANmirror(ind=1)
 for (x in c(deps, bio.deps)) {
     if(!require(x, character.only=TRUE, quietly=TRUE)){
@@ -60,7 +61,8 @@ for (x in c(deps, bio.deps)) {
 
 \section{Introduction}
 
-\input{sections/introduction}
+<<introduction, child='sections/introduction.Rnw'>>=
+@
 
 \section{Input data}
 

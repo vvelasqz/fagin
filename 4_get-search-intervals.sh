@@ -42,6 +42,12 @@ do
             synder -d $syndir/$FOCAL_SPECIES.vs.$s.syn $FOCAL_SPECIES $s $mapdir/db
         fi
         # # Find target-side search interval for entries in the input query gff
-        synder -i $INPUT/search.gff -s $db -c search > $map
+        synder -i $INPUT/search.gff -s $db -c search |
+            # Remove the '>' and search interval id columns
+            # These are columns which will probably be lost in the future
+            cut -f3-10 |
+            # Remove the few odd cases where the start > stop
+            # TODO: Figure out *why* this is happening in synder and fix it
+            awk '$6 <= $7' > $map
     fi
 done

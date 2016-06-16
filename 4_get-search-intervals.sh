@@ -39,15 +39,14 @@ do
         if [[ ! -r $db ]]
         then
             # Build synder database
-            synder -d $syndir/$FOCAL_SPECIES.vs.$s.syn $FOCAL_SPECIES $s $mapdir/db
+            awk -v minlen=$MINLEN '($6 - $5) > minlen' $syndir/$FOCAL_SPECIES.vs.$s.syn > z
+            synder -d z $FOCAL_SPECIES $s $mapdir/db
+            rm z
         fi
         # # Find target-side search interval for entries in the input query gff
         synder -i $INPUT/search.gff -s $db -c search |
             # Remove the '>' and search interval id columns
             # These are columns which will probably be lost in the future
-            cut -f3-10 |
-            # Remove the few odd cases where the start > stop
-            # TODO: Figure out *why* this is happening in synder and fix it
-            awk '$6 <= $7' > $map
+            cut -f3-10 > $map
     fi
 done

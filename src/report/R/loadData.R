@@ -1,3 +1,27 @@
+MakeGI <- function(starts, stops, scaffolds, strands=NULL){
+  require(genomeIntervals)
+  if(is.null(strands)){
+    new(
+      "Genome_intervals",
+      matrix(c(starts, stops), ncol=2),
+      annotation=data.frame(
+        seq_name=scaffolds,
+        inter_base=FALSE
+      )
+    )
+  } else {
+    new(
+      "Genome_intervals_stranded",
+      matrix(c(starts, stops), ncol=2),
+      annotation=data.frame(
+        seq_name=scaffolds,
+        inter_base=FALSE,
+        strand=strands
+      )
+    )
+  }
+}
+
 #' Load a GFF file
 #'
 #' The 9th column, which is conventionally an attribute column which may
@@ -7,55 +31,71 @@
 #' 
 #' @param gff.filename The path the the input GFF file
 #' @param features The features from the GFF that should be retained (e.g. mRNA, gene, CDS)
-#' @return A data.frame with 9 columns
+#' @return A genomIntervals object
 #' 
-LoadGFF <- function(gff.filename, features){
-    g <- read.delim(gff.filename, comment.char="#", header=FALSE, stringsAsFactors=FALSE)
+LoadGFF <- function(gfffile, features=NULL){
+  require(genomeIntervals) 
+  require(dplyr)
 
-    stopifnot(ncol(g) == 9)
+  g <- readGff3(gfffile)
+  annotation(g) <- dplyr::rename(annotation(g), seqid=gffAttributes)
 
-    colnames(g) <- c('chr', 'source', 'type', 'qstart', 'qend', 'score', 'strand', 'phase', 'seqid')
-    g <- g[order(g$chr, g$qstart), ]
-
-    if(!missing(features)){
-      g <- subset(g, type %in% features)
-    }
-
-    stopifnot(is.numeric(g$qstart))
-    stopifnot(is.numeric(g$qend))
-    stopifnot(all(g$strand %in% c('-', '+', '.')))
-
-    return(g)
+  if(is.null(features)){
+    g
+  } else {
+    g[g$type %in% features, ]
+  }
 }
 
-# Loads the output of a SatsumaSynteny run
-# The file should contain the following columns (in order)
-#  1. query sequence id (chromosome or scaffold)
-#  2. query start
-#  3. query end
-#  4. target sequence id (chromosome or scaffold)
-#  5. target start
-#  6. target end
-#  7. percent identity of match
-#  8. orientation
+
+#' Loads the output of a SatsumaSynteny run
+#' 
+#' The file should contain the following columns (in order)
+#' 1. query sequence id (chromosome or scaffold)
+#' 2. query start
+#' 3. query end
+#' 4. target sequence id (chromosome or scaffold)
+#' 5. target start
+#' 6. target end
+#' 7. percent identity of match
+#' 8. orientation
+#'
+#' The output is a list containing a query and target genomeInterval objects.
+#' Each contains a vector 
+#'
+#' @param synmap synteny map filename
+#' @return query and target genomeInterval objects
 LoadSyntenyMap <- function(synmap){
-    g <- read.table(synmap, stringsAsFactors=FALSE)
+  require(genomeIntervals)
+  g <- read.table(synmap, stringsAsFactors=FALSE)
 
-    stopifnot(ncol(g) == 8)
+  stopifnot(ncol(g) == 8)
+  colnames(g) <- c('qchr', 'qstart', 'qend', 'tchr', 'tstart', 'tend', 'pident', 'strand')
 
-    colnames(g) <- c('qchr', 'qstart', 'qend', 'tchr', 'tstart', 'tend', 'pident', 'strand')
-    g <- g[order(g$qchr, g$qstart), ]
-    g$queid <- 1:nrow(g)
-    g <- g[order(g$tchr, g$tstart), ]
-    g$tarid <- 1:nrow(g)
+  g <- g[order(g$qchr, g$qstart), ]
+  g$queid <- 1:nrow(g)
+  g <- g[order(g$tchr, g$tstart), ]
+  g$tarid <- 1:nrow(g)
 
-    stopifnot(is.numeric(g$qstart))
-    stopifnot(is.numeric(g$qend))
-    stopifnot(is.numeric(g$tstart))
-    stopifnot(is.numeric(g$tend))
-    stopifnot(is.numeric(g$pident))
-    stopifnot(all(g$strand %in% c('-', '+', '.')))
-return(g)
+  target <- MakeGI(
+    starts=g$tstart,
+    stops=g$tend,
+    scaffolds=g$tchr,
+    strands=g$strand
+  )
+  annotation(target)$over <- g$queid
+
+  g <- g[order(g$queid), ]
+
+  query <- MakeGI(
+    starts=g$qstart,
+    stops=g$qend,
+    scaffolds=g$qchr,
+    strands=factor('+', levels=c('+', '-'))
+  )
+  annotation(query)$over <- g$tarid
+
+  list(query=query, target=target)
 }
 
 #' Load file of N run positions
@@ -67,18 +107,15 @@ return(g)
 #' @param nstring.file name of the TAB delimited input file
 #' @return A data.frame with 4 columns: [ species | seqid | start | stop ]
 LoadNString <- function(nstring.file){
-    g <- read.delim(nstring.file, stringsAsFactors=FALSE)
+  g <- read.delim(nstring.file, stringsAsFactors=FALSE)
 
-    stopifnot(ncol(g) == 4)
+  stopifnot(ncol(g) == 4)
 
-    colnames(g) <- c('species', 'seqid', 'start', 'stop')
-    g <- g[order(g$seqid, g$start), ]
+  colnames(g) <- c('species', 'seqid', 'start', 'stop')
 
-    stopifnot(is.numeric(g$start))
-    stopifnot(is.numeric(g$stop))
-    stopifnot(g$start <= g$stop) # run length is 1, then start == stop
+  g <- base::split(x=g, f=factor(g$species))
 
-    return(g)
+  lapply(g, function(x) MakeGI(starts=x$start, stops=x$stop, scaffolds=x$seqid))
 }
 
 LoadSearchIntervals <- function(sifile){
@@ -91,11 +128,17 @@ LoadSearchIntervals <- function(sifile){
   si$tstart <- gsub('\\.', NA, si$tstart) %>% as.numeric
   si$tstop <- gsub('\\.', NA, si$tstop) %>% as.numeric
 
-  stopifnot(si$flag %in% 0:3)
-  stopifnot(si$qstart <= si$qstop)
-  stopifnot(with(si[complete.cases(si), ], tstart <= tstop))
+  stopifnot(si$flag %in% 0:4)
 
-  si
+  query <- MakeGI(starts=si$qstart, stops=si$qstop, scaffolds=si$qchr)
+  annotation(query)$seqid <- si$gene
+  annotation(query)$id <- 1:nrow(si)
+
+  target <- MakeGI(starts=si$tstart, stops=si$tstop, scaffolds=si$tchr)
+  annotation(target)$flag <- si$flag
+  annotation(target)$id <- 1:nrow(si)
+
+  list(query=query, target=target)
 }
 
 #' Load a newick format phylogenetic tree
@@ -176,17 +219,24 @@ LoadTarget <- function(
   gff      <-  LoadGFF(gfffile)
   syn      <-  LoadSyntenyMap(synfile)
 
+  # Just to check that LoadGFF correctly renamed the fields
+  stopifnot('seqid' %in% names(annotation(gff)))
+
   # all GFF seqids be associated with a protein sequence
   stopifnot(gff$seqid %in% names(aa))
 
+  si.seq_name  <- levels(si$target$seq_name)
+  gff.seq_name <- levels(gff$seq_name)
+  syn.seq_name <- levels(syn$target$seq_name)
+
   # the scaffolds in si and gff may vary, but they should be drawn from
   # the same pool, so there should be more than 0 in common.
-  stopifnot(sum(si$tchr %in% gff$chr) > 0)
+  stopifnot(sum(si.seq_name %in% gff.seq_name) > 0)
 
   # The scaffolds in the search interval file must have come from the synteny
   # file. The '.' character is needed for queries that have no known location, or
   # where the scaffold they are on is ambiguous.
-  stopifnot(si$tchr %in% c(syn$tchr, '.'))
+  stopifnot(si.seq_name %in% c(syn.seq_name, '.'))
 
   list(aa=aa, dna.file=dna.file, si=si, gff=gff, syn=syn)
 }

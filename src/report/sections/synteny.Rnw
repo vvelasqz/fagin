@@ -19,40 +19,62 @@ args <- list(
     nstring   = '~/src/git/cadmium/input/stat/nstrings.tab'
 )
 @
- 
+
 \subsection{Summaries of input data}
 % ============================================================================
 % Load all input data
-<<cache=TRUE>>=
+<<cache=TRUE, warning=FALSE, message=FALSE>>=
 syn <- LoadSyntenyMap(args$synteny)
 gff <- LoadGFF(args$query_gff, features='mRNA')
 nstring <- LoadNString(args$nstring)
 @
 
-
 \subsection{Gene feature format file for focal species}
 <<results='asis'>>=
-head(gff) %>% xtable
-plyr::ddply(gff, 'chr', summarize, mRNAs=length(chr)) %>% xtable
-@
-
-
-\subsection{N-string file}
-<<results='asis'>>=
-head(nstring) %>% xtable
+plyr::ddply(
+    annotation(gff),
+    'seq_name',
+    summarize,
+    mRNAs=length(seq_name)
+) %>% xtable
 @
 
 \subsection{Syntenic ouput of SatsumaSynteny}
 <<results='asis'>>=
-head(syn) %>% xtable
-plyr::ddply(syn, 'qchr', summarize, N.synteny.blocks=length(qchr)) %>% xtable
+plyr::ddply(
+    annotation(syn$query),
+    'seq_name',
+    summarize,
+    N.synteny.blocks=length(seq_name)
+) %>% xtable
 @
 
-% ============================================================================
-\begin{figure}[!hbpt]
-<<fig.width=8, fig.height=8, cache=TRUE>>=
-TestSyntenyGaps(syn, nstring)
+% TODO: Sync the TestSyntenicGaps code with new genomeIntervals implementation
+% % ============================================================================
+% \begin{figure}[!hbpt]
+% <<fig.width=8, fig.height=8, cache=TRUE>>=
+% TestSyntenyGaps(syn, nstring)
+% @
+% \caption{In black: missing regions on the target between syntenic blocks. In
+%     red: strings of N's, bases that have not been correctly sequenced}
+% \end{figure}
+
+\begin{figure}[!ht]
+    \centering
+<<cache=TRUE>>=
+lograt <- log2(size(syn$query) / size(syn$target)[syn$query$over])
+lograt <- lograt[abs(lograt) > 0.25] 
+plot(
+    lograt,
+    xlab='Ordered position on query genome',
+    ylab='log2 of query to target length ratio'
+)
+abline(0, 0)
 @
-\caption{In black: missing regions on the target between syntenic blocks. In
-    red: strings of N's, bases that have not been correctly sequenced}
+    \caption{\textbf{Diagnostic plot of query to target lengths in synteny
+        map}. The syntenic intervals on the query and target sides should
+        be of similar length.  They will not be exactly the same size if gaps
+        are allowed in the alignment, but wild deviation from 0 (more than,
+        say, 2) indicates errors in the input. To avoid overplottin, values
+        between -0.25 and 0.25 are not plotted.} 
 \end{figure}

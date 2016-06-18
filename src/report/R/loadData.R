@@ -37,7 +37,7 @@ LoadGFF <- function(gfffile, features=NULL){
   require(genomeIntervals) 
   require(dplyr)
 
-  g <- readGff3(gfffile)
+  g <- readZeroLengthFeaturesGff3(gfffile)
   annotation(g) <- dplyr::rename(annotation(g), seqid=gffAttributes)
 
   if(is.null(features)){

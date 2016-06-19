@@ -147,6 +147,12 @@ featureCountTable <- function(feat){
       set_names('Count')
 }
 
+
+
+# ============================================================================
+# Search sequence
+# ============================================================================
+
 #' Compare a protein query sequence to set of protein target sequences
 #'
 #' @export
@@ -163,8 +169,6 @@ AA_aln <- function(qseq, tseq, aln_type='local'){
   # alm[which.max(score(alm))]
   alm
 }
-
-
 
 
 # # ============================================================================

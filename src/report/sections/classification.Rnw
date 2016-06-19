@@ -147,6 +147,8 @@ query2gap <- query2gap %>%
 
 @
 
+
+
 \subsection{Find protein matches}
 
 <<>>=
@@ -175,39 +177,77 @@ label %>% factor %>% summary
 orp.origins$label <- label
 @
 
-<<>>=
+<<cache=TRUE>>=
 qseqs <- orp.origins %>%
   subset(label %in% c('Possible-genic+', 'Possible-genic')) %$%
   seqid %>% as.character %>% unique %>%
   query$aa[.]
 
-aln1 <- function(qname) {
-  fo.cds$orphan2target %>%
-    subset(query == qname) %$% target %>% target$aa[.] %>%
-    {AA_aln(qseqs[qname], ., aln_type='local')}
-}
+  aln1 <- function(qname) {
+    fo.cds$orphan2target %>%
+      subset(query == qname) %$% target %>% target$aa[.] %>%
+      {AA_aln(qseqs[qname], ., aln_type='local')}
+  }
 
-aln <- names(qseqs) %>% lapply(aln1)
-names(aln) <- names(qseqs)
+  aln <- names(qseqs) %>% lapply(aln1)
+  names(aln) <- names(qseqs)
 
+@
+<<>>=
 genic.orp <- lapply(aln, score) %>%
   unlist %>% {.[.>40]} %>% names %>%
   sub(pattern='\\.(.).*', replacement='.\\1') %>% unique
-
-genic.loci <- lapply(aln, score) %>%
-  unlist %>% {.[.>40]} %>% names %>%
-  sub(pattern='\\..*', replacement='') %>%
-  unique
 @
-
 <<echo=TRUE>>=
-genic.loci
-@
-
-<<echo=TRUE>>=
+genic.orp
 # Here is an example of one of the genic orphans
 writePairwiseAlignments(aln[[genic.orp[1]]])
 @
+
+
+
+\subsection{Check orthology functionality against all non-orphans}
+
+<<cache=TRUE>>=
+qseqs <- origins  %>%
+  subset(!orphan) %$% 
+  seqid %>% as.character %>% unique %>%
+  query$aa[.]
+
+  aln1 <- function(qname) {
+    fo.cds$query2target %>%
+      subset(query == qname) %$% target %>% target$aa[.] %>%
+      {AA_aln(qseqs[qname], ., aln_type='local')}
+  }
+
+  aln <- names(qseqs) %>% lapply(aln1)
+  names(aln) <- names(qseqs)
+@
+<<>>=
+  N <- names(aln) %>% length
+
+  d <- data.frame(
+    seqid = names(aln),
+    n.over = lapply(aln, length) %>% unlist,
+    n.ortho = lapply(aln, score) %>% lapply(function(x) sum(x > 40)) %>% unlist
+  )
+
+  # Proportion of genes whose search intervals include at least 1 significant hit
+  lapply(aln, score) %>% lapply(function(x) any(x > 40)) %>% unlist %>% sum %>% divide_by(N)
+
+  # Proportion of genes that link to given number of orthologs
+  d$n.ortho %>% factor %>% summary
+  
+  lapply(aln, score) %>% lapply(length) %>% unlist %>% factor %>% summary
+@
+\begin{figure}[!ht]
+    \centering
+<<>>=
+hist(lapply(aln, score) %>% unlist %>% log2)
+@
+    \caption{Scores of all local alignments against target genes in search intervals}
+    \label{fig:old-score}
+\end{figure}
 
 
 \subsection{Detect overprinting}

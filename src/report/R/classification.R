@@ -153,11 +153,11 @@ featureCountTable <- function(feat){
 #' @param qfile Filename of query protein sequence fasta file (one entry)
 #' @param tfile Filename of target protein sequence fasta file (multiple entries)
 #' @return PairwiseAlignmentsSingleSubject
-AA_aln <- function(qseq, tseq){
+AA_aln <- function(qseq, tseq, aln_type='local'){
   require(Biostrings)
   data(BLOSUM80)
   # A PairwiseAlignmentsSingleSubject object
-  alm <- pairwiseAlignment(tseq, qseq, substitutionMatrix=BLOSUM80)
+  alm <- pairwiseAlignment(tseq, qseq, substitutionMatrix=BLOSUM80, type=aln_type)
   # # A good hit should be a high positive number
   # besthit <- max(score(alm))
   # alm[which.max(score(alm))]

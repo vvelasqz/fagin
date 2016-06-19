@@ -164,14 +164,44 @@ scr <- orp.origins$scrambled
 cds <- orp.origins$si.overlaps.cds
 rna <- orp.origins$si.overlaps.mRNA
 
+rel <- orp.origins$bit == '10000'
+
 label <- ifelse(scr, 'Scrambled', 'Unknown')
 label <- ifelse(!(rna | scr), 'Possible-intergenic', label)
 label <- ifelse(cds, 'Possible-genic', label)
 label <- ifelse(rna & !cds, 'Possible-hitchhiker', label)
+label <- ifelse(rel & !(rna | scr), 'intergenic', label)
+label <- ifelse(rel & cds, 'Possible-genic+', label)
+label <- ifelse(rel & rna & !cds, 'hitchhiker', label)
+
+label %>% factor %>% summary
+
+orp.origins$label <- label
 @
 
 <<>>=
-  query$aa <- query$aa[origins$gene]
+qseqs <- orp.origins %>%
+  subset(label %in% c('Possible-genic+', 'Possible-genic')) %$%
+  seqid %>% as.character %>% unique %>%
+  query$aa[.]
+
+aln1 <- function(qname) {
+  fo.cds$orphan2target %>%
+    subset(query == qname) %$% target %>% target$aa[.] %>%
+    {AA_aln(qseqs[qname], ., aln_type='local')}
+}
+
+aln <- names(qseqs) %>% lapply(aln1)
+names(aln) <- names(qseqs)
+
+genic.loci <- lapply(aln, score) %>%
+  unlist %>% {.[.>40]} %>% names %>%
+  sub(pattern='\\..*', replacement='') %>%
+  unique
+@
+
+<<echo=TRUE>>=
+genic.loci
 @
 
 \subsection{Detect overprinting}

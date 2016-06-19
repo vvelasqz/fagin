@@ -1,14 +1,36 @@
-# # ============================================================================
-# # Global classifications
-# # ============================================================================
-#
-# classify_genes <- function(queries, targets, tree) {
-#   # TODO extend to actually do multiple sequences
-#   # lapply(queries, function(q) classify_gene(query[[q]], targets[[q]], tree))
-#   query = load_query()
-#   target = load_target()
-#   classify_gene(query, target, NA) 
-# }
+# =============================================================================
+# Initialization
+# =============================================================================
+
+initializeOrigins <- function(query, target){
+  genelist <- target$si$query$seqid %>% unique
+
+  tgenes <- target$gff$seqid %>% unique
+
+  stopifnot(genelist %in% names(query$aa))
+  stopifnot(tgenes %in% names(target$aa))
+
+  # The pipeline builds the protein sequences from the GFF and genome files, so
+  # the sequence ids in the faa and search interval files should be the same.  It
+  # is perfectly plausible that some proteins are known from mRNAs but are not
+  # placed in the genome (due to missing sequence, ambiguities or curator error).
+  # It is also reasonable that the user might try to bypass my helpful protein
+  # file preparations. They might try to slip in some of their own pet proteins.
+  # I could accomadate them, but I choose not to. Indeed, I would die first:
+  stopifnot(genelist %in% names(query$aa))
+
+  data.frame(
+    seqid  = genelist,
+    orphan = genelist %in% query$orphans,
+    class  = rep('Unknown', length(genelist))
+  )
+}
+
+
+
+# =============================================================================
+# Determine syntenic knowability
+# =============================================================================
 
 summarize.flags <- function(si){
   require(dplyr)
@@ -25,7 +47,121 @@ summarize.flags <- function(si){
     as.data.frame
 }
 
+syntenicState <- function(origins, flag){
+  stopifnot(c('seqid', 'orphan') %in% names(origins))
 
+  flag <- merge(origins[c('seqid', 'orphan')], flag)
+
+  stopifnot(c('seqid', 'orphan') == names(flag)[1:2])
+
+  flag$bit <- flag[,3:ncol(flag)] %>%
+    apply(1, function(x) paste0(as.numeric(x > 0), collapse='')) %>%
+    factor
+
+  origins$bit <- flag$bit
+
+  origins$scrambled <- as.character(flag$bit == '00010')
+
+  origins
+}
+
+getBitTable <- function(origins){
+  stopifnot('bit' %in% names(origins)) 
+
+  bittbl <- data.frame(
+    non_orphan = summary(subset(origins,  orphan)$bit),
+    orphan     = summary(subset(origins, !orphan)$bit)
+  )
+
+  bittbl.norm <- bittbl %>%
+    apply(1, function(x) x / colSums(bittbl)) %>% t %>% data.frame
+
+  bittbl$bit <- row.names(bittbl)
+  bittbl.norm$bit <- bittbl$bit
+
+  m <- merge(bittbl, bittbl.norm, by='bit')
+  names(m) <- c('bit', 'orp_count', 'non_orp_count', 'orp_prop', 'non_orp_prop')
+  m
+}
+
+
+
+# ============================================================================
+# Process target features that overlap search intervals
+# ============================================================================
+
+analyzeTargetFeature <- function(query, target, feature='mRNA'){
+  # Extract the genomeInterval object of intervals of defined size
+  si <- target$si$target[target$si$target %>% size %>% is.na %>% not]
+
+  ### Map search intervals to the features they overlap
+  ft <- target$gff[target$gff$type %in% feature]
+
+  # o.ft is a list, where:
+  #  - o.ft indices -> si indices
+  #  - o.ft values  -> ft indices
+  o.ft <- interval_overlap(si, ft)
+  # Assert the above relations holds:
+  stopifnot(length(o.ft) == nrow(si))
+  stopifnot(o.ft %>% unlist %>% max <= nrow(ft))
+
+  # Make a data.frame with two columns: query seqid | target gene id
+  query2target <- lapply(o.ft, function(x) ft$seqid[x]) %>%
+      set_names(target$si$query$seqid[si$id]) %>%
+      {data.frame(
+          query=rep(x=names(.), times=lapply(., length)),
+          target=unlist(.),
+          stringsAsFactors=FALSE
+      )} %>%
+      unique
+
+  # Assert number of query genes <= total in query species
+  stopifnot(query2target$query %>% unique %>% length <=
+            query$gff$seqid %>% unique %>% length)
+
+  # Assert all orphan genes are in the input GFF
+  stopifnot(query$orphans %in% query$gff$seqid)
+
+  # Find the orphans whose search intervals overlap a target feature
+  orphan2target <- query2target[query2target$query %in% query$orphans, ] %>%
+      subset(!is.na(query)) %>%
+      droplevels
+
+  list(
+    feature=feature,
+    # overlaps is a list, where:
+    #  - o.ft indices -> si indices
+    #  - o.ft values  -> ft indices
+    overlaps = o.ft,
+    # map of queries against features that overlap one of the search intervals
+    query2target = query2target,
+    # map of orphans against features that overlap one of the search intervals
+    orphan2target = orphan2target
+  )
+}
+
+featureCountTable <- function(feat){
+  lapply(feat$overlaps, length) %>% 
+      unlist %>% factor %>% summary %>%
+      data.frame(.) %>%
+      set_names('Count')
+}
+
+
+
+# # ============================================================================
+# # Global classifications
+# # ============================================================================
+#
+# classify_genes <- function(queries, targets, tree) {
+#   # TODO extend to actually do multiple sequences
+#   # lapply(queries, function(q) classify_gene(query[[q]], targets[[q]], tree))
+#   query = load_query()
+#   target = load_target()
+#   classify_gene(query, target, NA) 
+# }
+#
+#
 # # ============================================================================
 # # Label query gene against a single search interval
 # # ============================================================================

@@ -23,59 +23,9 @@ sflags <- summarize.flags(target$si)
 \subsection{Mapping features between GFF given scaffold}
 
 <<>>=
-initializeOrigins <- function(query, target){
-  genelist <- target$si$query$seqid %>% unique
-
-  tgenes <- target$gff$seqid %>% unique
-
-  stopifnot(genelist %in% names(query$aa))
-  stopifnot(tgenes %in% names(target$aa))
-
-  # The pipeline builds the protein sequences from the GFF and genome files, so
-  # the sequence ids in the faa and search interval files should be the same.  It
-  # is perfectly plausible that some proteins are known from mRNAs but are not
-  # placed in the genome (due to missing sequence, ambiguities or curator error).
-  # It is also reasonable that the user might try to bypass my helpful protein
-  # file preparations. They might try to slip in some of their own pet proteins.
-  # I could accomadate them, but I choose not to. Indeed, I would die first:
-  stopifnot(genelist %in% names(query$aa))
-
-  data.frame(
-    seqid  = genelist,
-    orphan = origins$seqid %in% query$orphans,
-    class  = rep('Unknown', length(genelist))
-  )
-}
-
-syntenicState <- function(origins, flag){
-  flag <- merge(origins[c('seqid', 'orphan')], flag)
-
-  flag$bit <- flag[,3:ncol(flag)] %>%
-    apply(1, function(x) paste0(as.numeric(x > 0), collapse='')) %>%
-    factor
-
-  origins$bit <- flag$bit
-
-  origins
-}
-
-syntenicStateTable <- function{origins}{
-  require(xtable)
-  bittbl <- data.frame(
-    non_orphan = summary(subset(origins,  orphan)$bit),
-    orphan     = summary(subset(origins, !orphan)$bit)
-  )
-
-  bittbl.norm <- bittbl %>%
-    apply(1, function(x) x / colSums(bittbl)) %>% t %>% data.frame
-
-  bittbl$bit <- row.names(bittbl)
-  bittbl.norm$bit <- bittbl$bit
-
-  m <- merge(bittbl, bittbl.norm, by='bit')
-  names(m) <- c('bit', 'non_orp_count', 'orp_count', 'non_orp_prop', 'orp_prop')
-  xtable(m, caption='Number of genes in each syntenic class.')
-}
+origins <- initializeOrigins(query, target)
+origins <- syntenicState(origins, sflags)
+bittbl <- getBitTable(origins)
 @
 
 \begin{figure}[!ht]
@@ -84,7 +34,7 @@ syntenicStateTable <- function{origins}{
 require(reshape2)
 require(ggplot2)
 m <- melt(
-    bittbl.norm,
+    bittbl[c('bit', 'non_orp_prop', 'orp_prop')],
     id.vars='bit',
     value.name='proportion',
     variable.name='class'
@@ -95,7 +45,9 @@ ggplot(m) +
     xlab('Synteny flags') +
     ylab('Proportion') +
     theme(
-        axis.text.x = element_text(angle=270, hjust=0, vjust=1)
+        axis.text.x = element_text(angle=270, hjust=0, vjust=1),
+        legend.position=c(1, 1),
+        legend.justification=c(1, 1)
     )
 @
   \caption{\textbf{Synteny flags}. \textbf{(0)} the search interval is reliable;
@@ -105,80 +57,85 @@ ggplot(m) +
   \label{fig:synflags}
 \end{figure}
 
+
+
 <<results='asis'>>=
-origins <- initializeOrigins(query, target) %>% syntenicState(sflags)
-synteniStateTable(origins)
+require(xtable)
+xtable(bittbl, caption='Nmumber of genes in each syntenic class.')
 @
 
 
 \subsection{Find queries that overlap target CDS}
 
 <<cache=TRUE>>=
-t_si <- target$si$target[target$si$target %>% size %>% is.na %>% not]
+    cds  <- analyzeTargetFeature(query, target, feature="CDS")
+    mrna <- analyzeTargetFeature(query, target, feature="mRNA")
+    origins$si.overlaps.cds  <- origins$seqid %in% (cds$query2target$query %>% unique)
+    origins$si.overlaps.mRNA <- origins$seqid %in% (mrna$query2target$query %>% unique)
+@
 
-# -------------------------------------------------------
-# Find overlaps between search intervals and target CDSs
-# -------------------------------------------------------
-t_CDS <- target$gff[target$gff$type == "CDS"]
 
-o.t <- interval_overlap(t_si, t_CDS)
-# There should be one entry in o for each feature in gff
-stopifnot(length(o.t) == nrow(t_si))
+<<results='asis'>>=
+require(xtable)
+featureCountTable(cds) %>%
+  xtable(caption='Number of target CDSs overlapping one search interval')
 @
 
 <<results='asis'>>=
 require(xtable)
-lapply(o.t, length) %>% 
-    unlist %>% factor %>% summary %>%
-    data.frame(.) %>%
-    set_names('Count') %>%
-    xtable(caption='Number of target genes overlapping one search interval')
-@
-
-
-<<>>=
-# number of target CDSs that overlap to at least one search interal
-o.t %>% unlist %>% unique %>% length
+featureCountTable(mrna) %>%
+  xtable(caption='Number of target mRNAs overlapping one search interval')
 @
 
 <<>>=
-# Ensure all ids are within the array bounds of t_CDS
-stopifnot(o.t %>% unlist %>% max <= nrow(t_CDS))
-
-# Make a data.frame with two columns: query seqid | target gene id
-query2target <- lapply(o.t, function(x) t_CDS$seqid[x]) %>%
-    set_names(target$si$query$seqid[t_si$id]) %>%
-    unlist %>%
-    data.frame(query=names(.), target=.) %>%
-    unique
-
-stopifnot(query$orphans %in% query$gff$seqid)
-
-# Find the orphans with apparent overlaps
-orphan2target <- query2target[query$gff$seqid %in% query$orphans, ] %>%
-    subset(!is.na(query)) %>%
-    droplevels
-
-# Now just search every query against the appropriate target gene
-# To estimate significance, permute the indices and do the same again.
+n.orp.cds  <- length(unique(cds$query2target$seqid))
+n.orp.mrna <- length(unique(mrna$query2target$seqid))
+n.orp <- query$orphans %>% unique %>% length
 @
+
+\begin{table}[!ht]
+    \centering
+    \label{tab:label}
+    \begin{tabular}{l | l | l}
+    feature & count & percent \\ 
+    \hline
+    CDS  \Sexpr{n.orp.cds}  & \%\Sexpr{signif(100 * n.orp.cds  / n.orp, 2)} \\
+    mRNA \Sexpr{n.orp.mrna} & \%\Sexpr{signif(100 * n.orp.mrna / n.orp, 2)} \\
+    \hline
+    \end{tabular}
+    \caption{Number of orphans with search intervals overlapping given features}
+\end{table}
+
+
 
 \subsection{Find queries overlapping N-strings}
 
 <<>>=
-# Find overlaps between search intervals and N-strings
-o.n <- interval_overlap(t_si, nstring)
-# There should be one entry in o for each feature in gff
-stopifnot(length(o.n) == nrow(t_si))
+# Extract the genomeInterval object of intervals of defined size
+si <- target$si$target[target$si$target %>% size %>% is.na %>% not]
 
-names(o.n) <- target$si$query$seqid[t_si$id]
+# Find overlaps between search intervals and N-strings
+o.n <- interval_overlap(si, nstring)
+# There should be one entry in o for each feature in gff
+stopifnot(length(o.n) == nrow(si))
+
 
 # List of genes where at least on search interval maps to a gap
-query2gap <- o.n %>% unlist %>% 
+ids <- which(lapply(o.n, length) > 0)
+query2gap <- o.n[ids]
+ids <- rep(ids, times=lapply(query2gap, length) %>% unlist)
+stopifnot(length(ids) == query2gap %>% unlist %>% length)
+
+query2gap <- query2gap %>%
+  unlist %>% 
+  {
     data.frame(
-        seqid=names(.),
-        length=size(nstring[., ])
+      query=target$si$query$seqid[ids],
+      length=size(nstring[., ])
     )
+  }
+
+  origins$si.overlaps.gap <- origins$seqid %in% query2gap$query
 @
 
 \subsection{Find protein matches}
@@ -192,3 +149,22 @@ query2gap <- o.n %>% unlist %>%
 \subsection{Detect protein hit to ngORF}
 
 \subsection{Find DNA hit}
+
+\subsection{Final Classifications}
+
+<<>>=
+orp.origins <- subset(origins, orphan)
+
+bscr <- orp.origins$scrambled %>% as.logical
+bcds <- orp.origins$si.overlaps.cds %>% as.logical
+brna <- orp.origins$si.overlaps.mRNA %>% as.logical
+
+label <- ifelse(bscr, 'Scrambled', 'Unknown')
+label <- ifelse(!(brna | bscr), 'Possible-intergenic', label)
+label <- ifelse(bcds, 'Possibly-genic', label)
+label <- ifelse(brna & !bcds, 'Possibly-intronic', label)
+@
+
+<<echo=TRUE>>=
+label %>% factor %>% summary
+@

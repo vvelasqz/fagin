@@ -30,7 +30,7 @@ nstring <- LoadNString(args$nstring)
 @
 
 \subsection{Gene feature format file for focal species}
-<<results='asis'>>=
+<<results='asis', cache=TRUE>>=
 plyr::ddply(
     annotation(gff),
     'seq_name',
@@ -40,7 +40,7 @@ plyr::ddply(
 @
 
 \subsection{Syntenic ouput of SatsumaSynteny}
-<<results='asis'>>=
+<<results='asis', cache=TRUE>>=
 plyr::ddply(
     annotation(syn$query),
     'seq_name',

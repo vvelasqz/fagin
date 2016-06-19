@@ -22,15 +22,15 @@ sflags <- summarize.flags(target$si)
 
 \subsection{Mapping features between GFF given scaffold}
 
-<<>>=
+<<cache=TRUE>>=
 origins <- initializeOrigins(query, target)
 origins <- syntenicState(origins, sflags)
-bittbl <- getBitTable(origins)
+bittbl  <- getBitTable(origins)
 @
 
 \begin{figure}[!ht]
     \centering
-<<fig.width=6, fig.height=4, message=FALSE>>=
+<<fig.width=6, fig.height=4, message=FALSE, cache=TRUE>>=
 require(reshape2)
 require(ggplot2)
 m <- melt(
@@ -68,28 +68,42 @@ xtable(bittbl, caption='Nmumber of genes in each syntenic class.')
 \subsection{Find queries that overlap target CDS}
 
 <<cache=TRUE>>=
-    cds  <- analyzeTargetFeature(query, target, feature="CDS")
-    mrna <- analyzeTargetFeature(query, target, feature="mRNA")
-    origins$si.overlaps.cds  <- origins$seqid %in% (cds$query2target$query %>% unique)
-    origins$si.overlaps.mRNA <- origins$seqid %in% (mrna$query2target$query %>% unique)
+    fo.cds  <- analyzeTargetFeature(query, target, feature="CDS")
+    fo.mrna <- analyzeTargetFeature(query, target, feature="mRNA")
 @
 
 
-<<results='asis'>>=
-require(xtable)
-featureCountTable(cds) %>%
-  xtable(caption='Number of target CDSs overlapping one search interval')
+\begin{figure}[!ht]
+    \centering
+<<fig.width=6, fig.height=4, message=FALSE, cache=TRUE>>=
+require(ggplot2)
+require(scales)
+featureCountTable(fo.cds) %>%
+  {data.frame(
+    N.cds=as.numeric(row.names(.)),
+    count=.$Count)
+  } %>%
+  ggplot +
+    geom_point(aes(x=N.cds, y=count)) +
+    xlab('Number of overlapped CDSs') +
+    ylab('Number of search intervals (log2)') +
+    scale_y_continuous(
+      trans='log2',
+      breaks=trans_breaks('log2', function(x) round(2^x))
+    )
 @
+  \caption{Number of CDS's overlapped by a single search interval}.
+\end{figure}
 
 <<results='asis'>>=
 require(xtable)
-featureCountTable(mrna) %>%
+featureCountTable(fo.mrna) %>%
   xtable(caption='Number of target mRNAs overlapping one search interval')
 @
 
 <<>>=
-n.orp.cds  <- length(unique(cds$query2target$seqid))
-n.orp.mrna <- length(unique(mrna$query2target$seqid))
+n.orp.cds  <- fo.cds$orphan2target$query  %>% unique %>% length
+n.orp.mrna <- fo.mrna$orphan2target$query %>% unique %>% length
 n.orp <- query$orphans %>% unique %>% length
 @
 
@@ -99,8 +113,8 @@ n.orp <- query$orphans %>% unique %>% length
     \begin{tabular}{l | l | l}
     feature & count & percent \\ 
     \hline
-    CDS  \Sexpr{n.orp.cds}  & \%\Sexpr{signif(100 * n.orp.cds  / n.orp, 2)} \\
-    mRNA \Sexpr{n.orp.mrna} & \%\Sexpr{signif(100 * n.orp.mrna / n.orp, 2)} \\
+    CDS  & \Sexpr{n.orp.cds}  & \%\Sexpr{signif(100 * n.orp.cds  / n.orp, 2)} \\
+    mRNA & \Sexpr{n.orp.mrna} & \%\Sexpr{signif(100 * n.orp.mrna / n.orp, 2)} \\
     \hline
     \end{tabular}
     \caption{Number of orphans with search intervals overlapping given features}
@@ -135,10 +149,26 @@ query2gap <- query2gap %>%
     )
   }
 
-  origins$si.overlaps.gap <- origins$seqid %in% query2gap$query
 @
 
 \subsection{Find protein matches}
+
+<<>>=
+origins$si.overlaps.cds  <- origins$seqid %in% (fo.cds$query2target$query %>% unique)
+origins$si.overlaps.mRNA <- origins$seqid %in% (fo.mrna$query2target$query %>% unique)
+origins$si.overlaps.gap  <- origins$seqid %in% query2gap$query
+
+orp.origins <- subset(origins, orphan)
+
+scr <- orp.origins$scrambled
+cds <- orp.origins$si.overlaps.cds
+rna <- orp.origins$si.overlaps.mRNA
+
+label <- ifelse(scr, 'Scrambled', 'Unknown')
+label <- ifelse(!(rna | scr), 'Possible-intergenic', label)
+label <- ifelse(cds, 'Possible-genic', label)
+label <- ifelse(rna & !cds, 'Possible-hitchhiker', label)
+@
 
 <<>>=
   query$aa <- query$aa[origins$gene]
@@ -151,19 +181,6 @@ query2gap <- query2gap %>%
 \subsection{Find DNA hit}
 
 \subsection{Final Classifications}
-
-<<>>=
-orp.origins <- subset(origins, orphan)
-
-bscr <- orp.origins$scrambled %>% as.logical
-bcds <- orp.origins$si.overlaps.cds %>% as.logical
-brna <- orp.origins$si.overlaps.mRNA %>% as.logical
-
-label <- ifelse(bscr, 'Scrambled', 'Unknown')
-label <- ifelse(!(brna | bscr), 'Possible-intergenic', label)
-label <- ifelse(bcds, 'Possibly-genic', label)
-label <- ifelse(brna & !bcds, 'Possibly-intronic', label)
-@
 
 <<echo=TRUE>>=
 label %>% factor %>% summary

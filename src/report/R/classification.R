@@ -60,7 +60,7 @@ syntenicState <- function(origins, flag){
 
   origins$bit <- flag$bit
 
-  origins$scrambled <- as.character(flag$bit == '00010')
+  origins$scrambled <- flag$bit == '00001'
 
   origins
 }
@@ -147,6 +147,24 @@ featureCountTable <- function(feat){
       set_names('Count')
 }
 
+#' Compare a protein query sequence to set of protein target sequences
+#'
+#' @export
+#' @param qfile Filename of query protein sequence fasta file (one entry)
+#' @param tfile Filename of target protein sequence fasta file (multiple entries)
+#' @return PairwiseAlignmentsSingleSubject
+AA_aln <- function(qseq, tseq){
+  require(Biostrings)
+  data(BLOSUM80)
+  # A PairwiseAlignmentsSingleSubject object
+  alm <- pairwiseAlignment(tseq, qseq, substitutionMatrix=BLOSUM80)
+  # # A good hit should be a high positive number
+  # besthit <- max(score(alm))
+  # alm[which.max(score(alm))]
+  alm
+}
+
+
 
 
 # # ============================================================================
@@ -166,20 +184,6 @@ featureCountTable <- function(feat){
 # # Label query gene against a single search interval
 # # ============================================================================
 #
-# #' Compare a protein query sequence to set of protein target sequences
-# #'
-# #' @export
-# #' @param qfile Filename of query protein sequence fasta file (one entry)
-# #' @param tfile Filename of target protein sequence fasta file (multiple entries)
-# #' @return PairwiseAlignmentsSingleSubject
-# get_match <- function(qseq, tseq){
-#   data(BLOSUM80)
-#   # A PairwiseAlignmentsSingleSubject object
-#   alm <- pairwiseAlignment(tseq, qseq, substitutionMatrix=BLOSUM80)
-#   # A good hit should be a high positive number
-#   besthit <- max(score(alm))
-#   alm[which.max(score(alm))]
-# }
 #
 # gene_is_deleted <- function(){ FALSE }
 #

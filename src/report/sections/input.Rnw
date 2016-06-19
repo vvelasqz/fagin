@@ -100,7 +100,7 @@ nstring.g <- ggplot(d) +
 @
 \begin{figure}[!ht]
     \centering
-<<>>=
+<<cache=TRUE>>=
 nstring.g
 @
     \caption{\textbf{Strings of unknowns}. Most assemblies have certain regions
@@ -121,7 +121,7 @@ kbcomp.g <- ggplot(kbcomp) +
 @
 \begin{figure}[!ht]
   \centering
-<<>>=
+<<cache=TRUE>>=
 kbcomp.g
 @
     \caption{\textbf{GC content of 10000 random 1kb intervals}. Any interval with 1 or more N's was ignored.}

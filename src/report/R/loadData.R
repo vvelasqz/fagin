@@ -118,7 +118,30 @@ LoadNString <- function(nstring.file){
   lapply(g, function(x) MakeGI(starts=x$start, stops=x$stop, scaffolds=x$seqid))
 }
 
-LoadSearchIntervals <- function(sifile){
+#' Load search intervals
+#'
+#' Input columns in sifile
+#' 1. gene   - query gene name
+#' 2. qchr   - query chromosome name
+#' 3. qstart - query start
+#' 4. qstop  - query stop
+#' 5. tchr   - target chromosome
+#' 6. tstart - target start
+#' 7. tstop  - target stop
+#' 8. flag   - syntenic flag, one of the following:
+#'    * 0 - query is fully within the target interval
+#'    * 1 - query starts outside the interval but stops inside
+#'    * 2 - query stops outside the interval but starts inside 
+#'    * 3 - query fully contains the target interval (start and stop unbounded)
+#'    * 4 - query does not overlap the target interval (unbound and unanchored)
+#'
+#' If the *extend* option is set, then unbounded edges of search intervals are
+#' extended by the length of the query gene times *extend_factor*.
+#'
+#' @param sifile input TAB delimited file
+#' @param extend (bool) if anchored (flag [123]), extend flanks by query length
+#' @param extend_factor a multiplier for extension
+LoadSearchIntervals <- function(sifile, extend=FALSE, extend_factor=1){
   require(magrittr)
   si <- read.table(sifile, stringsAsFactors=FALSE)
 
@@ -127,6 +150,14 @@ LoadSearchIntervals <- function(sifile){
   names(si) <- c('gene', 'qchr', 'qstart', 'qstop', 'tchr', 'tstart', 'tstop', 'flag')
   si$tstart <- gsub('\\.', NA, si$tstart) %>% as.numeric
   si$tstop <- gsub('\\.', NA, si$tstop) %>% as.numeric
+
+  if(extend){
+    extend_length <- with(si, qstop - qstart + 1) * extend_factor
+    el <- si$flag == 1 | si$flag == 3
+    er <- si$flag == 2 | si$flag == 3
+    si$tstart[el] <- si$tstart[el] - extend_length[el] %>% pmax(0)
+    si$tstop[er]  <- si$tstop[er]  + extend_length[er]
+  }
 
   stopifnot(si$flag %in% 0:4)
 

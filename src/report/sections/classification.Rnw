@@ -1,9 +1,7 @@
-<<cache=FALSE, message=FALSE, warning=FALSE>>=
+<<message=FALSE, warning=FALSE>>=
 source('~/src/git/cadmium/src/report/R/classification.R')
 source('~/src/git/cadmium/src/report/R/loadData.R')
-@
 
-<<cache=TRUE, message=FALSE, warning=FALSE>>=
 rdat <- "~/src/git/cadmium/input/io.Rdat"
 if(file.exists(rdat)){
   load(rdat)
@@ -27,7 +25,37 @@ if(file.exists(rdat)){
   bittbl  <- getBitTable(origins)
   fo.cds  <- analyzeTargetFeature(query, target, feature="CDS")
   fo.mrna <- analyzeTargetFeature(query, target, feature="mRNA")
-  save(query, target, nstring, sflags, origins, bittbl, fo.cds, fo.mrna, file=rdat)
+  query2gap <- findQueryGaps(nstring=nstring, target=target)
+  save(
+    query,      # query aa seqs, gff, and orphan list
+    target,     # target aa seqs, siearch intervals, gff, synteny map, and dna file
+    nstring,    # genomeIntervals object, positions of N-strings
+    sflags,     # syntenic flags for each query sequence
+    origins,    # origins file: [ seqid, orphan, class, bit, scrambled ]
+    bittbl,     # summary of syntenic states
+    fo.cds,     # overlaps of query genes against target CDSs
+    fo.mrna,    # overlaps of query genes against target mRNAs
+    query2gap, # table listing all genes that overlap an N-string, and the N-string length
+    file=rdat
+  )
+}
+
+alnrdat <- "~/src/git/cadmium/input/aln.Rdat"
+if(file.exists(alnrdat)){
+  load(alnrdat)
+} else {
+  aln <- AA_aln(
+    map=fo.cds$query2target,
+    query=query,
+    target=target
+  )
+  alnsum <- mutate(aln$scores, ortholog = score > 60) %>%
+    group_by(query) %>%
+    summarize(
+      n.over = length(query),
+      n.orth = sum(ortholog)
+    )
+  save(aln, alnsum, file=alnrdat)
 }
 @
 
@@ -120,131 +148,78 @@ n.orp <- query$orphans %>% unique %>% length
 \end{table}
 
 
-
 \subsection{Find queries overlapping N-strings}
-
-<<>>=
-# Extract the genomeInterval object of intervals of defined size
-si <- target$si$target[target$si$target %>% size %>% is.na %>% not]
-
-# Find overlaps between search intervals and N-strings
-o.n <- interval_overlap(si, nstring)
-# There should be one entry in o for each feature in gff
-stopifnot(length(o.n) == nrow(si))
-
-
-# List of genes where at least on search interval maps to a gap
-ids <- which(lapply(o.n, length) > 0)
-query2gap <- o.n[ids]
-ids <- rep(ids, times=lapply(query2gap, length) %>% unlist)
-stopifnot(length(ids) == query2gap %>% unlist %>% length)
-
-query2gap <- query2gap %>%
-  unlist %>% 
-  {
-    data.frame(
-      query=target$si$query$seqid[ids],
-      length=size(nstring[., ])
-    )
-  }
-@
-
 
 
 \subsection{Find protein matches}
-
-<<>>=
-origins$si.overlaps.cds  <- origins$seqid %in% (fo.cds$query2target$query %>% unique)
-origins$si.overlaps.mRNA <- origins$seqid %in% (fo.mrna$query2target$query %>% unique)
-origins$si.overlaps.gap  <- origins$seqid %in% query2gap$query
-
-orp.origins <- subset(origins, orphan)
-
-scr <- orp.origins$scrambled
-cds <- orp.origins$si.overlaps.cds
-rna <- orp.origins$si.overlaps.mRNA
-
-rel <- orp.origins$bit == '10000'
-
-label <- ifelse(scr, 'Scrambled', 'Unknown')
-label <- ifelse(!(rna | scr), 'Possible-intergenic', label)
-label <- ifelse(cds, 'Possible-genic', label)
-label <- ifelse(rna & !cds, 'Possible-hitchhiker', label)
-label <- ifelse(rel & !(rna | scr), 'intergenic', label)
-label <- ifelse(rel & cds, 'Possible-genic+', label)
-label <- ifelse(rel & rna & !cds, 'hitchhiker', label)
-
-label %>% factor %>% summary
-
-orp.origins$label <- label
-@
-
-<<>>=
-alnrdat <- "~/src/git/cadmium/input/aln.Rdat"
-if(file.exists(alnrdat)){
-  load(alnrdat)
-} else {
-  aln <- AA_aln(
-    map=fo.cds$query2target,
-    query=query,
-    target=target
-  )
-
-  alnsum <- mutate(aln$scores, ortholog = score > 40) %>%
-    group_by(query) %>%
-    summarize(
-      n.over = length(query),
-      n.orth = sum(ortholog)
-    )
-
-  save(aln, alnsum, file=alnrdat)
-}
-@
-
-<<>>=
-orp.qname <- orp.origins %>%
-  subset(label %in% c('Possible-genic+', 'Possible-genic')) %$%
-  seqid %>% as.character %>% unique
-@
-
 
 
 \subsection{Check orthology functionality against all non-orphans}
 
 <<>>=
-  old.qname <- origins %>%
-    subset(!orphan) %$% 
-    seqid %>% as.character %>% unique
+old.qname <- origins %>%
+  subset(!orphan) %$% 
+  seqid %>% as.character %>% unique
 
-  # total number of old genes
-  n.total <- length(old.qname)
+# total number of old genes
+n.total <- length(old.qname)
 
-  # number of old genes that do not overlap a CDS
-  n.missing <- old.qname %in% alnsum$query %>% not %>% sum
+# number of old genes that do not overlap a CDS
+n.missing <- old.qname %in% alnsum$query %>% not %>% sum
 
-  d <- alnsum[alnsum$query %in% old.qname, ]
+d <- alnsum[alnsum$query %in% old.qname, ]
 
-  # Proportion of genes whose search intervals overlap at least 1 CDS
-  nrow(d) / n.total 
+# Proportion of genes whose search intervals overlap at least 1 CDS
+perc.with.over <- signif(nrow(d) / n.total, 3) * 100 
 
-  # Proportion of genes that link to given number of orthologs
-  sum(d$n.orth > 0) / n.total
+# Proportion of genes that link to given number of orthologs
+perc.with.orth <- signif(sum(d$n.orth > 0) / n.total, 3) * 100 
 
-  # summary of the number of orthologs found
-  d$n.orth %>% factor %>% summary
+# summary of the number of orthologs found
+s.orth <- d$n.orth %>% factor %>% summary
 
-  # summary of the number of overlapping genes found
-  d$n.over %>% factor %>% summary
+# summary of the number of overlapping genes found
+s.over <- d$n.over %>% factor %>% summary
 @
+<<>>=
+m <- data.frame(
+  group = c(rep('Ortholog', length(s.orth)),
+            rep('Overlapping', length(s.over)+1)),
+  N = c(names(s.orth), '0', names(s.over)) %>% as.integer,
+  count = c(s.orth, n.missing, s.over)
+)
+@
+<<results='asis'>>=
+require(xtable)
+m %>% xtable(caption=sprintf(
+ '\\textbf{Ortholog}: the number of query genes (count) where N target genes
+ both overlap a search interval AND have a high protein sequence similarity
+ score.  \\textbf{Overlapping}: the number of query genes (count) where N
+ target genes overlap a search interval.  %s\\%% of query genes have overlaps
+ and %s\\%% have identified orthologs.', perc.with.over, perc.with.orth))
+@
+
 \begin{figure}[!ht]
     \centering
-<<>>=
-hist(lapply(old.aln, score) %>% unlist %>% log2)
+<<fig.width=6, fig.height=6>>=
+require(ggplot2)
+require(scales)
+ggplot(aln$scores) +
+  geom_histogram(aes(x=score, y=..density..), bins=60) +
+  ggtitle('Protein alignment scores') +
+  xlab('Score') +
+  scale_x_continuous(
+    trans='log2',
+    breaks=trans_breaks('log2', function(x) round(2^x))
+  )
 @
-    \caption{Scores of all local alignments against target genes in search intervals}
-    \label{fig:old-score}
+  \caption{
+    Scores of all local alignments against target genes in search intervals.
+    Note the bimodal distribution, which corresponds to the score of
+    non-homologous intervals versus homologous ones.
+  }
+  \label{fig:old-score}
 \end{figure}
-
 
 \subsection{Detect overprinting}
 
@@ -252,8 +227,83 @@ hist(lapply(old.aln, score) %>% unlist %>% log2)
 
 \subsection{Find DNA hit}
 
+\subsection{Leaf labels}
+
+<<>>=
+orp.origins <- subset(origins, orphan)
+
+orpseq <- orp.origins$seqid
+
+# Synteny is scrambled
+scr <- orp.origins$bit == '00001'
+# synteny is reliable
+rel <- orp.origins$bit == '10000'
+# at least one search interval overlaps a target CDS
+cds <- orpseq %in% (fo.cds$query2target$query %>% unique)
+# at least one search interval overlaps a target mRNA
+rna <- orpseq %in% (fo.mrna$query2target$query %>% unique)
+# the query has an ortholog in the target
+gen <- orpseq %in% (aln$scores %>% filter(score > 60) %$% query)
+# at least search interval overlaps a N-string
+nst <- orpseq %in% query2gap$query
+### TODO - add:
+# del - is deleted
+# nuc - has nucleotide match in SI
+# orf - has ngORF match in SI
+# pri - is overprinted
+
+stopifnot(which(gen) %in% which(cds))
+stopifnot(which(cds) %in% which(rna))
+stopifnot(intersect(which(scr), which(rel)) == 0)
+
+
+label <- rep('unknown', nrow(orp.origins))
+
+label[       !(rna | scr) ] <- 'possible-intergenic'
+label[ rel & !(rna | scr) ] <- 'intergenic'
+label[ rna & !cds         ] <- 'possible-hitchhiker'
+label[ cds & !gen         ] <- 'possible-genic'
+label[ gen                ] <- 'confirmed-genic'
+
+label[label == 'unknown' & nst ] <- 'unknown-gapped'
+label[label == 'unknown' & scr ] <- 'unknown-scrambled'
+
+orp.origins$label <- label
+@
+
+<<results='asis'>>=
+label %>%
+  factor %>%
+  summary %>%
+  as.data.frame %>%
+  set_names('count') %>%
+  xtable(caption='Labels for orphan genes')
+@
+
+\begin{description}
+
+  \item[Confirmed-genic] Query maps to one or more CDSs, and is significantly
+    similar to at least one of the annotated target genes.
+
+  \item[Intergenic] Query maps to no mRNAs and ALL search intervals are
+    bounded. The query overlaps no \textit{annotated} target gene.
+
+  \item[Possible-genic] Query maps to one or more CDSs, but there is no
+    predicted protein sequence similarity. 
+
+  \item[Possible-hitchhiker] Query maps to one or more mRNAs but to no CDSs.
+
+  \item[Possible-intergenic] Query maps to no mRNAs, but one or more search
+    intervals is unbounded.
+
+  \item[Unknown-gapped] The gene is of unknown origin and overlaps an
+    unassembled regions (N-string).
+
+  \item[Unknown-scrambled] No search intervals could be predicted for the query.
+
+\end{description}
+
 \subsection{Final Classifications}
 
-<<echo=TRUE>>=
-label %>% factor %>% summary
-@
+Recursively merge all leaf labels to form final predictions of ancenstral
+classes.

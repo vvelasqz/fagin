@@ -1,3 +1,8 @@
+require(magrittr)
+require(genomeIntervals)
+require(Biostrings)
+require(dplyr)
+
 # =============================================================================
 # Initialization
 # =============================================================================
@@ -33,8 +38,6 @@ initializeOrigins <- function(query, target){
 # =============================================================================
 
 summarize.flags <- function(si){
-  require(dplyr)
-  require(magrittr)
   data.frame(seqid=si$query$seqid, flag=si$target$flag) %>%
     dplyr::group_by(seqid) %>%
     summarize(
@@ -140,6 +143,8 @@ analyzeTargetFeature <- function(query, target, feature='mRNA'){
   )
 }
 
+
+
 featureCountTable <- function(feat){
   lapply(feat$overlaps, length) %>% 
       unlist %>% factor %>% summary %>%
@@ -149,12 +154,37 @@ featureCountTable <- function(feat){
 
 
 
+findQueryGaps <- function(nstring, target){
+  # Extract the genomeInterval object of intervals of defined size
+  si <- target$si$target[target$si$target %>% size %>% is.na %>% not]
+
+  # Find overlaps between search intervals and N-strings
+  o.n <- interval_overlap(si, nstring)
+  # There should be one entry in o for each feature in gff
+  stopifnot(length(o.n) == nrow(si))
+
+  # List of genes where at least one search interval maps to a gap
+  ids <- which(lapply(o.n, length) > 0)
+  query2gap <- o.n[ids]
+  ids <- rep(ids, times=lapply(query2gap, length) %>% unlist)
+  stopifnot(length(ids) == query2gap %>% unlist %>% length)
+
+  query2gap %>% unlist %>% 
+    {
+      data.frame(
+        query=target$si$query$seqid[ids],
+        length=size(nstring[., ])
+      )
+    }
+}
+
+
+
 # ============================================================================
 # Search sequence
 # ============================================================================
 
 AA_aln <- function(map, query, target){
-  require(Biostrings)
   data(BLOSUM80)
 
   # Align all orphans that possibly overlap a coding sequence

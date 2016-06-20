@@ -147,6 +147,37 @@ n.orp <- query$orphans %>% unique %>% length
     \caption{Number of orphans with search intervals overlapping given features}
 \end{table}
 
+\subsection{Find indel events}
+
+<<>>=
+ind <- findIndels(target, indel.threshold=0.05)
+
+q.res <- ind$d.sum %>% subset(N == n.resized) %$% seqid
+q.ind <- ind$d.sum %>% subset(N == n.indel)   %$% seqid
+
+# In this set of genes, an indel or resize has occurred in one or more search
+# intervals, but NOT in all of the search intervals.
+d.irr <- ind$d.sum %>% subset(N > (n.indel + n.resized))
+
+# All indel/resize event containing sequences must fall into one of the three above categories
+stopifnot(length(q.res) + length(q.ind) + nrow(d.irr) == nrow(ind$d.sum))
+@
+
+<<echo=TRUE>>=
+ind$d.sum %>% subset(type == "indel") %$% n.indel %>% factor %>% summary
+ind$d.sum %>% subset(type == "resized") %$% n.resized %>% factor %>% summary
+
+ind$d.sum %>% subset(type == "selective") %$% N %>% factor %>% summary
+ind$d.sum %>% subset(type == "selective") %$% n.indel %>% factor %>% summary
+ind$d.sum %>% subset(type == "selective") %$% n.resized %>% factor %>% summary
+@
+
+At least in the Arabidopsis thaliana versus Arabidopsis lyrata, all indel and
+resize events occur in no more than one search interval for a given query. In
+\Sexpr{length(q.res)} cases, the gene maps to only 1 search interval and is
+resized in it. Similarly for the \Sexpr{length(q.ind)} cases of indels. There
+are \Sexpr{nrow(d.irr)} cases where a gene maps to multiple search intervals,
+but still, only one of them is reduced or resized.
 
 \subsection{Find queries overlapping N-strings}
 
@@ -246,11 +277,14 @@ rna <- orpseq %in% (fo.mrna$query2target$query %>% unique)
 gen <- orpseq %in% (aln$scores %>% filter(score > 60) %$% query)
 # at least search interval overlaps a N-string
 nst <- orpseq %in% query2gap$query
+# number of confirmed indels (based on search interval size)
+ind <- orpseq %in% q.ind
+
 ### TODO - add:
-# del - is deleted
 # nuc - has nucleotide match in SI
 # orf - has ngORF match in SI
 # pri - is overprinted
+
 
 stopifnot(which(gen) %in% which(cds))
 stopifnot(which(cds) %in% which(rna))
@@ -264,11 +298,14 @@ label[ rel & !(rna | scr) ] <- 'intergenic'
 label[ rna & !cds         ] <- 'possible-hitchhiker'
 label[ cds & !gen         ] <- 'possible-genic'
 label[ gen                ] <- 'confirmed-genic'
+label[ ind                ] <- 'indel'
 
 label[label == 'unknown' & nst ] <- 'unknown-gapped'
 label[label == 'unknown' & scr ] <- 'unknown-scrambled'
 
 orp.origins$label <- label
+
+orp.origins$resized <- ifelse(orp.origins$seqid %in% q.res, TRUE, FALSE)
 @
 
 <<results='asis'>>=
@@ -284,6 +321,9 @@ label %>%
 
   \item[Confirmed-genic] Query maps to one or more CDSs, and is significantly
     similar to at least one of the annotated target genes.
+
+  \item[Indel] Query maps to bounded search interval that are less than 5\% the
+    query gene length. AND the query maps to no other intervals.
 
   \item[Intergenic] Query maps to no mRNAs and ALL search intervals are
     bounded. The query overlaps no \textit{annotated} target gene.

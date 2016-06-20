@@ -90,6 +90,59 @@ getBitTable <- function(origins){
 
 
 # ============================================================================
+# Find indels
+# ============================================================================
+
+#' Find possible indels or genes of resized size
+#'
+#' An indel is identified based on the following two criteria:
+#' 1. The search interval must be bounded (flag == 0)
+#' 2. The target to query ratio must be smaller than the given threshold
+#'    (default=0.05)
+#'
+#' A resized gene is identified based on the following criteria
+#' 1. The search interval must be bounded (flag == 0)
+#' 2. The search interval must NOT be an indel (as defined above)
+#' 3. The target to query ratio must be smaller than 1
+#'
+#' @param x target list
+#' @return list(d=data.frame(t.size | id | seqid | q.size | indel | resized),
+#'              d.sum=data.frame(seqid | n.indel | n.resized | N)
+findIndels <- function(target, indel.threshold=0.05){
+  d <- data.frame(
+    t.size = target$si$target %>% size,
+    id = target$si$target$id,
+    flag = target$si$target$flag
+  )
+  d$seqid   <- target$si$query$seqid[d$id]
+  d$q.size  <- target$si$query[d$id] %>% size
+  d$indel   <- with(d, t.size / q.size < indel.threshold & flag == 0)
+  d$resized <- with(d, t.size < q.size & flag == 0 & !indel)
+
+  d <- d[d$seqid %in% d$seqid[d$resized | d$indel], ]
+  d$flag <- NULL
+  d.sum <- group_by(d, seqid) %>% 
+    summarize(
+      n.indel = sum(indel),
+      n.resized = sum(resized),
+      N = length(indel)
+    )
+
+  is.indel     <- with(d.sum, N == n.indel)
+  is.resized   <- with(d.sum, N == n.resized)
+  is.selective <- with(d.sum, N > (n.resized + n.indel))
+
+  d.sum$type                 <- 'mixed'
+  d.sum[is.indel,     ]$type <- 'indel' 
+  d.sum[is.resized,   ]$type <- 'resized' 
+  d.sum[is.selective, ]$type <- 'selective' 
+  d.sum$type <- factor(d.sum$type, levels=c('mixed', 'indel', 'resized', 'selective'))
+
+  list(d=d, d.sum=d.sum)
+}
+
+
+# ============================================================================
 # Process target features that overlap search intervals
 # ============================================================================
 

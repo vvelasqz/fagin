@@ -153,21 +153,20 @@ featureCountTable <- function(feat){
 # Search sequence
 # ============================================================================
 
-#' Compare a protein query sequence to set of protein target sequences
-#'
-#' @export
-#' @param qfile Filename of query protein sequence fasta file (one entry)
-#' @param tfile Filename of target protein sequence fasta file (multiple entries)
-#' @return PairwiseAlignmentsSingleSubject
-AA_aln <- function(qseq, tseq, aln_type='local'){
+AA_aln <- function(map, query, target){
   require(Biostrings)
   data(BLOSUM80)
-  # A PairwiseAlignmentsSingleSubject object
-  alm <- pairwiseAlignment(tseq, qseq, substitutionMatrix=BLOSUM80, type=aln_type)
-  # # A good hit should be a high positive number
-  # besthit <- max(score(alm))
-  # alm[which.max(score(alm))]
-  alm
+
+  # Align all orphans that possibly overlap a coding sequence
+  aln <- pairwiseAlignment(
+    pattern=query$aa[map$query],
+    subject=target$aa[map$target],
+    type='local',
+    substitutionMatrix=BLOSUM80
+  )
+  map$score <- score(aln)
+
+  list(scores=map, alignments=aln)
 }
 
 

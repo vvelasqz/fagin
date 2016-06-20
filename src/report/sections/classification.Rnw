@@ -4,31 +4,34 @@ source('~/src/git/cadmium/src/report/R/loadData.R')
 @
 
 <<cache=TRUE, message=FALSE, warning=FALSE>>=
-query <- LoadQuery(
-  aafile="~/src/git/cadmium/input/faa/Arabidopsis_thaliana.faa",
-  gfffile="~/src/git/cadmium/input/gff/Arabidopsis_thaliana.gff",
-  orphanfile="~/src/git/cadmium/input/orphan-list.txt"
-)
-target <- LoadTarget(
-  aafile="~/src/git/cadmium/input/faa/Arabidopsis_lyrata.faa",
-  dnafile="~/src/git/cadmium/input/fna/Arabidopsis_lyrata.fna",
-  sifile="~/src/git/cadmium/input/maps/Arabidopsis_thaliana.vs.Arabidopsis_lyrata.map.tab",
-  synfile="~/src/git/cadmium/input/syn/Arabidopsis_thaliana.vs.Arabidopsis_lyrata.syn",
-  gfffile="~/src/git/cadmium/input/gff/Arabidopsis_lyrata.gff"
-)
-nstring <- LoadNString('~/src/git/cadmium/input/stat/nstrings.tab')[['Arabidopsis_lyrata']]
-sflags <- summarize.flags(target$si)
+rdat <- "~/src/git/cadmium/input/io.Rdat"
+if(file.exists(rdat)){
+  load(rdat)
+} else {
+  query <- LoadQuery(
+    aafile="~/src/git/cadmium/input/faa/Arabidopsis_thaliana.faa",
+    gfffile="~/src/git/cadmium/input/gff/Arabidopsis_thaliana.gff",
+    orphanfile="~/src/git/cadmium/input/orphan-list.txt"
+  )
+  target <- LoadTarget(
+    aafile="~/src/git/cadmium/input/faa/Arabidopsis_lyrata.faa",
+    dnafile="~/src/git/cadmium/input/fna/Arabidopsis_lyrata.fna",
+    sifile="~/src/git/cadmium/input/maps/Arabidopsis_thaliana.vs.Arabidopsis_lyrata.map.tab",
+    synfile="~/src/git/cadmium/input/syn/Arabidopsis_thaliana.vs.Arabidopsis_lyrata.syn",
+    gfffile="~/src/git/cadmium/input/gff/Arabidopsis_lyrata.gff"
+  )
+  nstring <- LoadNString('~/src/git/cadmium/input/stat/nstrings.tab')[['Arabidopsis_lyrata']]
+  sflags  <- summarize.flags(target$si)
+  origins <- initializeOrigins(query, target)
+  origins <- syntenicState(origins, sflags)
+  bittbl  <- getBitTable(origins)
+  fo.cds  <- analyzeTargetFeature(query, target, feature="CDS")
+  fo.mrna <- analyzeTargetFeature(query, target, feature="mRNA")
+  save(query, target, nstring, sflags, origins, bittbl, fo.cds, fo.mrna, file=rdat)
+}
 @
 
 \subsection{Mapping features between GFF given scaffold}
-
-<<cache=TRUE>>=
-origins <- initializeOrigins(query, target)
-origins <- syntenicState(origins, sflags)
-bittbl  <- getBitTable(origins)
-fo.cds  <- analyzeTargetFeature(query, target, feature="CDS")
-fo.mrna <- analyzeTargetFeature(query, target, feature="mRNA")
-@
 
 \begin{figure}[!ht]
     \centering
@@ -144,7 +147,6 @@ query2gap <- query2gap %>%
       length=size(nstring[., ])
     )
   }
-
 @
 
 
@@ -177,73 +179,67 @@ label %>% factor %>% summary
 orp.origins$label <- label
 @
 
-<<cache=TRUE>>=
-qseqs <- orp.origins %>%
-  subset(label %in% c('Possible-genic+', 'Possible-genic')) %$%
-  seqid %>% as.character %>% unique %>%
-  query$aa[.]
-
-  aln1 <- function(qname) {
-    fo.cds$orphan2target %>%
-      subset(query == qname) %$% target %>% target$aa[.] %>%
-      {AA_aln(qseqs[qname], ., aln_type='local')}
-  }
-
-  aln <- names(qseqs) %>% lapply(aln1)
-  names(aln) <- names(qseqs)
-
-@
 <<>>=
-genic.orp <- lapply(aln, score) %>%
-  unlist %>% {.[.>40]} %>% names %>%
-  sub(pattern='\\.(.).*', replacement='.\\1') %>% unique
+alnrdat <- "~/src/git/cadmium/input/aln.Rdat"
+if(file.exists(alnrdat)){
+  load(alnrdat)
+} else {
+  aln <- AA_aln(
+    map=fo.cds$query2target,
+    query=query,
+    target=target
+  )
+
+  alnsum <- mutate(aln$scores, ortholog = score > 40) %>%
+    group_by(query) %>%
+    summarize(
+      n.over = length(query),
+      n.orth = sum(ortholog)
+    )
+
+  save(aln, alnsum, file=alnrdat)
+}
 @
-<<echo=TRUE>>=
-genic.orp
-# Here is an example of one of the genic orphans
-writePairwiseAlignments(aln[[genic.orp[1]]])
+
+<<>>=
+orp.qname <- orp.origins %>%
+  subset(label %in% c('Possible-genic+', 'Possible-genic')) %$%
+  seqid %>% as.character %>% unique
 @
 
 
 
 \subsection{Check orthology functionality against all non-orphans}
 
-<<cache=TRUE>>=
-qseqs <- origins  %>%
-  subset(!orphan) %$% 
-  seqid %>% as.character %>% unique %>%
-  query$aa[.]
-
-  aln1 <- function(qname) {
-    fo.cds$query2target %>%
-      subset(query == qname) %$% target %>% target$aa[.] %>%
-      {AA_aln(qseqs[qname], ., aln_type='local')}
-  }
-
-  aln <- names(qseqs) %>% lapply(aln1)
-  names(aln) <- names(qseqs)
-@
 <<>>=
-  N <- names(aln) %>% length
+  old.qname <- origins %>%
+    subset(!orphan) %$% 
+    seqid %>% as.character %>% unique
 
-  d <- data.frame(
-    seqid = names(aln),
-    n.over = lapply(aln, length) %>% unlist,
-    n.ortho = lapply(aln, score) %>% lapply(function(x) sum(x > 40)) %>% unlist
-  )
+  # total number of old genes
+  n.total <- length(old.qname)
 
-  # Proportion of genes whose search intervals include at least 1 significant hit
-  lapply(aln, score) %>% lapply(function(x) any(x > 40)) %>% unlist %>% sum %>% divide_by(N)
+  # number of old genes that do not overlap a CDS
+  n.missing <- old.qname %in% alnsum$query %>% not %>% sum
+
+  d <- alnsum[alnsum$query %in% old.qname, ]
+
+  # Proportion of genes whose search intervals overlap at least 1 CDS
+  nrow(d) / n.total 
 
   # Proportion of genes that link to given number of orthologs
-  d$n.ortho %>% factor %>% summary
-  
-  lapply(aln, score) %>% lapply(length) %>% unlist %>% factor %>% summary
+  sum(d$n.orth > 0) / n.total
+
+  # summary of the number of orthologs found
+  d$n.orth %>% factor %>% summary
+
+  # summary of the number of overlapping genes found
+  d$n.over %>% factor %>% summary
 @
 \begin{figure}[!ht]
     \centering
 <<>>=
-hist(lapply(aln, score) %>% unlist %>% log2)
+hist(lapply(old.aln, score) %>% unlist %>% log2)
 @
     \caption{Scores of all local alignments against target genes in search intervals}
     \label{fig:old-score}

@@ -42,7 +42,7 @@ deps <- c(
     "data.tree",
     "xtable"
 )
-bio.deps <- c('Biostrings', 'genomeIntervals')
+bio.deps <- c('Biostrings', 'GenomicRanges', 'BiocParallel')
 chooseCRANmirror(ind=1)
 for (x in c(deps, bio.deps)) {
     if(!require(x, character.only=TRUE, quietly=TRUE)){

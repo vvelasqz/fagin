@@ -188,6 +188,10 @@ but still, only one of them is reduced or resized.
 \subsection{Check orthology functionality against all non-orphans}
 
 <<>>=
+
+# TODO: Check how many of the missing genes reside on the scaffolds that are
+# not covered by SI
+
 old.qname <- origins %>%
   subset(!orphan) %$% 
   seqid %>% as.character %>% unique
@@ -261,24 +265,26 @@ orfdat <- "~/src/git/cadmium/input/orf.Rdat"
 if(file.exists(orfdat)){
   load(orfdat)
 } else {
+  require(GenomicRanges)
   orfgff_filename="~/src/git/cadmium/input/orf-gff/Arabidopsis_lyrata.gff"
   orffaa_filename="~/src/git/cadmium/input/orf-faa/Arabidopsis_lyrata.faa"
   orfgff <- LoadGFF(orfgff_filename)
-  require(genomeIntervals)
-  si <- target$si$target[target$si$target %>% size %>% is.na %>% not]
+  
   # o.orf is a list, where:
   #  - o.orf indices -> si indices
   #  - o.orf values  -> orf indices
-  o.orf <- interval_overlap(si, orfgff)
+  o.orf <- findOverlaps(target$si$target, orfgff)
+  # I can delete this now, since all I need is the indices for accessing the
+  # ORF translated sequences
   rm(orfgff)
 
   orffaa <- LoadFASTA(orffaa_filename, isAA=TRUE)
 
   query2orf <- data.frame(
-    siid  = rep(si$id, times=lapply(o.orf, length)),
-    orfid = unlist(o.orf)
+    query = target$si$query$seqid[from(o.orf)],
+    siid  = from(o.orf),
+    orfid = to(o.orf)
   )
-  query2orf$query <- target$si$query$seqid[query2orf$siid]
 
   save(query2orf, orffaa, file=orfdat)
 }
@@ -307,7 +313,11 @@ if(file.exists(orfalndat)){
 @
 
 
-\subsection{Find DNA hit}
+% \subsection{Find DNA hit}
+%
+% <<>>=
+% genseq <- LoadFASTA(target$dna.file, isAA=FALSE)
+% @
 
 \subsection{Leaf labels}
 

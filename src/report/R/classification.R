@@ -1,5 +1,5 @@
 require(magrittr)
-require(genomeIntervals)
+require(GenomicRanges)
 require(Biostrings)
 require(dplyr)
 
@@ -8,7 +8,7 @@ require(dplyr)
 # =============================================================================
 
 initializeOrigins <- function(query, target){
-  genelist <- target$si$query$seqid %>% unique
+  genelist <- query$gff$seqid %>% unique
 
   tgenes <- target$gff$seqid %>% unique
 
@@ -27,7 +27,8 @@ initializeOrigins <- function(query, target){
   data.frame(
     seqid  = genelist,
     orphan = genelist %in% query$orphans,
-    class  = rep('Unknown', length(genelist))
+    class  = rep('Unknown', length(genelist)),
+    stringsAsFactors=FALSE
   )
 }
 
@@ -38,7 +39,11 @@ initializeOrigins <- function(query, target){
 # =============================================================================
 
 summarize.flags <- function(si){
-  data.frame(seqid=si$query$seqid, flag=si$target$flag) %>%
+  data.frame(
+    seqid=c(si$query$seqid, si$scrambled),
+    flag=c(si$target$flag, rep(4, length(si$scrambled))),
+    stringsAsFactors=FALSE
+  ) %>%
     dplyr::group_by(seqid) %>%
     summarize(
       f0=sum(flag == 0), 
@@ -47,7 +52,7 @@ summarize.flags <- function(si){
       f3=sum(flag == 3),
       f4=sum(flag == 4)
     ) %>%
-    as.data.frame
+    as.data.frame(stringsAsFactors=FALSE)
 }
 
 syntenicState <- function(origins, flag){
@@ -73,7 +78,8 @@ getBitTable <- function(origins){
 
   bittbl <- data.frame(
     non_orphan = summary(subset(origins,  orphan)$bit),
-    orphan     = summary(subset(origins, !orphan)$bit)
+    orphan     = summary(subset(origins, !orphan)$bit),
+    stringsAsFactors=FALSE
   )
 
   bittbl.norm <- bittbl %>%
@@ -109,13 +115,18 @@ getBitTable <- function(origins){
 #' @return list(d=data.frame(t.size | id | seqid | q.size | indel | resized),
 #'              d.sum=data.frame(seqid | n.indel | n.resized | N)
 findIndels <- function(target, indel.threshold=0.05){
+
+  sitar <- target$si$target
+  sique <- target$si$query
+
   d <- data.frame(
-    t.size = target$si$target %>% size,
-    id = target$si$target$id,
-    flag = target$si$target$flag
+    t.size = sitar %>% width,
+    ida    = sitar$id,
+    flag   = sitar$flag,
+    stringsAsFactors=FALSE
   )
-  d$seqid   <- target$si$query$seqid[d$id]
-  d$q.size  <- target$si$query[d$id] %>% size
+  d$seqid   <- sique$seqid[d$id]
+  d$q.size  <- sique[d$id] %>% width
   d$indel   <- with(d, t.size / q.size < indel.threshold & flag == 0)
   d$resized <- with(d, t.size < q.size & flag == 0 & !indel)
 
@@ -147,29 +158,36 @@ findIndels <- function(target, indel.threshold=0.05){
 # ============================================================================
 
 analyzeTargetFeature <- function(query, target, feature='mRNA'){
-  # Extract the genomeInterval object of intervals of defined size
-  si <- target$si$target[target$si$target %>% size %>% is.na %>% not]
+  si <- target$si$target
+
+  # I assume the order of elements in the query and search interval GRange
+  # objects is the same. The  *id* column was set at load time to be the same
+  # in the two objects. Here I assert that they have not been scrambled.
+  stopifnot(mcols(si)$id == mcols(target$si$query)$id)
 
   ### Map search intervals to the features they overlap
   ft <- target$gff[target$gff$type %in% feature]
 
-  # o.ft is a list, where:
-  #  - o.ft indices -> si indices
-  #  - o.ft values  -> ft indices
-  o.ft <- interval_overlap(si, ft)
-  # Assert the above relations holds:
-  stopifnot(length(o.ft) == nrow(si))
-  stopifnot(o.ft %>% unlist %>% max <= nrow(ft))
+  # A Hits object
+  # from(o.ft) accesses the si indices
+  # to(o.ft) acceses the ft indices
+  o.ft <- findOverlaps(si, ft)
 
-  # Make a data.frame with two columns: query seqid | target gene id
-  query2target <- lapply(o.ft, function(x) ft$seqid[x]) %>%
-      set_names(target$si$query$seqid[si$id]) %>%
-      {data.frame(
-          query=rep(x=names(.), times=lapply(., length)),
-          target=unlist(.),
-          stringsAsFactors=FALSE
-      )} %>%
-      unique
+  # Assert the above relations holds. The only reason why they wouldn't would
+  # be if I messed up the code (no user unput could break this).
+  stopifnot(max(from(o.ft)) <= length(si))
+  stopifnot(max(to(o.ft)) <= length(ft))
+
+  # NOTE: There is a teeny-tiny difference between the results I previously got
+  # with Genome_intervals and what I now get. Using GRanges I get 103306 rows
+  # in query2target for Arabidopsis thaliana versus lyrata data, with
+  # Genomic_intervals (and the old code), I got 103274. Maybe a small
+  # difference in how the algorithms are implemented? But I'm not sure.
+  query2target <- data.frame(
+    query=mcols(target$si$query)$seqid[from(o.ft)],
+    target=mcols(ft)$seqid[to(o.ft)],
+    stringsAsFactors=FALSE
+  ) %>% unique
 
   # Assert number of query genes <= total in query species
   stopifnot(query2target$query %>% unique %>% length <=
@@ -185,9 +203,9 @@ analyzeTargetFeature <- function(query, target, feature='mRNA'){
 
   list(
     feature=feature,
-    # overlaps is a list, where:
-    #  - o.ft indices -> si indices
-    #  - o.ft values  -> ft indices
+    # A Hits object
+    # from(o.ft) accesses the si indices
+    # to(o.ft) acceses the target genome GFF indices
     overlaps = o.ft,
     # map of queries against features that overlap one of the search intervals
     query2target = query2target,
@@ -208,27 +226,23 @@ featureCountTable <- function(feat){
 
 
 findQueryGaps <- function(nstring, target){
-  # Extract the genomeInterval object of intervals of defined size
-  si <- target$si$target[target$si$target %>% size %>% is.na %>% not]
+
+  sitar <- target$si$target
+  sique <- target$si$query
+
+  stopifnot(mcols(sitar)$id == mcols(sique)$id)
 
   # Find overlaps between search intervals and N-strings
-  o.n <- interval_overlap(si, nstring)
-  # There should be one entry in o for each feature in gff
-  stopifnot(length(o.n) == nrow(si))
+  over <- findOverlaps(sitar, nstring)
 
-  # List of genes where at least one search interval maps to a gap
-  ids <- which(lapply(o.n, length) > 0)
-  query2gap <- o.n[ids]
-  ids <- rep(ids, times=lapply(query2gap, length) %>% unlist)
-  stopifnot(length(ids) == query2gap %>% unlist %>% length)
+  stopifnot(max(from(over)) <= length(sitar))
+  stopifnot(max(to(over)) <= length(nstring))
 
-  query2gap %>% unlist %>% 
-    {
-      data.frame(
-        query=target$si$query$seqid[ids],
-        length=size(nstring[., ])
-      )
-    }
+  data.frame(
+    query = sique$seqid[from(over)],
+    length = nstring[to(over)] %>% width,
+    stringsAsFactors=FALSE
+  )
 }
 
 

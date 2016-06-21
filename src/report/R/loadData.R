@@ -1,25 +1,23 @@
-MakeGI <- function(starts, stops, scaffolds, strands=NULL){
-  require(genomeIntervals)
+MakeGI <- function(starts, stops, scaffolds, strands=NULL, metadata=NULL){
+  require(GenomicRanges)
   if(is.null(strands)){
-    new(
-      "Genome_intervals",
-      matrix(c(starts, stops), ncol=2),
-      annotation=data.frame(
-        seq_name=scaffolds,
-        inter_base=FALSE
-      )
+    g <- GRanges(
+      seqnames=scaffolds,
+      ranges=IRanges(starts, stops),
+      strand=rep("*", length(starts))
     )
   } else {
-    new(
-      "Genome_intervals_stranded",
-      matrix(c(starts, stops), ncol=2),
-      annotation=data.frame(
-        seq_name=scaffolds,
-        inter_base=FALSE,
-        strand=strands
-      )
+    strands <- gsub('\\.', '*', strands)
+    g <- GRanges(
+      seqnames=scaffolds,
+      ranges=IRanges(starts, stops),
+      strand=strands
     )
   }
+  if(!is.null(metadata)){
+    mcols(g) <- metadata
+  }
+  g
 }
 
 #' Load a GFF file
@@ -34,17 +32,18 @@ MakeGI <- function(starts, stops, scaffolds, strands=NULL){
 #' @return A genomIntervals object
 #' 
 LoadGFF <- function(gfffile, features=NULL){
-  require(genomeIntervals) 
   require(dplyr)
-
-  g <- readZeroLengthFeaturesGff3(gfffile)
-  annotation(g) <- dplyr::rename(annotation(g), seqid=gffAttributes)
-
-  if(is.null(features)){
-    g
-  } else {
-    g[g$type %in% features, ]
+  g <- read.table(gfffile, stringsAsFactors=FALSE) %>% dplyr::rename(seqid=V9, type=V3)
+  if(!is.null(features)){
+    g <- g[g[[3]] %in% features, ]
   }
+  g <- MakeGI(
+    starts    = g[[4]],
+    stops     = g[[5]],
+    scaffolds = g[[1]],
+    strands   = g[[7]],
+    metadata  = g[c(3,9)]
+  ) 
 }
 
 
@@ -66,7 +65,6 @@ LoadGFF <- function(gfffile, features=NULL){
 #' @param synmap synteny map filename
 #' @return query and target genomeInterval objects
 LoadSyntenyMap <- function(synmap){
-  require(genomeIntervals)
   g <- read.table(synmap, stringsAsFactors=FALSE)
 
   stopifnot(ncol(g) == 8)
@@ -81,9 +79,9 @@ LoadSyntenyMap <- function(synmap){
     starts=g$tstart,
     stops=g$tend,
     scaffolds=g$tchr,
-    strands=g$strand
+    strands=g$strand,
+    metadata=g['queid'] %>% dplyr::rename(over=queid)
   )
-  annotation(target)$over <- g$queid
 
   g <- g[order(g$queid), ]
 
@@ -91,9 +89,9 @@ LoadSyntenyMap <- function(synmap){
     starts=g$qstart,
     stops=g$qend,
     scaffolds=g$qchr,
-    strands=factor('+', levels=c('+', '-'))
+    strands=factor('+', levels=c('+', '-')),
+    metadata=g['tarid'] %>% dplyr::rename(over=tarid)
   )
-  annotation(query)$over <- g$tarid
 
   list(query=query, target=target)
 }
@@ -138,6 +136,11 @@ LoadNString <- function(nstring.file){
 #' If the *extend* option is set, then unbounded edges of search intervals are
 #' extended by the length of the query gene times *extend_factor*.
 #'
+#' Output consists of a list of three items:
+#' 1. query - (GRanges) query intervals, gene names, and common link key
+#' 2. target - (GRanges) search intervals, flags, and common link key
+#' 3. scrambled - Query seqids mapping to no search interval (flag == 4)
+#'
 #' @param sifile input TAB delimited file
 #' @param extend (bool) if anchored (flag [123]), extend flanks by query length
 #' @param extend_factor a multiplier for extension
@@ -148,8 +151,14 @@ LoadSearchIntervals <- function(sifile, extend=FALSE, extend_factor=1){
   stopifnot(ncol(si) == 8)
 
   names(si) <- c('gene', 'qchr', 'qstart', 'qstop', 'tchr', 'tstart', 'tstop', 'flag')
-  si$tstart <- gsub('\\.', NA, si$tstart) %>% as.numeric
-  si$tstop <- gsub('\\.', NA, si$tstop) %>% as.numeric
+
+  missing.interval <- si$tstart == '.' | si$tstop == '.' | si$tchr == '.'
+
+  scrambled <- si[missing.interval, 'gene']
+
+  si <- si[!missing.interval, ]
+  si$tstart <- as.numeric(si$tstart)
+  si$tstop <- as.numeric(si$tstop)
 
   if(extend){
     extend_length <- with(si, qstop - qstart + 1) * extend_factor
@@ -161,15 +170,28 @@ LoadSearchIntervals <- function(sifile, extend=FALSE, extend_factor=1){
 
   stopifnot(si$flag %in% 0:4)
 
-  query <- MakeGI(starts=si$qstart, stops=si$qstop, scaffolds=si$qchr)
-  annotation(query)$seqid <- si$gene
-  annotation(query)$id <- 1:nrow(si)
+  query <- MakeGI(
+    starts=si$qstart,
+    stops=si$qstop,
+    scaffolds=si$qchr,
+    metadata=data.frame(
+      seqid = si$gene,
+      id    = 1:nrow(si),
+      stringsAsFactors=FALSE
+    )
+  )
 
-  target <- MakeGI(starts=si$tstart, stops=si$tstop, scaffolds=si$tchr)
-  annotation(target)$flag <- si$flag
-  annotation(target)$id <- 1:nrow(si)
+  target <- MakeGI(
+    starts=si$tstart,
+    stops=si$tstop,
+    scaffolds=si$tchr,
+    metadata=data.frame(
+      flag = si$flag,
+      id   = 1:nrow(si)
+    )
+  )
 
-  list(query=query, target=target)
+  list(query=query, target=target, scrambled=scrambled)
 }
 
 #' Load a newick format phylogenetic tree
@@ -246,30 +268,32 @@ LoadTarget <- function(
   extend_factor=1
 )
 {
-  aa       <-  LoadFASTA(aafile)
+  aa       <-  LoadFASTA(aafile, isAA=TRUE)
   dna.file <-  dnafile
   si       <-  LoadSearchIntervals(sifile, extend=extend, extend_factor=extend_factor)
   gff      <-  LoadGFF(gfffile)
   syn      <-  LoadSyntenyMap(synfile)
 
   # Just to check that LoadGFF correctly renamed the fields
-  stopifnot('seqid' %in% names(annotation(gff)))
+  stopifnot('seqid' %in% names(mcols(gff)))
 
   # all GFF seqids be associated with a protein sequence
   stopifnot(gff$seqid %in% names(aa))
 
-  si.seq_name  <- levels(si$target$seq_name)
-  gff.seq_name <- levels(gff$seq_name)
-  syn.seq_name <- levels(syn$target$seq_name)
+  si.seq_name  <- si$target  %>% seqnames %>% levels
+  gff.seq_name <- gff        %>% seqnames %>% levels
+  syn.seq_name <- syn$target %>% seqnames %>% levels
 
   # the scaffolds in si and gff may vary, but they should be drawn from
   # the same pool, so there should be more than 0 in common.
   stopifnot(sum(si.seq_name %in% gff.seq_name) > 0)
 
-  # The scaffolds in the search interval file must have come from the synteny
-  # file. The '.' character is needed for queries that have no known location, or
-  # where the scaffold they are on is ambiguous.
-  stopifnot(si.seq_name %in% c(syn.seq_name, '.'))
+  # The scaffolds in the search interval file must the synteny file.
+  # NOTE: This may fail if '.' character appears in the SI file, where it
+  # indicates queries that have no known location or where the scaffold they
+  # are on is ambiguous. These cases should be filtered out in the
+  # LoadSyntenyMap function.
+  stopifnot(si.seq_name %in% syn.seq_name)
 
   list(aa=aa, dna.file=dna.file, si=si, gff=gff, syn=syn)
 }

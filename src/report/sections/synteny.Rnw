@@ -28,28 +28,24 @@ nstring <- LoadNString(args$nstring)
 
 \subsection{Gene feature format file for focal species}
 <<results='asis', cache=TRUE>>=
-plyr::ddply(
-    annotation(gff),
-    'seq_name',
-    summarize,
-    mRNAs=length(seq_name)
+data.frame(
+  Chromosome = gff %>% seqnames %>% levels,
+  mRNAs      = gff %>% seqnames %>% runLength
 ) %>% xtable
 @
 
 \subsection{Syntenic ouput of SatsumaSynteny}
 <<results='asis', cache=TRUE>>=
-plyr::ddply(
-    annotation(syn$query),
-    'seq_name',
-    summarize,
-    N.synteny.blocks=length(seq_name)
+data.frame(
+  Chromosome       = syn$query %>% seqnames %>% levels,
+  N.synteny.blocks = syn$query %>% seqnames %>% runLength
 ) %>% xtable
 @
 
 \begin{figure}[!ht]
     \centering
 <<cache=TRUE>>=
-lograt <- log2(size(syn$query) / size(syn$target)[syn$query$over])
+lograt <- log2(width(syn$query) / width(syn$target)[syn$query$over])
 lograt <- lograt[abs(lograt) > 0.25] 
 plot(
     lograt,

@@ -14,6 +14,7 @@ Extract
 REQUIRES:
     bedtools v2.23.0
     emboss transseq
+    emboss getorf
     smof
 EOF
     exit 0
@@ -47,4 +48,48 @@ do
         sed '/>/s/_[0-9]\+//' |
         smof clean -sux > input/faa/$s.faa
     rm x
+done
+
+# Get open reading frames from each input genome
+mkdir -p $INPUT/orf-faa
+mkdir -p $INPUT/orf-gff
+for s in $species
+do
+    fna=$INPUT/fna/$s.fna
+    faa=$INPUT/orf-faa/$s.faa
+    gff=$INPUT/orf-gff/$s.gff
+    cat $fna |
+        # Find all START STOP bound ORFs with 10+ AA
+        getorf -filter -find 1 -minsize 30 |
+        # Filter out all ORFs with unknown residues
+        smof grep -v -q X | 
+        # Pipe the protein sequence to a protein fasta file
+        tee  $faa |
+        # Parse a header such as:
+        # >scaffold_1_432765 [258 - 70] (REVERSE SENSE) 
+        sed -nr 's/>([^ ]+)_([0-9])+ \[([0-9]+) - ([0-9]+)\]/\1 \3 \4 \1_\2/p' |
+        # Prepare GFF
+        awk '
+            BEGIN{OFS="\t"}
+            {
+                seq_name = $1
+                uid = $4
+                if($5 ~ /REVERSE/){
+                    strand = "-"
+                } else {
+                    strand = "+"
+                }
+                if($2 < $3){
+                    start = $2 
+                    stop  = $3
+                } else {
+                    start = $3 
+                    stop  = $2
+                }
+            }
+            { print seq_name, ".", "ORF", start, stop, ".", strand, ".", uid }
+        ' > $gff
+
+        # simplify fasta headers
+        sed -ri '/>/ s/ .*//' $faa
 done

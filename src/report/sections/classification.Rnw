@@ -35,7 +35,7 @@ if(file.exists(rdat)){
     bittbl,     # summary of syntenic states
     fo.cds,     # overlaps of query genes against target CDSs
     fo.mrna,    # overlaps of query genes against target mRNAs
-    query2gap, # table listing all genes that overlap an N-string, and the N-string length
+    query2gap,  # table listing all genes that overlap an N-string, and the N-string length
     file=rdat
   )
 }
@@ -254,7 +254,58 @@ ggplot(aln$scores) +
 
 \subsection{Detect overprinting}
 
-\subsection{Detect protein hit to ngORF}
+\subsection{Detect protein hit to ORF}
+
+<<>>=
+orfdat <- "~/src/git/cadmium/input/orf.Rdat"
+if(file.exists(orfdat)){
+  load(orfdat)
+} else {
+  orfgff_filename="~/src/git/cadmium/input/orf-gff/Arabidopsis_lyrata.gff"
+  orffaa_filename="~/src/git/cadmium/input/orf-faa/Arabidopsis_lyrata.faa"
+  orfgff <- LoadGFF(orfgff_filename)
+  require(genomeIntervals)
+  si <- target$si$target[target$si$target %>% size %>% is.na %>% not]
+  # o.orf is a list, where:
+  #  - o.orf indices -> si indices
+  #  - o.orf values  -> orf indices
+  o.orf <- interval_overlap(si, orfgff)
+  rm(orfgff)
+
+  orffaa <- LoadFASTA(orffaa_filename, isAA=TRUE)
+
+  query2orf <- data.frame(
+    siid  = rep(si$id, times=lapply(o.orf, length)),
+    orfid = unlist(o.orf)
+  )
+  query2orf$query <- target$si$query$seqid[query2orf$siid]
+
+  save(query2orf, orffaa, file=orfdat)
+}
+@
+
+<<>>=
+orfalndat <- "~/src/git/cadmium/input/orfaln.Rdat"
+if(file.exists(orfalnrdat)){
+  load(orfalnrdat)
+} else {
+  orfmap <- query2orf[query2orf$query %in% query$orphan, ]
+
+  require(Biostrings)
+  data(BLOSUM80)
+
+  orfaln <- pairwiseAlignment(
+    pattern=query$aa[orfmap$query],
+    subject=orffaa[orfmap$orfid],
+    type='local',
+    substitutionMatrix=BLOSUM80
+  )
+  orfmap$score <- score(orfaln)
+
+  save(orfaln, orfmap, file=orfalndat)
+}
+@
+
 
 \subsection{Find DNA hit}
 
@@ -279,10 +330,13 @@ gen <- orpseq %in% (aln$scores %>% filter(score > 60) %$% query)
 nst <- orpseq %in% query2gap$query
 # number of confirmed indels (based on search interval size)
 ind <- orpseq %in% q.ind
+# ORF match in SI
+orf <- orpseq %in% (orfmap %>% subset(score > 100) %$% query)
+
+orfhits <- orfmap %>% group_by(query) %>% summarize(orf_top_score=max(score), N.orf=length(score)) 
 
 ### TODO - add:
 # nuc - has nucleotide match in SI
-# orf - has ngORF match in SI
 # pri - is overprinted
 
 
@@ -299,16 +353,19 @@ label[ rna & !cds         ] <- 'possible-hitchhiker'
 label[ cds & !gen         ] <- 'possible-genic'
 label[ gen                ] <- 'confirmed-genic'
 label[ ind                ] <- 'indel'
+label[ orf & !gen         ] <- 'candidate-gene'
 
 label[label == 'unknown' & nst ] <- 'unknown-gapped'
 label[label == 'unknown' & scr ] <- 'unknown-scrambled'
 
 orp.origins$label <- label
+orp.origins$orf_hit <- NULL
 
 orp.origins$resized <- ifelse(orp.origins$seqid %in% q.res, TRUE, FALSE)
 @
 
 <<results='asis'>>=
+require(xtable)
 label %>%
   factor %>%
   summary %>%
@@ -318,6 +375,11 @@ label %>%
 @
 
 \begin{description}
+
+  \item[Candidate-gene] Query maps to an unannotated ORF with a high sequence
+    similarity score. Currently I do not have a statistically sound method for
+    selecting a threshold score and am just using a conservative 100 bit
+    threshold.
 
   \item[Confirmed-genic] Query maps to one or more CDSs, and is significantly
     similar to at least one of the annotated target genes.

@@ -241,12 +241,14 @@ LoadTarget <- function(
   dnafile="~/src/git/cadmium/input/fna/Arabidopsis_lyrata.fna",
   sifile="~/src/git/cadmium/input/maps/Arabidopsis_thaliana.vs.Arabidopsis_lyrata.map.tab",
   synfile="~/src/git/cadmium/input/syn/Arabidopsis_thaliana.vs.Arabidopsis_lyrata.syn",
-  gfffile="~/src/git/cadmium/input/gff/Arabidopsis_lyrata.gff"
+  gfffile="~/src/git/cadmium/input/gff/Arabidopsis_lyrata.gff",
+  extend=TRUE,
+  extend_factor=1
 )
 {
   aa       <-  LoadFASTA(aafile)
   dna.file <-  dnafile
-  si       <-  LoadSearchIntervals(sifile)
+  si       <-  LoadSearchIntervals(sifile, extend=extend, extend_factor=extend_factor)
   gff      <-  LoadGFF(gfffile)
   syn      <-  LoadSyntenyMap(synfile)
 

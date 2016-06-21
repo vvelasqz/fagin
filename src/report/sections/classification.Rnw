@@ -286,8 +286,8 @@ if(file.exists(orfdat)){
 
 <<>>=
 orfalndat <- "~/src/git/cadmium/input/orfaln.Rdat"
-if(file.exists(orfalnrdat)){
-  load(orfalnrdat)
+if(file.exists(orfalndat)){
+  load(orfalndat)
 } else {
   orfmap <- query2orf[query2orf$query %in% query$orphan, ]
 

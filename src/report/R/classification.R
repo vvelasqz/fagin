@@ -200,7 +200,7 @@ analyzeTargetFeature <- function(query, target, feature='mRNA'){
 
 featureCountTable <- function(feat){
   lapply(feat$overlaps, length) %>% 
-      unlist %>% factor %>% summary %>%
+      unlist %>% factor %>% summary(maxsum=Inf) %>%
       data.frame(.) %>%
       set_names('Count')
 }

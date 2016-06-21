@@ -7,9 +7,6 @@ require(intervals)
 require(plyr)
 require(magrittr)
 require(xtable)
-source('~/src/git/cadmium/src/report/R/findMissingGenes.R')
-source('~/src/git/cadmium/src/report/R/testSyntenicGaps.R')
-source('~/src/git/cadmium/src/report/R/build_gene2int.R')
 source('~/src/git/cadmium/src/report/R/loadData.R')
 
 # TODO REMOVE THIS IN PRODUCTION CODE
@@ -48,16 +45,6 @@ plyr::ddply(
     N.synteny.blocks=length(seq_name)
 ) %>% xtable
 @
-
-% TODO: Sync the TestSyntenicGaps code with new genomeIntervals implementation
-% % ============================================================================
-% \begin{figure}[!hbpt]
-% <<fig.width=8, fig.height=8, cache=TRUE>>=
-% TestSyntenyGaps(syn, nstring)
-% @
-% \caption{In black: missing regions on the target between syntenic blocks. In
-%     red: strings of N's, bases that have not been correctly sequenced}
-% \end{figure}
 
 \begin{figure}[!ht]
     \centering

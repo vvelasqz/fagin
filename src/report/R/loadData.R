@@ -164,7 +164,7 @@ LoadSearchIntervals <- function(sifile, extend=FALSE, extend_factor=1){
     extend_length <- with(si, qstop - qstart + 1) * extend_factor
     el <- si$flag == 1 | si$flag == 3
     er <- si$flag == 2 | si$flag == 3
-    si$tstart[el] <- si$tstart[el] - extend_length[el] %>% pmax(0)
+    si$tstart[el] <- (si$tstart[el] - extend_length[el]) %>% pmax(1)
     si$tstop[er]  <- si$tstop[er]  + extend_length[er]
   }
 

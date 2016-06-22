@@ -2,6 +2,14 @@
 source('~/src/git/cadmium/src/report/R/classification.R')
 source('~/src/git/cadmium/src/report/R/loadData.R')
 
+# TODO: check all inputs, and handle missing files appropriately
+
+# TODO: remove hard-coding of files by reading the config file
+
+# TODO: condense all the following code to a few functions
+# TODO: loop through these loading one target at a time nad returning the output and plots
+# TODO: merge all these into one. Save the full data at each step to an Rdat folder
+
 rdat <- "~/src/git/cadmium/input/io.Rdat"
 if(file.exists(rdat)){
   load(rdat)

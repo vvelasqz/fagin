@@ -1,3 +1,74 @@
+#' Read config file
+#'
+#' Loads the following strings into a list:
+#'  FAA_DIR        \
+#'  GFF_DIR        |
+#'  SYN_DIR        | data directories
+#'  GENE_DIR       |
+#'  GENOME_DIR     |
+#'  SI_DIR         /
+#'  SPECIES_FILE   \
+#'  SCAFLEN        |
+#'  NSTRINGS       | individual data files
+#'  ORPHAN_LIST    |
+#'  TREE           /
+#'  FOCAL_SPECIES  - Focal species name
+#' 
+#' @param configfile Absolute path to the config file
+#' @return list of inputs
+CollectInputs <- function(configfile='~/src/git/cadmium/cadmium.cfg'){
+    if(!file.exists(configfile)){
+        cat(sprintf("Cannot open configfile '%s'\n", configfile))
+    }
+    source(configfile, local=TRUE)
+    expected.vars <- c(
+        'R_FAA_DIR',
+        'R_GFF_DIR',
+        'R_SYN_DIR',
+        'R_GENE_DIR',
+        'R_GENOME_DIR',
+        'R_SI_DIR',
+        'R_SPECIES_FILE',
+        'R_SCAFLEN',
+        'R_NSTRINGS',
+        'R_ORPHAN_LIST',
+        'TREE',
+        'FOCAL_SPECIES'
+    )
+    # Check for existence of all required variables
+    for(v in expected.vars){
+        if(!exists(v)){
+            cat(sprintf("Variable '%s' is not defined in the config file '%s'", f, configfile))
+        }
+    }
+    # Check existence of directories
+    for(v in expected.vars[1:6]){
+        if(!dir.exists(eval(parse(text=v)))){
+            cat(sprintf("Variable '%s' does not point to a valid directory", v))
+        }
+    }
+    # Check existence of files
+    for(v in expected.vars[7:11]){
+        if(!file.exists(eval(parse(text=v)))){
+            cat(sprintf("Variable '%s' does not point to a readable file", v))
+        }
+    }
+    list(
+        FAA_DIR       = R_FAA_DIR,
+        GFF_DIR       = R_GFF_DIR,
+        SYN_DIR       = R_SYN_DIR,
+        GENE_DIR      = R_GENE_DIR,
+        GENOME_DIR    = R_GENOME_DIR,
+        SI_DIR        = R_SI_DIR,
+        SPECIES_FILE  = R_SPECIES_FILE,
+        SCAFLEN       = R_SCAFLEN,
+        NSTRINGS      = R_NSTRINGS,
+        ORPHAN_LIST   = R_ORPHAN_LIST,
+        TREE          = TREE,
+        FOCAL_SPECIES = FOCAL_SPECIES
+    )
+}
+
 MakeGI <- function(starts, stops, scaffolds, strands=NULL, metadata=NULL, seqinfo=NULL){
   require(GenomicRanges)
   if(is.null(strands)){

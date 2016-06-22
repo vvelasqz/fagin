@@ -2,6 +2,10 @@
 source('~/src/git/cadmium/src/report/R/classification.R')
 source('~/src/git/cadmium/src/report/R/loadData.R')
 
+config <- LoadConfig(configfile='~/src/git/cadmium/cadmium.cfg')
+
+l_seqinfo <- LoadSeqinfoList(config)
+
 # TODO: check all inputs, and handle missing files appropriately
 
 # TODO: remove hard-coding of files by reading the config file
@@ -14,16 +18,12 @@ rdat <- "~/src/git/cadmium/input/io.Rdat"
 if(file.exists(rdat)){
   load(rdat)
 } else {
-  scaflen <- read.table('~/src/git/cadmium/input/stat/scaffold-lengths.tab', header=TRUE, stringsAsFactors=FALSE)
-  qinfo <- PrepareSeqinfo(scaflen, 'Arabidopsis_thaliana')
-  tinfo <- PrepareSeqinfo(scaflen, 'Arabidopsis_lyrata')
-
   query <- LoadQuery(
     aafile="~/src/git/cadmium/input/faa/Arabidopsis_thaliana.faa",
     gfffile="~/src/git/cadmium/input/gff/Arabidopsis_thaliana.gff",
     orphanfile="~/src/git/cadmium/input/orphan-list.txt",
     genefile='~/src/git/cadmium/input/gene/Arabidopsis_thaliana.gene.fna',
-    seqinfo=qinfo
+    seqinfo=l_seqinfo[['Arabidopsis_thaliana']]
   )
   # TODO: Fix the out-of-range bugs
   target <- LoadTarget(
@@ -32,8 +32,8 @@ if(file.exists(rdat)){
     sifile="~/src/git/cadmium/input/maps/Arabidopsis_thaliana.vs.Arabidopsis_lyrata.map.tab",
     synfile="~/src/git/cadmium/input/syn/Arabidopsis_thaliana.vs.Arabidopsis_lyrata.syn",
     gfffile="~/src/git/cadmium/input/gff/Arabidopsis_lyrata.gff",
-    tinfo=tinfo,
-    qinfo=qinfo
+    tinfo=l_seqinfo[['Arabidopsis_lyrata']],
+    qinfo=l_seqinfo[['Arabidopsis_thaliana']]
   )
   nstring <- LoadNString('~/src/git/cadmium/input/stat/nstrings.tab')[['Arabidopsis_lyrata']]
   sflags  <- summarize.flags(target$si)

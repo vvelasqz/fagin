@@ -129,3 +129,8 @@ kbcomp.g
 
 
 \subsection{Proteomic statistics}
+
+<<>>=
+# cleanup
+rm(list=ls())
+@

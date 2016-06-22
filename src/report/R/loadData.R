@@ -1,19 +1,16 @@
-MakeGI <- function(starts, stops, scaffolds, strands=NULL, metadata=NULL){
+MakeGI <- function(starts, stops, scaffolds, strands=NULL, metadata=NULL, seqinfo=NULL){
   require(GenomicRanges)
   if(is.null(strands)){
-    g <- GRanges(
-      seqnames=scaffolds,
-      ranges=IRanges(starts, stops),
-      strand=rep("*", length(starts))
-    )
+    strands=rep("*", length(starts))
   } else {
     strands <- gsub('\\.', '*', strands)
-    g <- GRanges(
-      seqnames=scaffolds,
-      ranges=IRanges(starts, stops),
-      strand=strands
-    )
   }
+  g <- GRanges(
+    seqnames=scaffolds,
+    ranges=IRanges(starts, stops),
+    strand=strands,
+    seqinfo=seqinfo
+  )
   if(!is.null(metadata)){
     mcols(g) <- metadata
   }
@@ -31,18 +28,19 @@ MakeGI <- function(starts, stops, scaffolds, strands=NULL, metadata=NULL){
 #' @param features The features from the GFF that should be retained (e.g. mRNA, gene, CDS)
 #' @return A genomIntervals object
 #' 
-LoadGFF <- function(gfffile, features=NULL){
+LoadGFF <- function(gfffile, features=NULL, ...){
   require(dplyr)
   g <- read.table(gfffile, stringsAsFactors=FALSE) %>% dplyr::rename(seqid=V9, type=V3)
   if(!is.null(features)){
     g <- g[g[[3]] %in% features, ]
   }
-  g <- MakeGI(
+  MakeGI(
     starts    = g[[4]],
     stops     = g[[5]],
     scaffolds = g[[1]],
     strands   = g[[7]],
-    metadata  = g[c(3,9)]
+    metadata  = g[c(3,9)],
+    ...
   ) 
 }
 
@@ -64,7 +62,7 @@ LoadGFF <- function(gfffile, features=NULL){
 #'
 #' @param synmap synteny map filename
 #' @return query and target genomeInterval objects
-LoadSyntenyMap <- function(synmap){
+LoadSyntenyMap <- function(synmap, qinfo=NULL, tinfo=NULL){
   g <- read.table(synmap, stringsAsFactors=FALSE)
 
   stopifnot(ncol(g) == 8)
@@ -80,7 +78,8 @@ LoadSyntenyMap <- function(synmap){
     stops=g$tend,
     scaffolds=g$tchr,
     strands=g$strand,
-    metadata=g['queid'] %>% dplyr::rename(over=queid)
+    metadata=g['queid'] %>% dplyr::rename(over=queid),
+    seqinfo=tinfo
   )
 
   g <- g[order(g$queid), ]
@@ -90,7 +89,8 @@ LoadSyntenyMap <- function(synmap){
     stops=g$qend,
     scaffolds=g$qchr,
     strands=factor('+', levels=c('+', '-')),
-    metadata=g['tarid'] %>% dplyr::rename(over=tarid)
+    metadata=g['tarid'] %>% dplyr::rename(over=tarid),
+    seqinfo=qinfo
   )
 
   list(query=query, target=target)
@@ -144,12 +144,10 @@ LoadNString <- function(nstring.file){
 #' @param sifile input TAB delimited file
 #' @param extend (bool) if anchored (flag [123]), extend flanks by query length
 #' @param extend_factor a multiplier for extension
-LoadSearchIntervals <- function(sifile, extend=FALSE, extend_factor=1){
+LoadSearchIntervals <- function(sifile, extend=FALSE, extend_factor=1, qinfo=NULL, tinfo=NULL){
   require(magrittr)
   si <- read.table(sifile, stringsAsFactors=FALSE)
-
   stopifnot(ncol(si) == 8)
-
   names(si) <- c('gene', 'qchr', 'qstart', 'qstop', 'tchr', 'tstart', 'tstop', 'flag')
 
   missing.interval <- si$tstart == '.' | si$tstop == '.' | si$tchr == '.'
@@ -160,13 +158,27 @@ LoadSearchIntervals <- function(sifile, extend=FALSE, extend_factor=1){
   si$tstart <- as.numeric(si$tstart)
   si$tstop <- as.numeric(si$tstop)
 
+  #TODO: need a more elegant solution to the initial index problem
+  # But the Synder output is 0-based, Bioconductor is 1-based
+  si$qstart <- si$qstart + 1
+  si$qstop  <- si$qstop  + 1
+  si$tstart <- si$tstart + 1
+  si$tstop  <- si$tstop  + 1
+
   if(extend){
     extend_length <- with(si, qstop - qstart + 1) * extend_factor
     el <- si$flag == 1 | si$flag == 3
     er <- si$flag == 2 | si$flag == 3
     si$tstart[el] <- (si$tstart[el] - extend_length[el]) %>% pmax(1)
-    si$tstop[er]  <- si$tstop[er]  + extend_length[er]
+    if(is.null(tinfo)){
+      maxend = Inf
+    } else {
+      maxend = seqlengths(tinfo)[si$tchr]
+    }
+    si$tstop[er] <- (si$tstop[er] + extend_length[er]) %>% pmin(maxend[er])
   }
+
+  si$tmax <- seqlengths(tinfo)[si$tchr]
 
   stopifnot(si$flag %in% 0:4)
 
@@ -178,7 +190,8 @@ LoadSearchIntervals <- function(sifile, extend=FALSE, extend_factor=1){
       seqid = si$gene,
       id    = 1:nrow(si),
       stringsAsFactors=FALSE
-    )
+    ),
+    seqinfo=qinfo
   )
 
   target <- MakeGI(
@@ -188,7 +201,8 @@ LoadSearchIntervals <- function(sifile, extend=FALSE, extend_factor=1){
     metadata=data.frame(
       flag = si$flag,
       id   = 1:nrow(si)
-    )
+    ),
+    seqinfo=tinfo
   )
 
   list(query=query, target=target, scrambled=scrambled)
@@ -217,6 +231,17 @@ LoadFASTA <- function(filename, isAA=TRUE){
   }
 }
 
+PrepareSeqinfo <- function(scaflen, species){
+  if(!is.null(scaflen) && !is.null(species)){
+    stopifnot(c('species', 'scaffold', 'length') %in% names(scaflen))
+    stopifnot(species %in% scaflen$species)
+    scaflen <- scaflen[scaflen$species == species, ]
+    Seqinfo(seqnames=scaflen$scaffold, seqlengths=scaflen$length, genome=species)
+  } else {
+    NULL
+  }
+}
+
 #' Load all data required for classification on the query (focal species)
 #' side
 
@@ -231,12 +256,14 @@ LoadFASTA <- function(filename, isAA=TRUE){
 LoadQuery <- function(
   aafile="~/src/git/cadmium/input/faa/Arabidopsis_thaliana.faa",
   gfffile="~/src/git/cadmium/input/gff/Arabidopsis_thaliana.gff",
-  orphanfile="~/src/git/cadmium/input/orphan-list.txt"
+  orphanfile="~/src/git/cadmium/input/orphan-list.txt",
+  seqinfo=NULL
 )
 {
   require(Biostrings)
+
   aa      <- LoadFASTA(aafile)
-  gff     <- LoadGFF(gfffile)
+  gff     <- LoadGFF(gfffile, seqinfo=seqinfo)
   orphans <- read.table(orphanfile, stringsAsFactors=FALSE)[[1]]
   # all orphans should be associated with a protein sequence
   stopifnot(orphans %in% names(aa))
@@ -264,15 +291,18 @@ LoadTarget <- function(
   sifile="~/src/git/cadmium/input/maps/Arabidopsis_thaliana.vs.Arabidopsis_lyrata.map.tab",
   synfile="~/src/git/cadmium/input/syn/Arabidopsis_thaliana.vs.Arabidopsis_lyrata.syn",
   gfffile="~/src/git/cadmium/input/gff/Arabidopsis_lyrata.gff",
+  qinfo=NULL,
+  tinfo=NULL,
   extend=TRUE,
   extend_factor=1
 )
 {
   aa       <-  LoadFASTA(aafile, isAA=TRUE)
   dna.file <-  dnafile
-  si       <-  LoadSearchIntervals(sifile, extend=extend, extend_factor=extend_factor)
-  gff      <-  LoadGFF(gfffile)
-  syn      <-  LoadSyntenyMap(synfile)
+  si       <-  LoadSearchIntervals(sifile, extend=extend, extend_factor=extend_factor,
+                                   qinfo=qinfo, tinfo=tinfo)
+  gff      <-  LoadGFF(gfffile, seqinfo=tinfo)
+  syn      <-  LoadSyntenyMap(synfile, qinfo=qinfo, tinfo=tinfo)
 
   # Just to check that LoadGFF correctly renamed the fields
   stopifnot('seqid' %in% names(mcols(gff)))

@@ -6,17 +6,25 @@ rdat <- "~/src/git/cadmium/input/io.Rdat"
 if(file.exists(rdat)){
   load(rdat)
 } else {
+  scaflen <- read.table('~/src/git/cadmium/input/stat/scaffold-lengths.tab', header=TRUE, stringsAsFactors=FALSE)
+  qinfo <- PrepareSeqinfo(scaflen, 'Arabidopsis_thaliana')
+  tinfo <- PrepareSeqinfo(scaflen, 'Arabidopsis_lyrata')
+
   query <- LoadQuery(
     aafile="~/src/git/cadmium/input/faa/Arabidopsis_thaliana.faa",
     gfffile="~/src/git/cadmium/input/gff/Arabidopsis_thaliana.gff",
-    orphanfile="~/src/git/cadmium/input/orphan-list.txt"
+    orphanfile="~/src/git/cadmium/input/orphan-list.txt",
+    seqinfo=qinfo
   )
+  # TODO: Fix the out-of-range bugs, may need to look into Synder
   target <- LoadTarget(
     aafile="~/src/git/cadmium/input/faa/Arabidopsis_lyrata.faa",
     dnafile="~/src/git/cadmium/input/fna/Arabidopsis_lyrata.fna",
     sifile="~/src/git/cadmium/input/maps/Arabidopsis_thaliana.vs.Arabidopsis_lyrata.map.tab",
     synfile="~/src/git/cadmium/input/syn/Arabidopsis_thaliana.vs.Arabidopsis_lyrata.syn",
-    gfffile="~/src/git/cadmium/input/gff/Arabidopsis_lyrata.gff"
+    gfffile="~/src/git/cadmium/input/gff/Arabidopsis_lyrata.gff",
+    tinfo=tinfo,
+    qinfo=qinfo
   )
   nstring <- LoadNString('~/src/git/cadmium/input/stat/nstrings.tab')[['Arabidopsis_lyrata']]
   sflags  <- summarize.flags(target$si)
@@ -191,6 +199,7 @@ but still, only one of them is reduced or resized.
 
 # TODO: Check how many of the missing genes reside on the scaffolds that are
 # not covered by SI
+# TODO: Fit two normal distributions: one for the noise, one for the signal.
 
 old.qname <- origins %>%
   subset(!orphan) %$% 
@@ -310,14 +319,15 @@ if(file.exists(orfalndat)){
 
   save(orfaln, orfmap, file=orfalndat)
 }
+# TODO: based off the distribution of scores, fit a normal to the noise.  Here
+# fit a normal distribution using the 1st and 3rd quantiles. This should work
+# since the number of true homologs expected is very low. The quantile based
+# fitting will be robust against the far outliers.
 @
 
 
-% \subsection{Find DNA hit}
-%
-% <<>>=
-% genseq <- LoadFASTA(target$dna.file, isAA=FALSE)
-% @
+\subsection{Find DNA hit}
+
 
 \subsection{Leaf labels}
 
@@ -345,7 +355,7 @@ orf <- orpseq %in% (orfmap %>% subset(score > 100) %$% query)
 
 orfhits <- orfmap %>% group_by(query) %>% summarize(orf_top_score=max(score), N.orf=length(score)) 
 
-### TODO - add:
+### TODO: - add:
 # nuc - has nucleotide match in SI
 # pri - is overprinted
 

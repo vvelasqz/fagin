@@ -1,3 +1,125 @@
+#' Read config file
+#'
+#' Loads the following variables from the config file into a list:
+#' R_FAA_DIR        \
+#' R_GFF_DIR        |
+#' R_SYN_DIR        | data directories
+#' R_GENE_DIR       |
+#' R_GENOME_DIR     |
+#' R_SI_DIR         /
+#' R_SPECIES_FILE   \
+#' R_SCAFLEN        |
+#' R_NSTRINGS       | individual data files
+#' R_ORPHAN_LIST    |
+#' R_TREE           /
+#' R_FOCAL_SPECIES  - string
+#' R_EXTEND         - boolean
+#' R_EXTEND_RATIO   - numeric
+#'
+#' These variables are loaded into the following R list entries:
+#'  d_faa
+#'  d_gff
+#'  d_syn
+#'  d_gene
+#'  d_genome
+#'  d_si
+#'  f_scaflen
+#'  f_nstrings
+#'  f_orphan
+#'  f_tree
+#'  species
+#'  focal_species
+#'  extend
+#'  extend_ratio
+#'
+#' Where d_* are directories, and f_* are files. `species` is loaded as a
+#' character string where `focal_species` is a required member.
+#' 
+#' @param configfile Absolute path to the config file
+#' @return list of inputs
+LoadConfig <- function(configfile='~/src/git/cadmium/cadmium.cfg'){
+    if(!file.exists(configfile)){
+        cat(sprintf("Cannot open configfile '%s'\n", configfile))
+    }
+    source(configfile, local=TRUE)
+    expected.vars <- c(
+        'R_FAA_DIR',
+        'R_GFF_DIR',
+        'R_SYN_DIR',
+        'R_GENE_DIR',
+        'R_GENOME_DIR',
+        'R_SI_DIR',
+        'R_SPECIES_FILE',
+        'R_SCAFLEN',
+        'R_NSTRINGS',
+        'R_ORPHAN_LIST',
+        'R_TREE',
+        'R_FOCAL_SPECIES'
+    )
+    # Check for existence of all required variables
+    for(v in expected.vars){
+        if(!exists(v)){
+            cat(sprintf("Variable '%s' is not defined in the config file '%s'\n", f, configfile))
+        }
+    }
+    # Check existence of directories
+    for(v in expected.vars[1:6]){
+        if(!dir.exists(eval(parse(text=v)))){
+            cat(sprintf("Variable '%s' does not point to a valid directory\n", v))
+        }
+    }
+    # Check existence of files
+    for(v in expected.vars[7:11]){
+        if(!file.exists(eval(parse(text=v)))){
+            cat(sprintf("Variable '%s' does not point to a readable file\n", v))
+        }
+    }
+
+    extend = as.logical(R_EXTEND)
+
+    extend_ratio = as.numeric(R_EXTEND_RATIO)
+
+    species <- read.table(R_SPECIES_FILE, stringsAsFactors=FALSE)[[1]]
+    if(!R_FOCAL_SPECIES %in% species){
+      cat(sprintf("Focal species '%s' not found in the species list: [%s]\n",
+                  R_FOCAL_SPECIES, paste(species, collapse=", ")))
+    }
+    list(
+        d_faa         = R_FAA_DIR,
+        d_gff         = R_GFF_DIR,
+        d_syn         = R_SYN_DIR,
+        d_gene        = R_GENE_DIR,
+        d_genome      = R_GENOME_DIR,
+        d_si          = R_SI_DIR,
+        f_scaflen     = R_SCAFLEN,
+        f_nstrings    = R_NSTRINGS,
+        f_orphan      = R_ORPHAN_LIST,
+        f_tree        = R_TREE,
+        species       = species,
+        focal_species = R_FOCAL_SPECIES,
+        extend        = extend,
+        extend_ratio  = extend_ratio
+    )
+}
+
+LoadSeqinfoList <- function(config){
+  scaflen <- read.table(config$f_scaflen, header=TRUE, stringsAsFactors=FALSE)
+  stopifnot(c('species', 'scaffold', 'length') %in% names(scaflen))
+  stopifnot(setequal(scaflen$species, config$species))
+  lapply(
+    config$species,
+    function(s) {
+      with(subset(scaflen, species == s),
+        Seqinfo(
+          seqnames=scaffold,
+          seqlengths=length,
+          genome=s
+        )
+      )
+    }
+  ) %>% set_names(config$species)
+}
+
 MakeGI <- function(starts, stops, scaffolds, strands=NULL, metadata=NULL, seqinfo=NULL){
   require(GenomicRanges)
   if(is.null(strands)){
@@ -228,17 +350,6 @@ LoadFASTA <- function(filename, isAA=TRUE){
     readAAStringSet(filename)
   } else {
     readDNAStringSet(filename)
-  }
-}
-
-PrepareSeqinfo <- function(scaflen, species){
-  if(!is.null(scaflen) && !is.null(species)){
-    stopifnot(c('species', 'scaffold', 'length') %in% names(scaflen))
-    stopifnot(species %in% scaflen$species)
-    scaflen <- scaflen[scaflen$species == species, ]
-    Seqinfo(seqnames=scaflen$scaffold, seqlengths=scaflen$length, genome=species)
-  } else {
-    NULL
   }
 }
 

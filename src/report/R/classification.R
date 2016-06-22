@@ -266,6 +266,73 @@ AA_aln <- function(map, query, target){
   list(scores=map, alignments=aln)
 }
 
+#' Extract a DNAStringSet from a DNAStringSet and a GRange object
+#' 
+#' @param gr A GRange object
+#' @param fa A DNAStringSet object
+#' @return DNAStringSet
+seqFromGenomicRange <- function(gr, fa, scramble=FALSE){
+
+  stopifnot(class(gr) == "GRanges")
+  stopifnot(class(fa) == 'DNAStringSet')
+
+  d <- ranges(gr) %>% as.data.frame
+  d$name <- seqnames(gr) %>% as.character
+  d$end <- NULL
+
+  # Randomize the starts and scaffolds (preserving linkage), but preserve width
+  if(scramble){
+    random.indices <- sample(1:nrow(d))
+    d[, c('start', 'name')] <- d[random.indices, c('start', 'name')]
+  }
+
+  a <- list()
+  for(i in 1:nrow(d)){
+    q <- fa[[d$name[i]]]
+    a[[as.character(i)]] <- subseq(
+      q,
+      start=d$start[i],
+      width=min(d$width[i], length(q) - d$start[i])
+    )
+  }
+  DNAStringSet(unlist(a))
+}
+
+
+#' Align queries against intervals extracted from a genome
+#' 
+#' @param gr GRanges object
+#' @param genome DNAStringSet object
+#' @param query.seqs DNAStringSet object
+#' @param ... Arguments passed to seqFromGenomicRange
+#' @return desc
+#' 
+alignToGenome <- function(query.seqs, genome, gr, ...){
+
+  stopifnot(length(gr) == length(query.seqs))
+  stopifnot(class(gr) == "GRanges")
+  stopifnot(class(genome) == "DNAStringSet")
+  stopifnot(class(query.seqs) == "DNAStringSet")
+
+  search.intervals <- seqFromGenomicRange(gr, genome, ...)
+
+  # Retrieve only the maximum scores
+  nuc.scores <- pairwiseAlignment(
+    pattern=query.seqs,
+    subject=search.intervals,
+    type='local',
+    scoreOnly=TRUE
+  )
+
+  data.frame(
+    seqid = query.seqs %>% names,
+    qwidth = query.seqs %>% width,
+    twidth = search.intervals %>% width,
+    score = nuc.scores,
+    stringsAsFactors=FALSE
+  )
+}
+
 
 # # ============================================================================
 # # Global classifications

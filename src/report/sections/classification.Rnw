@@ -14,9 +14,10 @@ if(file.exists(rdat)){
     aafile="~/src/git/cadmium/input/faa/Arabidopsis_thaliana.faa",
     gfffile="~/src/git/cadmium/input/gff/Arabidopsis_thaliana.gff",
     orphanfile="~/src/git/cadmium/input/orphan-list.txt",
+    genefile='~/src/git/cadmium/input/gene/Arabidopsis_thaliana.gene.fna',
     seqinfo=qinfo
   )
-  # TODO: Fix the out-of-range bugs, may need to look into Synder
+  # TODO: Fix the out-of-range bugs
   target <- LoadTarget(
     aafile="~/src/git/cadmium/input/faa/Arabidopsis_lyrata.faa",
     dnafile="~/src/git/cadmium/input/fna/Arabidopsis_lyrata.fna",
@@ -328,6 +329,52 @@ if(file.exists(orfalndat)){
 
 \subsection{Find DNA hit}
 
+<<>>=
+nuchitdat <- "~/src/git/cadmium/input/nuchit.Rdat"
+if(file.exists(nuchitdat)){
+  load(nuchitdat)
+} else {
+  genseq <- LoadFASTA(target$dna.file, isAA=FALSE)
+
+  # Get orphan intervals
+  orfgff <- target$si$target[target$si$query$seqid %in% query$orphans] 
+
+  set.seed(42)
+  ogen <- query$genes[target$si$query[orfgff$id]$seqid]
+  orp.dna.hits      <- alignToGenome(ogen, genseq, orfgff)
+  orp.dna.hits.ctrl <- alignToGenome(ogen, genseq, orfgff, scramble=TRUE)
+  save(orp.dna.hits, orp.dna.hits.ctrl, file=nuchitdat)
+}
+@
+
+<<fig.width=8, fig.height=6>>=
+plot(
+  orp.dna.hits$qwidth,
+  orp.dna.hits$twidth,
+  xlab='Orphan gene length (bases)',
+  ylab='Search interval length (bases)'
+)
+@
+
+\begin{figure}[!ht]
+  \centering
+<<>>=
+require(scales)
+require(ggplot2)
+d <- rbind(orp.dna.hits, orp.dna.hits.ctrl)
+d$group <- c(rep('Real',     nrow(orp.dna.hits)),
+             rep('Permuted', nrow(orp.dna.hits.ctrl))) %>% factor
+ggplot(d) +
+  geom_histogram(aes(x=score, y=..density..), bins=50) +
+  facet_wrap(~group) +
+  scale_x_continuous(
+    trans='log2',
+    breaks=trans_breaks('log2', function(x) round(2^x))
+  )
+@
+  \caption{\textbf{Permuted versus real alignment score.}}
+  \label{fig:nucscores}
+\end{figure}
 
 \subsection{Leaf labels}
 
@@ -352,18 +399,15 @@ nst <- orpseq %in% query2gap$query
 ind <- orpseq %in% q.ind
 # ORF match in SI
 orf <- orpseq %in% (orfmap %>% subset(score > 100) %$% query)
+# nuc - has nucleotide match in SI
+nuc <- orpseq %in% (orp.dna.hits %>% subset(score > 60) %$% seqid)
 
 orfhits <- orfmap %>% group_by(query) %>% summarize(orf_top_score=max(score), N.orf=length(score)) 
-
-### TODO: - add:
-# nuc - has nucleotide match in SI
-# pri - is overprinted
 
 
 stopifnot(which(gen) %in% which(cds))
 stopifnot(which(cds) %in% which(rna))
 stopifnot(intersect(which(scr), which(rel)) == 0)
-
 
 label <- rep('unknown', nrow(orp.origins))
 
@@ -380,6 +424,7 @@ label[label == 'unknown' & scr ] <- 'unknown-scrambled'
 
 orp.origins$label <- label
 orp.origins$orf_hit <- NULL
+orp.origins$dna_hit <- nuc 
 
 orp.origins$resized <- ifelse(orp.origins$seqid %in% q.res, TRUE, FALSE)
 @

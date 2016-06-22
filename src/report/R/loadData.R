@@ -257,19 +257,22 @@ LoadQuery <- function(
   aafile="~/src/git/cadmium/input/faa/Arabidopsis_thaliana.faa",
   gfffile="~/src/git/cadmium/input/gff/Arabidopsis_thaliana.gff",
   orphanfile="~/src/git/cadmium/input/orphan-list.txt",
+  genefile='~/src/git/cadmium/input/gene/Arabidopsis_thaliana.gene.fna',
   seqinfo=NULL
 )
 {
   require(Biostrings)
 
-  aa      <- LoadFASTA(aafile)
+  aa      <- LoadFASTA(aafile, isAA=TRUE)
+  # Query gene sequences (including UTR and introns)
+  genes   <- LoadFASTA(genefile, isAA=FALSE)
   gff     <- LoadGFF(gfffile, seqinfo=seqinfo)
   orphans <- read.table(orphanfile, stringsAsFactors=FALSE)[[1]]
   # all orphans should be associated with a protein sequence
   stopifnot(orphans %in% names(aa))
   # all GFF seqids be associated with a protein sequence
   stopifnot(gff$seqid %in% names(aa))
-  list(aa=aa, gff=gff, orphans=orphans)
+  list(aa=aa, gff=gff, genes=genes, orphans=orphans)
 }
 
 

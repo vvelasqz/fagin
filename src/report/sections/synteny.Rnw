@@ -61,3 +61,8 @@ abline(0, 0)
         say, 2) indicates errors in the input. To avoid overplottin, values
         between -0.25 and 0.25 are not plotted.} 
 \end{figure}
+
+<<>>=
+# Cleanup
+rm(list=ls())
+@

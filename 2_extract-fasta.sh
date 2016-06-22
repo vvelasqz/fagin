@@ -30,15 +30,27 @@ done
 species=$(cat $INPUT/species)
 
 mkdir -p $INPUT/faa
+mkdir -p $INPUT/gene
+
 for s in $species
 do
-    cat input/gff/$s.gff |
+    cat $INPUT/gff/$s.gff |
+        awk '$3 == "mRNA"' |
+        grep -v '#' |
+        awk 'BEGIN{OFS="\t"} {$3 = $9; print}' |
+        bedtools getfasta         \
+            -fi $INPUT/fna/$s.fna \
+            -bed /dev/stdin       \
+            -fo /dev/stdout       \
+            -name > $INPUT/gene/$s.gene.fna
+
+    cat $INPUT/gff/$s.gff |
         awk '$3 == "CDS"' |
         grep -v '#' |
         sort -k3n -k9 |
         awk 'BEGIN{FS="\t";OFS="\t"}{$3 = $9" "$7; print}' |
         bedtools getfasta        \
-            -fi input/fna/$s.fna \
+            -fi $INPUT/fna/$s.fna \
             -bed /dev/stdin      \
             -fo /dev/stdout      \
             -name |
@@ -46,7 +58,7 @@ do
     cat <(smof grep ' +' x) <(smof grep ' -' x | revseq -filter) | 
         transeq -filter |
         sed '/>/s/_[0-9]\+//' |
-        smof clean -sux > input/faa/$s.faa
+        smof clean -sux > $INPUT/faa/$s.faa
     rm x
 done
 

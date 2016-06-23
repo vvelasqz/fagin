@@ -64,15 +64,10 @@ for (x in c(deps, bio.deps)) {
 <<introduction, child='sections/introduction.Rnw'>>=
 @
 
-\section{Input data}
-
-<<input, child='sections/input.Rnw'>>=
-@
-
-\section{Syntenic results}
-
-<<synteny, child='sections/synteny.Rnw'>>=
-@
+% \section{Input data}
+%
+% <<input, child='sections/input.Rnw'>>=
+% @
 
 \section{Classification results}
 

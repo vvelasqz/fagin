@@ -3,10 +3,13 @@
 #' Loads the following variables from the config file into a list:
 #' R_FAA_DIR        \
 #' R_GFF_DIR        |
-#' R_SYN_DIR        | data directories
+#' R_SYN_DIR        |
 #' R_GENE_DIR       |
-#' R_GENOME_DIR     |
-#' R_SI_DIR         /
+#' R_GENOME_DIR     | data directories
+#' R_SI_DIR         |
+#' R_ORFGFF         |
+#' R_CACHE          |
+#' R_ORFFAA         /
 #' R_SPECIES_FILE   \
 #' R_SCAFLEN        |
 #' R_NSTRINGS       | individual data files
@@ -23,6 +26,9 @@
 #'  d_gene
 #'  d_genome
 #'  d_si
+#'  d_orfgff
+#'  d_orffaa
+#'  d_cache
 #'  f_scaflen
 #'  f_nstrings
 #'  f_orphan
@@ -48,7 +54,10 @@ LoadConfig <- function(configfile='~/src/git/cadmium/cadmium.cfg'){
         'R_SYN_DIR',
         'R_GENE_DIR',
         'R_GENOME_DIR',
+        'R_CACHE',
         'R_SI_DIR',
+        'R_ORFGFF',
+        'R_ORFFAA',
         'R_SPECIES_FILE',
         'R_SCAFLEN',
         'R_NSTRINGS',
@@ -63,13 +72,13 @@ LoadConfig <- function(configfile='~/src/git/cadmium/cadmium.cfg'){
         }
     }
     # Check existence of directories
-    for(v in expected.vars[1:6]){
+    for(v in expected.vars[1:9]){
         if(!dir.exists(eval(parse(text=v)))){
             cat(sprintf("Variable '%s' does not point to a valid directory\n", v))
         }
     }
     # Check existence of files
-    for(v in expected.vars[7:11]){
+    for(v in expected.vars[10:14]){
         if(!file.exists(eval(parse(text=v)))){
             cat(sprintf("Variable '%s' does not point to a readable file\n", v))
         }
@@ -91,6 +100,9 @@ LoadConfig <- function(configfile='~/src/git/cadmium/cadmium.cfg'){
         d_gene        = R_GENE_DIR,
         d_genome      = R_GENOME_DIR,
         d_si          = R_SI_DIR,
+        d_orfgff      = R_ORFGFF,
+        d_orffaa      = R_ORFFAA,
+        d_cache       = R_CACHE,
         f_scaflen     = R_SCAFLEN,
         f_nstrings    = R_NSTRINGS,
         f_orphan      = R_ORPHAN_LIST,
@@ -103,6 +115,7 @@ LoadConfig <- function(configfile='~/src/git/cadmium/cadmium.cfg'){
 }
 
 LoadSeqinfoList <- function(config){
+  require(GenomicRanges)
   scaflen <- read.table(config$f_scaflen, header=TRUE, stringsAsFactors=FALSE)
   stopifnot(c('species', 'scaffold', 'length') %in% names(scaflen))
   stopifnot(setequal(scaflen$species, config$species))
@@ -297,6 +310,8 @@ LoadSearchIntervals <- function(sifile, extend=FALSE, extend_factor=1, qinfo=NUL
   si$tstart <- si$tstart + 1
   si$tstop  <- si$tstop  + 1
 
+  stopifnot(si$tchr %in% seqnames(tinfo))
+
   if(extend){
     extend_length <- with(si, qstop - qstart + 1) * extend_factor
     el <- si$flag == 1 | si$flag == 3
@@ -305,9 +320,9 @@ LoadSearchIntervals <- function(sifile, extend=FALSE, extend_factor=1, qinfo=NUL
     if(is.null(tinfo)){
       maxend = Inf
     } else {
-      maxend = seqlengths(tinfo)[si$tchr]
+      maxend = seqlengths(tinfo)[si$tchr][er]
     }
-    si$tstop[er] <- (si$tstop[er] + extend_length[er]) %>% pmin(maxend[er])
+    si$tstop[er] <- (si$tstop[er] + extend_length[er]) %>% pmin(maxend)
   }
 
   si$tmax <- seqlengths(tinfo)[si$tchr]
@@ -415,12 +430,14 @@ LoadTarget <- function(species, config, l_seqinfo){
   qinfo      <- l_seqinfo[[config$focal_species]]
   tinfo      <- l_seqinfo[[species]]
 
-  dnafile <- sprintf('%s/%s.fna',     config$d_genome, species)
   sifile  <- sprintf('%s/%s.vs.%s.map.tab', config$d_si, config$focal_species, species)
   synfile <- sprintf('%s/%s.vs.%s.syn', config$d_syn, config$focal_species, species)
 
+  dna.file    <- sprintf('%s/%s.fna', config$d_genome, species)
+  orfgff.file <- sprintf('%s/%s.gff', config$d_orfgff, species)
+  orffaa.file <- sprintf('%s/%s.faa', config$d_orffaa, species)
+
   aa <- LoadFASTA(aafile, isAA=TRUE)
-  dna.file <- dnafile
   si <- LoadSearchIntervals(sifile,
                             extend=config$extend,
                             extend_factor=config$extend_factor,
@@ -451,5 +468,14 @@ LoadTarget <- function(species, config, l_seqinfo){
   # LoadSyntenyMap function.
   stopifnot(si.seq_name %in% syn.seq_name)
 
-  list(aa=aa, dna.file=dna.file, si=si, gff=gff, syn=syn, nstring=nstring)
+  list(
+    aa=aa,
+    dna.file=dna.file,
+    orfgff.file=orfgff.file,
+    orffaa.file=orffaa.file,
+    si=si,
+    gff=gff,
+    syn=syn,
+    nstring=nstring
+  )
 }

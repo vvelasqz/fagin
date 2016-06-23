@@ -1,6 +1,10 @@
 <<message=FALSE, warning=FALSE>>=
 source('~/src/git/cadmium/src/report/R/classification.R')
 source('~/src/git/cadmium/src/report/R/loadData.R')
+source('~/src/git/cadmium/src/report/R/indels.R')
+source('~/src/git/cadmium/src/report/R/syntenic_stats.R')
+source('~/src/git/cadmium/src/report/R/sequence_alignments.R')
+source('~/src/git/cadmium/src/report/R/feature_overlaps.R')
 
 config <- LoadConfig(configfile='~/src/git/cadmium/cadmium.cfg')
 
@@ -8,57 +12,123 @@ l_seqinfo <- LoadSeqinfoList(config)
 
 # TODO: check all inputs, and handle missing files appropriately
 
-# TODO: condense all the following code to a few functions
-# TODO: loop through these loading one target at a time nad returning the output and plots
-# TODO: merge all these into one. Save the full data at each step to an Rdat folder
+query <- LoadQuery(config, l_seqinfo)
 
-rdat <- "~/src/git/cadmium/input/io.Rdat"
-if(file.exists(rdat)){
-  load(rdat)
-} else {
-  query <- LoadQuery(config, l_seqinfo)
+use_cache = TRUE
+
+results <- list()
+for(s in config$species){
+  if(s %in% c(config$focal_species, 'Brassica_rapa')){
+    next
+  }
+
+  cache <- function(x, ...){
+    if(!dir.exists(config$d_cache)){
+      dir.create(config$d_cache)
+    }
+    filename <- sprintf(
+      '%s/%s.vs.%s-%s.Rdat',
+      config$d_cache, config$focal_species, s, deparse(substitute(x))
+    )
+    if(file.exists(filename) && use_cache){
+      load(filename)
+    } else {
+      out <- x(...)
+      if(use_cache){
+        save(out, file=filename)
+      }
+    }
+    out
+  }
 
   # TODO: Fix the out-of-range bugs
-  target <- LoadTarget('Arabidopsis_lyrata', config, l_seqinfo)
+  target <- cache(LoadTarget, species=s, config=config, l_seqinfo=l_seqinfo)
 
-  sflags  <- summarize.flags(target$si)
+  sflags <- cache(summarize.flags, target$si)
+
   origins <- initializeOrigins(query, target)
-  origins <- syntenicState(origins, sflags)
-  bittbl  <- getBitTable(origins)
-  fo.cds  <- analyzeTargetFeature(query, target, feature="CDS")
-  fo.mrna <- analyzeTargetFeature(query, target, feature="mRNA")
-  query2gap <- findQueryGaps(nstring=target$nstring, target=target)
-  save(
-    query,      # query aa seqs, gff, and orphan list
-    target,     # target aa seqs, siearch intervals, gff, synteny map, and dna file
-    sflags,     # syntenic flags for each query sequence
-    origins,    # origins file: [ seqid, orphan, class, bit, scrambled ]
-    bittbl,     # summary of syntenic states
-    fo.cds,     # overlaps of query genes against target CDSs
-    fo.mrna,    # overlaps of query genes against target mRNAs
-    query2gap,  # table listing all genes that overlap an N-string, and the N-string length
-    file=rdat
-  )
-}
 
-alnrdat <- "~/src/git/cadmium/input/aln.Rdat"
-if(file.exists(alnrdat)){
-  load(alnrdat)
-} else {
-  aln <- AA_aln(
-    map=fo.cds$query2target,
-    query=query,
-    target=target
+  # B1 - Queries of scrambled origin
+  origins <- cache(syntenicState, origins, sflags)
+
+  bittbl <- getBitTable(origins)
+
+  # B2 - Queries overlap an indel in a target SI
+  ind       <- cache(findIndels, target, indel.threshold=0.05)
+  ind.stats <- indelStats(ind)
+  ind.sumar <- indelSummaries(ind)
+
+  overlapping.features <- cache(analyzeTargetFeature, query, target)
+  # B3 - Queries whose SI overlap an mRNA
+  fo.mrna <- overlapping.features$mRNA
+  # B4 - Queries whose SI overlap a CDS
+  fo.cds <- overlapping.features$CDS
+
+  # B5 - Queries whose SI overlap an N-string
+  query2gap <- cache(findQueryGaps, nstring=target$nstring, target=target)
+
+  results[[s]] <- list(
+    species=s,
+    target=target,
+    sflags=sflags,
+    origins=origins,
+    bittbl=bittbl,
+    fo.mrna=fo.mrna,
+    fo.cds=fo.cds,
+    query2gap=query2gap
   )
-  alnsum <- mutate(aln$scores, ortholog = score > 60) %>%
-    group_by(query) %>%
-    summarize(
-      n.over = length(query),
-      n.orth = sum(ortholog)
-    )
-  save(aln, alnsum, file=alnrdat)
+
+  # # B6 - Queries whose protein seq matches a target protein in the SI
+  # aln       <- cache(AA_aln, map=fo.cds$query2target, query=query, target=target)
+  # aln.stats <- AA_aln_stats(aln, query)
+  #
+  # # B7 - Queries whose protein matches an ORF in an SI
+  # query2orf <- cache(get_query2orf, target) 
+  # orfmap    <- get_orfmap(query2orf, query, target)
+  #
+  # # B8 - Queries whose gene matches (DNA-DNA) an SI 
+  # orp2dna <- cache(get_orphan_dna_hits, query, target)
+  #
+  # orp.origins <- determineLabels(origins, fo.cds, fo.mrna, aln, query2gap, ind.stats, orfmap, orp2dna)
 }
 @
+
+\subsection{Data input}
+
+\begin{figure}[!ht]
+    \centering
+<<cache=TRUE>>=
+require(reshape2)
+require(ggplot2)
+lapply(
+  results,
+  function(x){
+    syn <- x$target$syn
+    lograt <- log2(width(syn$query) / width(syn$target)[syn$query$over])
+    lograt <- lograt[abs(lograt) > 0.25] 
+    data.frame(
+      lograt=lograt,
+      index=1:length(lograt)
+    )
+  }
+) %>% melt(id.vars=c('lograt', 'index')) %>% dplyr::rename(species=L1) %>%
+ggplot +
+  geom_point(aes(x=index, y=lograt), size=0.2) +
+  xlab('Ordered position on query genome') +
+  ylab('log2 of query to target length ratio') +
+  facet_wrap(~species, scale='free_x')
+@
+    \caption{\textbf{Diagnostic plot of query to target lengths in synteny
+        map}. The syntenic intervals on the query and target sides should
+        be of similar length.  They will not be exactly the same size if gaps
+        are allowed in the alignment, but wild deviation from 0 (more than,
+        say, 2) indicates errors in the input. To avoid overplottin, values
+        between -0.25 and 0.25 are not plotted.} 
+\end{figure}
+
+
+
+%#####################
 
 \subsection{Mapping features between GFF given scaffold}
 
@@ -67,22 +137,24 @@ if(file.exists(alnrdat)){
 <<fig.width=6, fig.height=4, message=FALSE, cache=TRUE>>=
 require(reshape2)
 require(ggplot2)
-m <- melt(
-    bittbl[c('bit', 'non_orp_prop', 'orp_prop')],
-    id.vars='bit',
-    value.name='proportion',
-    variable.name='class'
-)
-ggplot(m) +
-    geom_point(aes(x=bit, y=proportion, color=class)) +
-    geom_line(aes(x=bit, y=proportion, group=class)) +
-    xlab('Synteny flags') +
-    ylab('Proportion') +
-    theme(
-        axis.text.x = element_text(angle=270, hjust=0, vjust=1),
-        legend.position=c(1, 1),
-        legend.justification=c(1, 1)
-    )
+require(gridExtra)
+require(dplyr)
+
+m <- lapply(results, function(x) x$bittbl) %>%
+  melt(id.vars='bit', value.name='proportion', variable.name='class') %>%
+  subset(class %in% c('non_orp_prop', 'orp_prop')) %>%
+  dplyr::rename(species=L1)
+  ggplot(m) +
+      geom_point(aes(x=bit, y=proportion, color=class)) +
+      geom_line(aes(x=bit, y=proportion, group=class)) +
+      xlab('Synteny flags') +
+      ylab('Proportion') +
+      theme(
+          axis.text.x = element_text(angle=270, hjust=0, vjust=1),
+          legend.position=c(1, 1),
+          legend.justification=c(1, 1)
+      ) +
+      facet_wrap(~species)
 @
   \caption{\textbf{Synteny flags}. \textbf{(0)} the search interval is reliable;
     \textbf{(1)} the start edge is unreliable; \textbf{(2)} the stop edge is
@@ -95,7 +167,7 @@ ggplot(m) +
 
 <<results='asis'>>=
 require(xtable)
-xtable(bittbl, caption='Nmumber of genes in each syntenic class.')
+xtable(m, caption=sprintf('Number of genes in each syntenic class.'))
 @
 
 
@@ -107,11 +179,14 @@ xtable(bittbl, caption='Nmumber of genes in each syntenic class.')
 <<fig.width=6, fig.height=4, message=FALSE, cache=TRUE>>=
 require(ggplot2)
 require(scales)
-featureCountTable(fo.cds) %>%
-  {data.frame(
-    N.cds=as.numeric(row.names(.)),
-    count=.$Count)
-  } %>%
+lapply(results, function(x){
+  featureCountTable(x$fo.cds) %>%
+    {data.frame(
+      N.cds=as.numeric(row.names(.)),
+      count=.$Count)
+    }
+  }
+) %>% melt(id.vars=c('N.cds', 'count')) %>% dplyr::rename(species=L1) %>%
   ggplot +
     geom_point(aes(x=N.cds, y=count)) +
     xlab('Number of overlapped CDSs') +
@@ -119,317 +194,146 @@ featureCountTable(fo.cds) %>%
     scale_y_continuous(
       trans='log2',
       breaks=trans_breaks('log2', function(x) round(2^x))
-    )
+    ) +
+    facet_wrap(~species)
 @
   \caption{Number of CDS's overlapped by a single search interval}.
 \end{figure}
 
 <<results='asis'>>=
 require(xtable)
-featureCountTable(fo.mrna) %>%
+lapply(results, function(x){
+  featureCountTable(x$fo.mrna) %>%
+    {data.frame(
+      N.mrna=as.numeric(row.names(.)),
+      count=.$Count)
+    }
+  }
+) %>% melt(id.vars=c('N.mrna', 'count')) %>% dplyr::rename(species=L1) %>%
   xtable(caption='Number of target mRNAs overlapping one search interval')
 @
 
-<<>>=
-n.orp.cds  <- fo.cds$orphan2target$query  %>% unique %>% length
-n.orp.mrna <- fo.mrna$orphan2target$query %>% unique %>% length
-n.orp <- query$orphans %>% unique %>% length
-@
-\begin{table}[!ht]
-    \centering
-    \label{tab:label}
-    \begin{tabular}{l | l | l}
-    feature & count & percent \\ 
-    \hline
-    CDS  & \Sexpr{n.orp.cds}  & \%\Sexpr{signif(100 * n.orp.cds  / n.orp, 2)} \\
-    mRNA & \Sexpr{n.orp.mrna} & \%\Sexpr{signif(100 * n.orp.mrna / n.orp, 2)} \\
-    \hline
-    \end{tabular}
-    \caption{Number of orphans with search intervals overlapping given features}
-\end{table}
+% <<>>=
+% n.orp.cds  <- fo.cds$orphan2target$query  %>% unique %>% length
+% n.orp.mrna <- fo.mrna$orphan2target$query %>% unique %>% length
+% n.orp <- query$orphans %>% unique %>% length
+% @
+% \begin{table}[!ht]
+%     \centering
+%     \label{tab:label}
+%     \begin{tabular}{l | l | l}
+%     feature & count & percent \\ 
+%     \hline
+%     CDS  & \Sexpr{n.orp.cds}  & \%\Sexpr{signif(100 * n.orp.cds  / n.orp, 2)} \\
+%     mRNA & \Sexpr{n.orp.mrna} & \%\Sexpr{signif(100 * n.orp.mrna / n.orp, 2)} \\
+%     \hline
+%     \end{tabular}
+%     \caption{Number of orphans with search intervals overlapping given features}
+% \end{table}
 
 \subsection{Find indel events}
 
-<<>>=
-ind <- findIndels(target, indel.threshold=0.05)
-
-q.res <- ind$d.sum %>% subset(N == n.resized) %$% seqid
-q.ind <- ind$d.sum %>% subset(N == n.indel)   %$% seqid
-
-# In this set of genes, an indel or resize has occurred in one or more search
-# intervals, but NOT in all of the search intervals.
-d.irr <- ind$d.sum %>% subset(N > (n.indel + n.resized))
-
-# All indel/resize event containing sequences must fall into one of the three above categories
-stopifnot(length(q.res) + length(q.ind) + nrow(d.irr) == nrow(ind$d.sum))
-@
-
-<<echo=TRUE>>=
-ind$d.sum %>% subset(type == "indel") %$% n.indel %>% factor %>% summary
-ind$d.sum %>% subset(type == "resized") %$% n.resized %>% factor %>% summary
-
-ind$d.sum %>% subset(type == "selective") %$% N %>% factor %>% summary
-ind$d.sum %>% subset(type == "selective") %$% n.indel %>% factor %>% summary
-ind$d.sum %>% subset(type == "selective") %$% n.resized %>% factor %>% summary
-@
-
-At least in the Arabidopsis thaliana versus Arabidopsis lyrata, all indel and
-resize events occur in no more than one search interval for a given query. In
-\Sexpr{length(q.res)} cases, the gene maps to only 1 search interval and is
-resized in it. Similarly for the \Sexpr{length(q.ind)} cases of indels. There
-are \Sexpr{nrow(d.irr)} cases where a gene maps to multiple search intervals,
-but still, only one of them is reduced or resized.
+% At least in the Arabidopsis thaliana versus Arabidopsis lyrata, all indel and
+% resize events occur in no more than one search interval for a given query. In
+% \Sexpr{length(q.res)} cases, the gene maps to only 1 search interval and is
+% resized in it. Similarly for the \Sexpr{length(q.ind)} cases of indels. There
+% are \Sexpr{nrow(d.irr)} cases where a gene maps to multiple search intervals,
+% but still, only one of them is reduced or resized.
 
 \subsection{Find queries overlapping N-strings}
 
-
 \subsection{Find protein matches}
-
 
 \subsection{Check orthology functionality against all non-orphans}
 
-<<>>=
+% <<>>=
+% m <- data.frame(
+%   group = c(rep('Ortholog', length(s.orth)),
+%             rep('Overlapping', length(s.over)+1)),
+%   N = c(names(s.orth), '0', names(s.over)) %>% as.integer,
+%   count = c(s.orth, n.missing, s.over)
+% )
+% @
+% <<results='asis'>>=
+% require(xtable)
+% m %>% xtable(caption=sprintf(
+%  '\\textbf{Ortholog}: the number of query genes (count) where N target genes
+%  both overlap a search interval AND have a high protein sequence similarity
+%  score.  \\textbf{Overlapping}: the number of query genes (count) where N
+%  target genes overlap a search interval.  %s\\%% of query genes have overlaps
+%  and %s\\%% have identified orthologs.', perc.with.over, perc.with.orth))
+% @
 
-# TODO: Check how many of the missing genes reside on the scaffolds that are
-# not covered by SI
-# TODO: Fit two normal distributions: one for the noise, one for the signal.
 
-old.qname <- origins %>%
-  subset(!orphan) %$% 
-  seqid %>% as.character %>% unique
-
-# total number of old genes
-n.total <- length(old.qname)
-
-# number of old genes that do not overlap a CDS
-n.missing <- old.qname %in% alnsum$query %>% not %>% sum
-
-d <- alnsum[alnsum$query %in% old.qname, ]
-
-# Proportion of genes whose search intervals overlap at least 1 CDS
-perc.with.over <- signif(nrow(d) / n.total, 3) * 100 
-
-# Proportion of genes that link to given number of orthologs
-perc.with.orth <- signif(sum(d$n.orth > 0) / n.total, 3) * 100 
-
-# summary of the number of orthologs found
-s.orth <- d$n.orth %>% factor %>% summary
-
-# summary of the number of overlapping genes found
-s.over <- d$n.over %>% factor %>% summary
-@
-<<>>=
-m <- data.frame(
-  group = c(rep('Ortholog', length(s.orth)),
-            rep('Overlapping', length(s.over)+1)),
-  N = c(names(s.orth), '0', names(s.over)) %>% as.integer,
-  count = c(s.orth, n.missing, s.over)
-)
-@
-<<results='asis'>>=
-require(xtable)
-m %>% xtable(caption=sprintf(
- '\\textbf{Ortholog}: the number of query genes (count) where N target genes
- both overlap a search interval AND have a high protein sequence similarity
- score.  \\textbf{Overlapping}: the number of query genes (count) where N
- target genes overlap a search interval.  %s\\%% of query genes have overlaps
- and %s\\%% have identified orthologs.', perc.with.over, perc.with.orth))
-@
-
-\begin{figure}[!ht]
-    \centering
-<<fig.width=6, fig.height=6>>=
-require(ggplot2)
-require(scales)
-ggplot(aln$scores) +
-  geom_histogram(aes(x=score, y=..density..), bins=60) +
-  ggtitle('Protein alignment scores') +
-  xlab('Score') +
-  scale_x_continuous(
-    trans='log2',
-    breaks=trans_breaks('log2', function(x) round(2^x))
-  )
-@
-  \caption{
-    Scores of all local alignments against target genes in search intervals.
-    Note the bimodal distribution, which corresponds to the score of
-    non-homologous intervals versus homologous ones.
-  }
-  \label{fig:old-score}
-\end{figure}
+% \begin{figure}[!ht]
+%     \centering
+% <<fig.width=6, fig.height=6>>=
+% require(ggplot2)
+% require(scales)
+% ggplot(aln$scores) +
+%   geom_histogram(aes(x=score, y=..density..), bins=60) +
+%   ggtitle('Protein alignment scores') +
+%   xlab('Score') +
+%   scale_x_continuous(
+%     trans='log2',
+%     breaks=trans_breaks('log2', function(x) round(2^x))
+%   )
+% @
+%   \caption{
+%     Scores of all local alignments against target genes in search intervals.
+%     Note the bimodal distribution, which corresponds to the score of
+%     non-homologous intervals versus homologous ones.
+%   }
+%   \label{fig:old-score}
+% \end{figure}
 
 \subsection{Detect overprinting}
 
 \subsection{Detect protein hit to ORF}
 
-<<>>=
-orfdat <- "~/src/git/cadmium/input/orf.Rdat"
-if(file.exists(orfdat)){
-  load(orfdat)
-} else {
-  require(GenomicRanges)
-  orfgff_filename="~/src/git/cadmium/input/orf-gff/Arabidopsis_lyrata.gff"
-  orffaa_filename="~/src/git/cadmium/input/orf-faa/Arabidopsis_lyrata.faa"
-  orfgff <- LoadGFF(orfgff_filename)
-  
-  # o.orf is a list, where:
-  #  - o.orf indices -> si indices
-  #  - o.orf values  -> orf indices
-  o.orf <- findOverlaps(target$si$target, orfgff)
-  # I can delete this now, since all I need is the indices for accessing the
-  # ORF translated sequences
-  rm(orfgff)
-
-  orffaa <- LoadFASTA(orffaa_filename, isAA=TRUE)
-
-  query2orf <- data.frame(
-    query = target$si$query$seqid[from(o.orf)],
-    siid  = from(o.orf),
-    orfid = to(o.orf)
-  )
-
-  save(query2orf, orffaa, file=orfdat)
-}
-@
-
-<<>>=
-orfalndat <- "~/src/git/cadmium/input/orfaln.Rdat"
-if(file.exists(orfalndat)){
-  load(orfalndat)
-} else {
-  orfmap <- query2orf[query2orf$query %in% query$orphan, ]
-
-  require(Biostrings)
-  data(BLOSUM80)
-
-  orfaln <- pairwiseAlignment(
-    pattern=query$aa[orfmap$query],
-    subject=orffaa[orfmap$orfid],
-    type='local',
-    substitutionMatrix=BLOSUM80
-  )
-  orfmap$score <- score(orfaln)
-
-  save(orfaln, orfmap, file=orfalndat)
-}
-# TODO: based off the distribution of scores, fit a normal to the noise.  Here
-# fit a normal distribution using the 1st and 3rd quantiles. This should work
-# since the number of true homologs expected is very low. The quantile based
-# fitting will be robust against the far outliers.
-@
-
-
 \subsection{Find DNA hit}
 
-<<>>=
-nuchitdat <- "~/src/git/cadmium/input/nuchit.Rdat"
-if(file.exists(nuchitdat)){
-  load(nuchitdat)
-} else {
-  genseq <- LoadFASTA(target$dna.file, isAA=FALSE)
-
-  # Get orphan intervals
-  orfgff <- target$si$target[target$si$query$seqid %in% query$orphans] 
-
-  set.seed(42)
-  ogen <- query$genes[target$si$query[orfgff$id]$seqid]
-  orp.dna.hits      <- alignToGenome(ogen, genseq, orfgff)
-  orp.dna.hits.ctrl <- alignToGenome(ogen, genseq, orfgff, scramble=TRUE)
-  save(orp.dna.hits, orp.dna.hits.ctrl, file=nuchitdat)
-}
-@
-
-<<fig.width=8, fig.height=6>>=
-plot(
-  orp.dna.hits$qwidth,
-  orp.dna.hits$twidth,
-  xlab='Orphan gene length (bases)',
-  ylab='Search interval length (bases)'
-)
-@
-
-\begin{figure}[!ht]
-  \centering
-<<>>=
-require(scales)
-require(ggplot2)
-d <- rbind(orp.dna.hits, orp.dna.hits.ctrl)
-d$group <- c(rep('Real',     nrow(orp.dna.hits)),
-             rep('Permuted', nrow(orp.dna.hits.ctrl))) %>% factor
-ggplot(d) +
-  geom_histogram(aes(x=score, y=..density..), bins=50) +
-  facet_wrap(~group) +
-  scale_x_continuous(
-    trans='log2',
-    breaks=trans_breaks('log2', function(x) round(2^x))
-  )
-@
-  \caption{\textbf{Permuted versus real alignment score.}}
-  \label{fig:nucscores}
-\end{figure}
+% <<>>=
+%   plot(
+%     orp2dna$hits$qwidth,
+%     orp2dna$hits$twidth,
+%     xlab='Orphan gene length (bases)',
+%     ylab='Search interval length (bases)'
+%   )
+% @
+%
+% \begin{figure}[!ht]
+%   \centering
+% <<>>=
+% require(scales)
+% require(ggplot2)
+% d <- rbind(orp2dna$hits, orp2dna$ctrl)
+% d$group <- c(rep('Real',     nrow(orp2dna$hits)),
+%              rep('Permuted', nrow(orp2dna$ctrl))) %>% factor
+% ggplot(d) +
+%   geom_histogram(aes(x=score, y=..density..), bins=50) +
+%   facet_wrap(~group) +
+%   scale_x_continuous(
+%     trans='log2',
+%     breaks=trans_breaks('log2', function(x) round(2^x))
+%   )
+% @
+%   \caption{\textbf{Permuted versus real alignment score.}}
+%   \label{fig:nucscores}
+% \end{figure}
 
 \subsection{Leaf labels}
 
-<<>>=
-orp.origins <- subset(origins, orphan)
 
-orpseq <- orp.origins$seqid
-
-# Synteny is scrambled
-scr <- orp.origins$bit == '00001'
-# synteny is reliable
-rel <- orp.origins$bit == '10000'
-# at least one search interval overlaps a target CDS
-cds <- orpseq %in% (fo.cds$query2target$query %>% unique)
-# at least one search interval overlaps a target mRNA
-rna <- orpseq %in% (fo.mrna$query2target$query %>% unique)
-# the query has an ortholog in the target
-gen <- orpseq %in% (aln$scores %>% filter(score > 60) %$% query)
-# at least search interval overlaps a N-string
-nst <- orpseq %in% query2gap$query
-# number of confirmed indels (based on search interval size)
-ind <- orpseq %in% q.ind
-# ORF match in SI
-orf <- orpseq %in% (orfmap %>% subset(score > 100) %$% query)
-# nuc - has nucleotide match in SI
-nuc <- orpseq %in% (orp.dna.hits %>% subset(score > 60) %$% seqid)
-
-orfhits <- orfmap %>% group_by(query) %>% summarize(orf_top_score=max(score), N.orf=length(score)) 
+  % require(xtable)
+  % label %>%
+  %   factor %>%
+  %   summary %>%
+  %   as.data.frame %>%
+  %   set_names('count') %>%
+  %   xtable(caption='Labels for orphan genes')
 
 
-stopifnot(which(gen) %in% which(cds))
-stopifnot(which(cds) %in% which(rna))
-stopifnot(intersect(which(scr), which(rel)) == 0)
-
-label <- rep('unknown', nrow(orp.origins))
-
-label[       !(rna | scr) ] <- 'possible-intergenic'
-label[ rel & !(rna | scr) ] <- 'intergenic'
-label[ rna & !cds         ] <- 'possible-hitchhiker'
-label[ cds & !gen         ] <- 'possible-genic'
-label[ gen                ] <- 'confirmed-genic'
-label[ ind                ] <- 'indel'
-label[ orf & !gen         ] <- 'candidate-gene'
-
-label[label == 'unknown' & nst ] <- 'unknown-gapped'
-label[label == 'unknown' & scr ] <- 'unknown-scrambled'
-
-orp.origins$label <- label
-orp.origins$orf_hit <- NULL
-orp.origins$dna_hit <- nuc 
-
-orp.origins$resized <- ifelse(orp.origins$seqid %in% q.res, TRUE, FALSE)
-@
-
-<<results='asis'>>=
-require(xtable)
-label %>%
-  factor %>%
-  summary %>%
-  as.data.frame %>%
-  set_names('count') %>%
-  xtable(caption='Labels for orphan genes')
-@
 
 \begin{description}
 

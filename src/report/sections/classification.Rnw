@@ -8,8 +8,6 @@ l_seqinfo <- LoadSeqinfoList(config)
 
 # TODO: check all inputs, and handle missing files appropriately
 
-# TODO: remove hard-coding of files by reading the config file
-
 # TODO: condense all the following code to a few functions
 # TODO: loop through these loading one target at a time nad returning the output and plots
 # TODO: merge all these into one. Save the full data at each step to an Rdat folder
@@ -18,35 +16,21 @@ rdat <- "~/src/git/cadmium/input/io.Rdat"
 if(file.exists(rdat)){
   load(rdat)
 } else {
-  query <- LoadQuery(
-    aafile="~/src/git/cadmium/input/faa/Arabidopsis_thaliana.faa",
-    gfffile="~/src/git/cadmium/input/gff/Arabidopsis_thaliana.gff",
-    orphanfile="~/src/git/cadmium/input/orphan-list.txt",
-    genefile='~/src/git/cadmium/input/gene/Arabidopsis_thaliana.gene.fna',
-    seqinfo=l_seqinfo[['Arabidopsis_thaliana']]
-  )
+  query <- LoadQuery(config, l_seqinfo)
+
   # TODO: Fix the out-of-range bugs
-  target <- LoadTarget(
-    aafile="~/src/git/cadmium/input/faa/Arabidopsis_lyrata.faa",
-    dnafile="~/src/git/cadmium/input/fna/Arabidopsis_lyrata.fna",
-    sifile="~/src/git/cadmium/input/maps/Arabidopsis_thaliana.vs.Arabidopsis_lyrata.map.tab",
-    synfile="~/src/git/cadmium/input/syn/Arabidopsis_thaliana.vs.Arabidopsis_lyrata.syn",
-    gfffile="~/src/git/cadmium/input/gff/Arabidopsis_lyrata.gff",
-    tinfo=l_seqinfo[['Arabidopsis_lyrata']],
-    qinfo=l_seqinfo[['Arabidopsis_thaliana']]
-  )
-  nstring <- LoadNString('~/src/git/cadmium/input/stat/nstrings.tab')[['Arabidopsis_lyrata']]
+  target <- LoadTarget('Arabidopsis_lyrata', config, l_seqinfo)
+
   sflags  <- summarize.flags(target$si)
   origins <- initializeOrigins(query, target)
   origins <- syntenicState(origins, sflags)
   bittbl  <- getBitTable(origins)
   fo.cds  <- analyzeTargetFeature(query, target, feature="CDS")
   fo.mrna <- analyzeTargetFeature(query, target, feature="mRNA")
-  query2gap <- findQueryGaps(nstring=nstring, target=target)
+  query2gap <- findQueryGaps(nstring=target$nstring, target=target)
   save(
     query,      # query aa seqs, gff, and orphan list
     target,     # target aa seqs, siearch intervals, gff, synteny map, and dna file
-    nstring,    # genomeIntervals object, positions of N-strings
     sflags,     # syntenic flags for each query sequence
     origins,    # origins file: [ seqid, orphan, class, bit, scrambled ]
     bittbl,     # summary of syntenic states

@@ -14,7 +14,7 @@
 #' R_TREE           /
 #' R_FOCAL_SPECIES  - string
 #' R_EXTEND         - boolean
-#' R_EXTEND_RATIO   - numeric
+#' R_EXTEND_FACTOR  - numeric
 #'
 #' These variables are loaded into the following R list entries:
 #'  d_faa
@@ -30,7 +30,7 @@
 #'  species
 #'  focal_species
 #'  extend
-#'  extend_ratio
+#'  extend_factor
 #'
 #' Where d_* are directories, and f_* are files. `species` is loaded as a
 #' character string where `focal_species` is a required member.
@@ -77,7 +77,7 @@ LoadConfig <- function(configfile='~/src/git/cadmium/cadmium.cfg'){
 
     extend = as.logical(R_EXTEND)
 
-    extend_ratio = as.numeric(R_EXTEND_RATIO)
+    extend_factor = as.numeric(R_EXTEND_FACTOR)
 
     species <- read.table(R_SPECIES_FILE, stringsAsFactors=FALSE)[[1]]
     if(!R_FOCAL_SPECIES %in% species){
@@ -98,7 +98,7 @@ LoadConfig <- function(configfile='~/src/git/cadmium/cadmium.cfg'){
         species       = species,
         focal_species = R_FOCAL_SPECIES,
         extend        = extend,
-        extend_ratio  = extend_ratio
+        extend_factor = extend_factor
     )
 }
 
@@ -226,7 +226,7 @@ LoadSyntenyMap <- function(synmap, qinfo=NULL, tinfo=NULL){
 #' 
 #' @param nstring.file name of the TAB delimited input file
 #' @return A data.frame with 4 columns: [ species | seqid | start | stop ]
-LoadNString <- function(nstring.file){
+LoadNString <- function(nstring.file, l_seqinfo){
   g <- read.delim(nstring.file, stringsAsFactors=FALSE)
 
   stopifnot(ncol(g) == 4)
@@ -235,7 +235,17 @@ LoadNString <- function(nstring.file){
 
   g <- base::split(x=g, f=factor(g$species))
 
-  lapply(g, function(x) MakeGI(starts=x$start, stops=x$stop, scaffolds=x$seqid))
+  lapply(
+    names(g),
+    function(x){
+      MakeGI(
+        starts=g[[x]]$start,
+        stops=g[[x]]$stop,
+        scaffolds=g[[x]]$seqid,
+        seqinfo=l_seqinfo[[x]]
+      )
+    }
+  ) %>% set_names(names(g))
 }
 
 #' Load search intervals
@@ -353,9 +363,7 @@ LoadFASTA <- function(filename, isAA=TRUE){
   }
 }
 
-#' Load all data required for classification on the query (focal species)
-#' side
-
+#' Load all focal species data needed for classification
 #'
 #' This data includes:
 #' 1. The protein sequence for each gene
@@ -364,15 +372,15 @@ LoadFASTA <- function(filename, isAA=TRUE){
 #' @param aafile Protein sequence for each gene
 #' @param gfffile Full species GFF file
 #' @return list of query data
-LoadQuery <- function(
-  aafile="~/src/git/cadmium/input/faa/Arabidopsis_thaliana.faa",
-  gfffile="~/src/git/cadmium/input/gff/Arabidopsis_thaliana.gff",
-  orphanfile="~/src/git/cadmium/input/orphan-list.txt",
-  genefile='~/src/git/cadmium/input/gene/Arabidopsis_thaliana.gene.fna',
-  seqinfo=NULL
-)
+LoadQuery <- function(config, l_seqinfo)
 {
   require(Biostrings)
+
+  aafile     <- sprintf('%s/%s.faa', config$d_faa, config$focal_species)
+  gfffile    <- sprintf('%s/%s.gff', config$d_gff, config$focal_species)
+  orphanfile <- config$f_orphan
+  genefile   <- sprintf('%s/%s.gene.fna', config$d_gene, config$focal_species)
+  seqinfo    <- l_seqinfo[[config$focal_species]]
 
   aa      <- LoadFASTA(aafile, isAA=TRUE)
   # Query gene sequences (including UTR and introns)
@@ -399,24 +407,28 @@ LoadQuery <- function(
 #' @return gfffile
 #' @return sifile search interval file
 #' @return fnafile
-LoadTarget <- function(
-  aafile="~/src/git/cadmium/input/faa/Arabidopsis_lyrata.faa",
-  dnafile="~/src/git/cadmium/input/fna/Arabidopsis_lyrata.fna",
-  sifile="~/src/git/cadmium/input/maps/Arabidopsis_thaliana.vs.Arabidopsis_lyrata.map.tab",
-  synfile="~/src/git/cadmium/input/syn/Arabidopsis_thaliana.vs.Arabidopsis_lyrata.syn",
-  gfffile="~/src/git/cadmium/input/gff/Arabidopsis_lyrata.gff",
-  qinfo=NULL,
-  tinfo=NULL,
-  extend=TRUE,
-  extend_factor=1
-)
-{
-  aa       <-  LoadFASTA(aafile, isAA=TRUE)
-  dna.file <-  dnafile
-  si       <-  LoadSearchIntervals(sifile, extend=extend, extend_factor=extend_factor,
-                                   qinfo=qinfo, tinfo=tinfo)
-  gff      <-  LoadGFF(gfffile, seqinfo=tinfo)
-  syn      <-  LoadSyntenyMap(synfile, qinfo=qinfo, tinfo=tinfo)
+LoadTarget <- function(species, config, l_seqinfo){
+
+  aafile     <- sprintf('%s/%s.faa',      config$d_faa,  species)
+  gfffile    <- sprintf('%s/%s.gff',      config$d_gff,  species)
+  genefile   <- sprintf('%s/%s.gene.fna', config$d_gene, species)
+  qinfo      <- l_seqinfo[[config$focal_species]]
+  tinfo      <- l_seqinfo[[species]]
+
+  dnafile <- sprintf('%s/%s.fna',     config$d_genome, species)
+  sifile  <- sprintf('%s/%s.vs.%s.map.tab', config$d_si, config$focal_species, species)
+  synfile <- sprintf('%s/%s.vs.%s.syn', config$d_syn, config$focal_species, species)
+
+  aa <- LoadFASTA(aafile, isAA=TRUE)
+  dna.file <- dnafile
+  si <- LoadSearchIntervals(sifile,
+                            extend=config$extend,
+                            extend_factor=config$extend_factor,
+                            qinfo=qinfo,
+                            tinfo=tinfo) 
+  gff <- LoadGFF(gfffile, seqinfo=tinfo)
+  syn <- LoadSyntenyMap(synfile, qinfo=qinfo, tinfo=tinfo)
+  nstring <- LoadNString(config$f_nstrings, l_seqinfo)[[species]]
 
   # Just to check that LoadGFF correctly renamed the fields
   stopifnot('seqid' %in% names(mcols(gff)))
@@ -439,5 +451,5 @@ LoadTarget <- function(
   # LoadSyntenyMap function.
   stopifnot(si.seq_name %in% syn.seq_name)
 
-  list(aa=aa, dna.file=dna.file, si=si, gff=gff, syn=syn)
+  list(aa=aa, dna.file=dna.file, si=si, gff=gff, syn=syn, nstring=nstring)
 }

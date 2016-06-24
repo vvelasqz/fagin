@@ -23,6 +23,80 @@ initializeOrigins <- function(query, target){
   )
 }
 
+getTargetResults <- function(species, query, config, l_seqinfo, use_cache=TRUE){
+
+  cache <- function(x, ...){
+    if(!dir.exists(config$d_cache)){
+      dir.create(config$d_cache)
+    }
+    filename <- sprintf(
+      '%s/%s.vs.%s-%s.Rdat',
+      config$d_cache, config$focal_species, species, deparse(substitute(x))
+    )
+    if(file.exists(filename) && use_cache){
+      load(filename)
+    } else {
+      out <- x(...)
+      if(use_cache){
+        save(out, file=filename)
+      }
+    }
+    out
+  }
+
+  # TODO: Fix the out-of-range bugs
+  target <- cache(LoadTarget, species=species, config=config, l_seqinfo=l_seqinfo)
+
+  sflags <- cache(summarize.flags, target$si)
+
+  origins <- cache(initializeOrigins, query, target)
+
+  # B1 - Queries of scrambled origin
+  origins <- cache(syntenicState, origins, sflags)
+
+  bittbl <- cache(getBitTable, origins)
+
+  # B2 - Queries overlap an indel in a target SI
+  ind       <- cache(findIndels, target, indel.threshold=0.05)
+  ind.stats <- cache(indelStats, ind)
+  ind.sumar <- cache(indelSummaries, ind)
+
+  features <- cache(analyzeTargetFeature, query, target)
+
+  # B5 - Queries whose SI overlap an N-string
+  query2gap <- cache(findQueryGaps, nstring=target$nstring, target=target)
+
+  # B6 - Queries whose protein seq matches a target protein in the SI
+  aln       <- cache(AA_aln, map=features$CDS, query=query, target=target)
+  aln.stats <- cache(AA_aln_stats, aln, query)
+  prot2prot.scores <- features$CDS %>%
+    dplyr::mutate(score = score(aln$aln))
+
+  # B7 - Queries whose protein matches an ORF in an SI
+  query2orf <- cache(get_query2orf, target) 
+  orfmap    <- cache(get_orfmap, query2orf, query, target)
+
+  # B8 - Queries whose gene matches (DNA-DNA) an SI 
+  orp2dna <- cache(get_orphan_dna_hits, query, target)
+
+  list(
+    species=s,
+    target=target,
+    sflags=sflags,
+    origins=origins,
+    bittbl=bittbl,
+    ind=ind,
+    ind.stats=ind.stats,
+    ind.sumar=ind.sumar,
+    features=features,
+    query2gap=query2gap,
+    aln.stats=aln.stats,
+    prot2prot.scores=prot2prot.scores,
+    orfmap=orfmap,
+    orp2dna=orp2dna
+  )
+}
+
 determineLabels <- function(){
   orp.origins <- subset(origins, orphan)
   #

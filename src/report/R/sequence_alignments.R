@@ -3,6 +3,7 @@
 # ============================================================================
 
 AA_aln <- function(map, query, target){
+  require(dplyr)
   data(BLOSUM80)
 
   # Align all orphans that possibly overlap a coding sequence
@@ -12,9 +13,9 @@ AA_aln <- function(map, query, target){
     type='local',
     substitutionMatrix=BLOSUM80
   )
-  map$score <- score(aln)
+  map$scores <- score(aln)
 
-  alnsum <- mutate(map$scores, ortholog = score > 60) %>%
+  alnsum <- dplyr::mutate(map, ortholog = scores > 60) %>%
     group_by(query) %>%
     summarize(
       n.over = length(query),
@@ -142,11 +143,11 @@ get_orphan_dna_hits <- function(query, target){
   orfgff <- target$si$target[target$si$query$seqid %in% query$orphans] 
   set.seed(42)
   ogen <- query$genes[target$si$query[orfgff$id]$seqid]
-  hits      <- alignToGenome(ogen, genseq, orfgff)
+  hits <- alignToGenome(ogen, genseq, orfgff)
   ctrl <- alignToGenome(ogen, genseq, orfgff, scramble=TRUE)
   list(
-    hits=orp.dna.hits,
-    ctrl=orp.dna.hits.ctrl
+    hits=hits,
+    ctrl=ctrl
   )
 }
 

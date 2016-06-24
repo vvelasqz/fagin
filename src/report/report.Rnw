@@ -34,7 +34,6 @@ deps <- c(
     "devtools",
     "magrittr",
     "ggplot2",
-    "plyr",
     "dplyr",
     "ape",
     "scales",
@@ -64,10 +63,10 @@ for (x in c(deps, bio.deps)) {
 <<introduction, child='sections/introduction.Rnw'>>=
 @
 
-% \section{Input data}
-%
-% <<input, child='sections/input.Rnw'>>=
-% @
+\section{Input data}
+
+<<input, child='sections/input.Rnw'>>=
+@
 
 \section{Classification results}
 

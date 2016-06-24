@@ -70,8 +70,8 @@ do
     fna=$INPUT/fna/$s.fna
     faa=$INPUT/orf-faa/$s.faa
     gff=$INPUT/orf-gff/$s.gff
-    cat $fna |
-        # Find all START STOP bound ORFs with 10+ AA
+    smof clean --reduce-header $fna |
+       # Find all START STOP bound ORFs with 10+ AA
         getorf -filter -find 1 -minsize 30 |
         # Filter out all ORFs with unknown residues
         smof grep -v -q X | 
@@ -79,7 +79,7 @@ do
         tee  $faa |
         # Parse a header such as:
         # >scaffold_1_432765 [258 - 70] (REVERSE SENSE) 
-        sed -nr 's/>([^ ]+)_([0-9])+ \[([0-9]+) - ([0-9]+)\]/\1 \3 \4 \1_\2/p' |
+        sed -nr '/^>/ s/>([^ ]+)_([0-9])+ \[([0-9]+) - ([0-9]+)\]/\1 \3 \4 \1_\2/p' |
         # Prepare GFF
         awk '
             BEGIN{OFS="\t"}
@@ -101,7 +101,4 @@ do
             }
             { print seq_name, ".", "ORF", start, stop, ".", strand, ".", uid }
         ' > $gff
-
-        # simplify fasta headers
-        sed -ri '/>/ s/ .*//' $faa
 done

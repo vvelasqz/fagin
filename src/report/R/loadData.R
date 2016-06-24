@@ -45,7 +45,7 @@
 #' @return list of inputs
 LoadConfig <- function(configfile='~/src/git/cadmium/cadmium.cfg'){
     if(!file.exists(configfile)){
-        cat(sprintf("Cannot open configfile '%s'\n", configfile))
+        warning(sprintf("Cannot open configfile '%s'", configfile))
     }
     source(configfile, local=TRUE)
     expected.vars <- c(
@@ -68,19 +68,19 @@ LoadConfig <- function(configfile='~/src/git/cadmium/cadmium.cfg'){
     # Check for existence of all required variables
     for(v in expected.vars){
         if(!exists(v)){
-            cat(sprintf("Variable '%s' is not defined in the config file '%s'\n", f, configfile))
+            warning(sprintf("Variable '%s' is not defined in the config file '%s'", f, configfile))
         }
     }
     # Check existence of directories
     for(v in expected.vars[1:9]){
         if(!dir.exists(eval(parse(text=v)))){
-            cat(sprintf("Variable '%s' does not point to a valid directory\n", v))
+            warning(sprintf("Variable '%s' does not point to a valid directory", v))
         }
     }
     # Check existence of files
     for(v in expected.vars[10:14]){
         if(!file.exists(eval(parse(text=v)))){
-            cat(sprintf("Variable '%s' does not point to a readable file\n", v))
+            warning(sprintf("Variable '%s' does not point to a readable file", v))
         }
     }
 
@@ -90,7 +90,7 @@ LoadConfig <- function(configfile='~/src/git/cadmium/cadmium.cfg'){
 
     species <- read.table(R_SPECIES_FILE, stringsAsFactors=FALSE)[[1]]
     if(!R_FOCAL_SPECIES %in% species){
-      cat(sprintf("Focal species '%s' not found in the species list: [%s]\n",
+      warning(sprintf("Focal species '%s' not found in the species list: [%s]",
                   R_FOCAL_SPECIES, paste(species, collapse=", ")))
     }
     list(

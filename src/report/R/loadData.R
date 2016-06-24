@@ -310,7 +310,10 @@ LoadSearchIntervals <- function(sifile, extend=FALSE, extend_factor=1, qinfo=NUL
   si$tstart <- si$tstart + 1
   si$tstop  <- si$tstop  + 1
 
-  stopifnot(si$tchr %in% seqnames(tinfo))
+  if(!all(si$tchr %in% seqnames(tinfo))){
+    warning("The search interval file contains scaffolds not in the genome
+    file. This is a vary bad sign. Soooooo bad.")
+  }
 
   if(extend){
     extend_length <- with(si, qstop - qstart + 1) * extend_factor

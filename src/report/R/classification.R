@@ -97,55 +97,73 @@ getTargetResults <- function(species, query, config, l_seqinfo, use_cache=TRUE){
   )
 }
 
-determineLabels <- function(){
-  orp.origins <- subset(origins, orphan)
-  #
-  orpseq <- orp.origins$seqid
-  #
+#' Build label set for a single pair of species
+growAPair <- function(result, query){
+  orphans <- query$orphans 
+
+  orp.origins <- subset(result$origins, orphan)
+
   # Synteny is scrambled
   scr <- orp.origins$bit == '00001'
   # synteny is reliable
   rel <- orp.origins$bit == '10000'
   # at least one search interval overlaps a target CDS
-  cds <- orpseq %in% (fo.cds$query2target$query %>% unique)
+  cds <- orphans %in% (result$features$CDS$query %>% unique)
   # at least one search interval overlaps a target mRNA
-  rna <- orpseq %in% (fo.mrna$query2target$query %>% unique)
+  rna <- orphans %in% (result$features$mRNA$query %>% unique)
   # the query has an ortholog in the target
-  gen <- orpseq %in% (aln$scores %>% filter(score > 60) %$% query)
+  gen <- orphans %in% (result$prot2prot.scores %>% filter(score > 60) %$% query)
   # at least search interval overlaps a N-string
-  nst <- orpseq %in% query2gap$query
+  nst <- orphans %in% result$query2gap$query
   # number of confirmed indels (based on search interval size)
-  ind <- orpseq %in% ind.stats$indeled.queries
+  ind <- orphans %in% result$ind.stats$indeled.queries
+  # number of confirmed resized (based on search interval size)
+  res <- orphans %in% result$ind.stats$resized.queries
   # ORF match in SI
-  orf <- orpseq %in% (orfmap %>% subset(score > 100) %$% query)
+  orf <- orphans %in% (result$orfmap %>% subset(score > 100) %$% query)
   # nuc - has nucleotide match in SI
-  nuc <- orpseq %in% (orp2dna$hits %>% subset(score > 60) %$% seqid)
-  #
-  orfhits <- orfmap %>% group_by(query) %>% summarize(orf_top_score=max(score), N.orf=length(score)) 
-  #
-  #
-  stopifnot(which(gen) %in% which(cds))
-  stopifnot(which(cds) %in% which(rna))
-  stopifnot(intersect(which(scr), which(rel)) == 0)
-  #
-  label <- rep('unknown', nrow(orp.origins))
-  #
-  label[       !(rna | scr) ] <- 'possible-intergenic'
-  label[ rel & !(rna | scr) ] <- 'intergenic'
-  label[ rna & !cds         ] <- 'possible-hitchhiker'
-  label[ cds & !gen         ] <- 'possible-genic'
-  label[ gen                ] <- 'confirmed-genic'
-  label[ ind                ] <- 'indel'
-  label[ orf & !gen         ] <- 'candidate-gene'
-  #
-  label[label == 'unknown' & nst ] <- 'unknown-gapped'
-  label[label == 'unknown' & scr ] <- 'unknown-scrambled'
-  #
-  orp.origins$label <- label
-  orp.origins$orf_hit <- NULL
-  orp.origins$dna_hit <- nuc 
-  #
-  orp.origins$resized <- ifelse(orp.origins$seqid %in% ind.stats$resized.queries, TRUE, FALSE)
+  nuc <- orphans %in% (result$orp2dna$hits %>% subset(score > 60) %$% seqid)
 
-  orp.origins
+  
+  labels <- data.frame(
+    scr=scr,
+    rel=rel,
+    cds=cds,
+    rna=rna,
+    gen=gen,
+    nst=nst,
+    ind=ind,
+    res=res,
+    orf=orf,
+    nuc=nuc
+  ) %>%
+  set_rownames(orphans)
 }
+
+#' Merge labels for all species
+determineLabels <- function(query, results){
+
+  lapply(results, growAPair, query)
+ 
+  # orfhits <- result$orfmap %>%
+  #   group_by(query) %>%
+  #   summarize(orf_top_score=max(score), N.orf=length(score)) 
+  #
+  # stopifnot(which(gen) %in% which(cds))
+  # stopifnot(which(cds) %in% which(rna))
+  # stopifnot(intersect(which(scr), which(rel)) == 0)
+  #
+  # label <- rep('unknown', nrow(orp.origins))
+  #
+  # label[       !(rna | scr) ] <- 'possible-intergenic'
+  # label[ rel & !(rna | scr) ] <- 'intergenic'
+  # label[ rna & !cds         ] <- 'possible-hitchhiker'
+  # label[ cds & !gen         ] <- 'possible-genic'
+  # label[ gen                ] <- 'confirmed-genic'
+  # label[ ind                ] <- 'indel'
+  # label[ orf & !gen         ] <- 'candidate-gene'
+  #
+  # label[label == 'unknown' & nst ] <- 'unknown-gapped'
+  # label[label == 'unknown' & scr ] <- 'unknown-scrambled'
+}
+

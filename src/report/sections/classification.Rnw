@@ -38,7 +38,7 @@ for(s in config$species){
   )
 }
 
-  # orp.origins <- determineLabels(origins, fo.cds, fo.mrna, aln, query2gap, ind.stats, orfmap, orp2dna)
+labels <- determineLabels(que, results)
 @
 
 \subsection{Data input}

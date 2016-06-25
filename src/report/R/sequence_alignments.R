@@ -2,22 +2,10 @@
 # Search sequence - AA-AA - Query genes against target genes
 # ============================================================================
 
-AA_aln <- function(features, query, target){
-  require(dplyr)
+AA_aln <- function(map, target, query){
   data(BLOSUM80)
 
-  map <- merge(
-    features$CDS,
-    mcols(target$gff)[c('seqid', 'parent')],
-    by.x='target', by.y='seqid'
-  ) %>%
-  as.data.frame %>%
-  select(query, parent) %>%
-  rename(target=parent) %>%
-  unique
-
   tarseq <- target$aa[map$target]
-
   queseq <- query$aa[map$query]
 
   # Align all orphans that possibly overlap a coding sequence
@@ -79,6 +67,32 @@ AA_aln_stats <- function(aln, query){
   )
 }
 
+#' CDS feature wrapper for AA_aln
+#'
+#' Inputs:
+#' map - [ query | target ] where target is a CDS id
+#' query - full query dataset
+#' target - full target dataset
+cds_to_AA_aln <- function(map, query, target){
+  require(dplyr)
+
+  map <- merge(
+    map,
+    mcols(target$gff)[c('seqid', 'parent')],
+    by.x='target', by.y='seqid'
+  ) %>%
+  as.data.frame %>%
+  dplyr::select(query, parent) %>%
+  dplyr::rename(target=parent) %>%
+  unique
+
+  AA_aln(map, target, query)
+}
+
+mrna_to_AA_aln <- function(map, query, target){
+  map <- unique(map)
+  AA_aln(map, target, query)
+}
 
 # ============================================================================
 # Search sequence - DNA-DNA - Query genes against target seach intervals
@@ -132,7 +146,7 @@ alignToGenome <- function(query.seqs, genome, gr, ...){
   stopifnot(class(genome) == "DNAStringSet")
   stopifnot(class(query.seqs) == "DNAStringSet")
 
-  search.intervals <- seqFromGenomicRange(gr, genome, ...)
+  search.intervals <- seqFromGenomicRange(gr=gr, fa=genome, ...)
 
   # Retrieve only the maximum scores
   nuc.scores <- pairwiseAlignment(
@@ -157,8 +171,8 @@ get_orphan_dna_hits <- function(query, target){
   orfgff <- target$si$target[target$si$query$seqid %in% query$orphans] 
   set.seed(42)
   ogen <- query$genes[target$si$query[orfgff$id]$seqid]
-  hits <- alignToGenome(ogen, genseq, orfgff)
-  ctrl <- alignToGenome(ogen, genseq, orfgff, scramble=TRUE)
+  hits <- alignToGenome(query.seqs=ogen, genome=genseq, gr=orfgff)
+  ctrl <- alignToGenome(query.seqs=ogen, genome=genseq, gr=orfgff, scramble=TRUE)
   list(
     hits=hits,
     ctrl=ctrl

@@ -26,8 +26,8 @@ query.cache <- sprintf('%s/query.Rdat', config$d_cache)
 if(file.exists(query.cache)){
   load(query.cache)
 } else {
-  que <- LoadQuery(config, l_seqinfo)
-  save(que, file=query.cache)
+  query <- LoadQuery(config, l_seqinfo)
+  save(query, file=query.cache)
 }
 
 results <- list()
@@ -37,14 +37,15 @@ for(s in config$species){
   }
   results[[s]] <- getTargetResults(
     species   = s,
-    query     = que,
+    query     = query,
     config    = config,
     l_seqinfo = l_seqinfo,
     use_cache = TRUE
   )
+  gc()
 }
 
-labels <- determineLabels(que, results)
+# labels <- determineLabels(query, results)
 @
 
 \subsection{Data input}
@@ -55,7 +56,7 @@ labels <- determineLabels(que, results)
 lapply(
   results,
   function(x){
-    syn <- x$target$syn
+    syn <- x$syn
     lograt <- log2(width(syn$query) / width(syn$target)[syn$query$over])
     lograt <- lograt[abs(lograt) > 0.25] 
     data.frame(
@@ -130,18 +131,19 @@ m %>%
 \begin{figure}[!ht]
   \centering
 <<cache=TRUE, message=FALSE>>=
-lapply(results, function(x) x$sflags) %>%
-  melt %>%
+lapply(results, function(x) x$synteny$flags) %>%
+  lapply(function(x) mutate(x, seqid=rownames(x))) %>%
+  melt(id.vars='seqid') %>%
   dplyr::mutate(
-    size = width(que$aa[seqid]),
-    orph = ifelse(seqid %in% que$orphans, 'orphan', 'non-orphan')
+    size = width(query$aa[seqid]),
+    orph = ifelse(seqid %in% query$orphans, 'orphan', 'non-orphan')
   ) %>%
   dplyr::rename(flag=variable, species=L1) %>%
   subset(value > 0) %>%
   ggplot(aes(x=flag, y=size)) +
-    geom_boxplot(width=0.5, notch=TRUE) +
+    geom_boxplot(width=0.5, notch=TRUE, outlier.size=0) +
     geom_violin(alpha=0.3) +
-    facet_wrap(species~orph, scale='free_y') +
+    facet_grid(species~orph) +
     scale_y_continuous(
       trans='log2',
       breaks=trans_breaks('log2', function(x) round(2^x))
@@ -210,39 +212,35 @@ lapply(results, function(x) x$sflags) %>%
 \begin{figure}[!ht]
   \centering
 <<fig.width=6, fig.height=4, message=FALSE, cache=TRUE>>=
-# TODO: Kill this fugly monster
-m <- lapply(results, function(x) x$features$mRNA) %>%
-    melt %>%
-    dplyr::rename(species=L1) %>%
-    count(query, species) %>%
-    dplyr::rename(N.mrna=n)
-# All the following sin just to get the zeros in
-z <- split(m, m$species) %>%
-    lapply(
-      function(x){
-        a <- setdiff(names(que$aa), x$query)
-        data.frame(
-          query=a,
-          species=rep(x$species[1], length(a)),
-          N.mrna=rep(0, length(a))
-        )
-      }
-    ) %>%
-    do.call(what=rbind) %>%
-    set_rownames(NULL)
-# Now bind the ugly sisters together
-rbind(m, z) %>%
-  count(species, N.mrna) %>%
-  ggplot(aes(x=N.mrna, y=n)) +
-    geom_point() +
-    geom_line(aes(group=species), alpha=0.05) +
-    xlab('Number of overlapped mRNAs') +
-    ylab('Number of search intervals') +
-    scale_y_continuous(
-      trans='log2',
-      breaks=trans_breaks('log2', function(x) round(2^x))
-    ) +
-    facet_wrap(~species)
+require(tidyr)
+
+m <- lapply(results, function(x) x$features) %>%
+    melt(id.vars=c('query', 'target'), level=2) %>%
+    dplyr::rename(species=L2, type=L3) %>%
+    filter(type %in% c('CDS', 'mRNA', 'gene')) %>%
+    count(query, species, type) %>%
+    dplyr::rename(n.feature=n) %>%
+    count(species, type, n.feature)
+m.zero <- m %>%
+  group_by(species, type) %>%
+  summarize(n=sum(n)) %>%
+  mutate(
+    n.feature = 0,
+    n = length(query$aa) - n
+  )
+m2 <- rbind(m, m.zero)
+
+ggplot(m2) +
+  geom_point(aes(x=n.feature, y=n), size=0.2) +
+  geom_line(aes(x=n.feature, y=n), alpha=0.05) +
+  xlab('Number of overlapped mRNAs') +
+  ylab('Number of search intervals') +
+  scale_y_continuous(
+    trans='log2',
+    breaks=trans_breaks('log2', function(x) round(2^x))
+  ) +
+  facet_grid(type~species)
+
 @
   \caption{Number of target mRNAs overlapping one search interval}
 \end{figure}
@@ -260,9 +258,9 @@ merge(
     melt %>%
     dplyr::rename(CDS=value, species=L1),
   results %>%
-    lapply(function(x) x$fo.mrna$orphan2target$query) %>%
+    lapply(function(x) x$features$mRNA$query) %>%
     lapply(unique) %>%
-    lapply(length) %>%
+    lapply(function(x) sum(x %in% query$orphans)) %>%
     melt %>%
     dplyr::rename(mRNA=value, species=L1)
 ) %>% xtable(caption='Number of orphans with search intervals overlapping given features')
@@ -276,14 +274,18 @@ results %>%
   melt %>%
   dplyr::rename(seqid=value, group=L2, species=L1) %>%
   dplyr::mutate(
-    orphan = ifelse(seqid %in% que$orphans, 'orphan', 'non-orphan'),
+    orphan = ifelse(seqid %in% query$orphans, 'orp', 'old'),
     group = sub('.queries', '', group)
   ) %>%
   dplyr::count(group, species, orphan) %>%
-  dcast(group + orphan ~ species, mean, value.var='n') %>%
-  dplyr::arrange(orphan, group) %>%
+  dcast(species ~ group + orphan, mean, value.var='n') %>%
+  dplyr::arrange(indeled_old, resized_old, indeled_orp, resized_orp) %>%
+  dplyr::rename(
+    ind_old=indeled_old, ind_orp=indeled_orp,
+    res_old=resized_old, res_orp=resized_orp
+  ) %>%
   xtable(
-    display=c('s', 's', 's', 'd', 'd'), 
+    display=c('s', 's', 'd', 'd', 'd', 'd'), 
     caption=
       'Summary of indel and resize events. A query is classified as indeled if at
       least one search interval is less than 5\\% of the length of the query. A
@@ -307,12 +309,13 @@ results %>%
   lapply(function(x) unique(x$query2gap$query)) %>%
   melt %>%
   dplyr::mutate(
-    orphan = ifelse(value %in% que$orphans, 'orphan', 'non-orphan')
+    orphan = ifelse(value %in% query$orphans, 'orphan', 'non-orphan')
   ) %>%
   dplyr::rename(species=L1) %>%
   dplyr::count(species, orphan) %>%
-  dcast(orphan ~ species, mean, value.var='n') %>%
+  dcast(species ~ orphan, mean, value.var='n') %>%
   xtable(
+    display=c('s', 's', 'd', 'd'),
     caption=
     'The number of query genes for which at least one search interval overlaps
     at least one string of Ns (unknown bases) in the target genome. These genes
@@ -329,11 +332,12 @@ results %>%
 \begin{figure}[!ht]
   \centering
 <<message=FALSE, cache=TRUE>>=
+
 m <- results %>% 
   lapply(function(x) x$prot2prot.scores[c('query', 'score')]) %>%
   melt(id.vars=c('query', 'score')) %>%
   dplyr::rename(species=L1) %>%
-  dplyr::mutate(orphan = query %in% que$orphans)
+  dplyr::mutate(orphan = (query %in% query$orphans))
 
 ggplot() +
   geom_violin(
@@ -343,7 +347,10 @@ ggplot() +
   ) +
   geom_point(
     mapping=aes(x=species, y=score, color=orphan),
-    data=subset(m, score > 64 & orphan),
+    data=subset(m, score > 64 & orphan) %>%
+         dplyr::group_by(query, species) %>%
+         dplyr::summarize(score=max(score)) %>%
+         as.data.frame,
     position=position_jitter(width=1),
     color='red'
   ) +
@@ -352,6 +359,7 @@ ggplot() +
     trans='log2',
     breaks=trans_breaks('log2', function(x) round(2^x))
   )
+
 @
   \caption{\
     Non-orphan genes are expected to have at a highscoring homolog, so there

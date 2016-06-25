@@ -29,7 +29,7 @@
 \maketitle
 
 <<install.dependencies, echo=FALSE, message=FALSE>>=
-opts_chunk$set(echo=FALSE)
+# opts_chunk$set(echo=FALSE)
 deps <- c(
     "devtools",
     "magrittr",

@@ -19,12 +19,17 @@ getTargetResults <- function(species, query, config, l_seqinfo, use_cache=TRUE){
     out
   }
 
+  message(sprintf('Loading data for %s', species))
+
+  message('--loading target')
   # TODO: Fix the out-of-range bugs
   target <- cache(LoadTarget, species=species, config=config, l_seqinfo=l_seqinfo)
 
+  message('--summarizing synteny')
   # B1 - Queries of scrambled origin
   synteny <- cache(summarize.flags, si=target$si, query=query)
 
+  message('--processing indel and resize events')
   # B2 - Queries overlap an indel in a target SI
   ind       <- cache(findIndels, target, indel.threshold=0.05)
   ind.stats <- cache(indelStats, ind)
@@ -32,32 +37,48 @@ getTargetResults <- function(species, query, config, l_seqinfo, use_cache=TRUE){
 
   # B3 and B4 (CDS and mRNA overlaps)
 
+  message('--processing feature overlaps')
   # TODO: I do not currently use features other than CDS and mRNA, so I could
   # save memory by filtering them out
   features <- cache(analyzeTargetFeature, query, target)
 
+  message('--mapping to gaps in target genome')  
   # B5 - Queries whose SI overlap an N-string
   query2gap <- cache(findQueryGaps, nstring=target$nstring, target=target)
 
+  message('--selecting all orphans and 1000 non-orphans for protein alignment')
   # B6 - Queries whose protein seq matches a target protein in the SI
-  aln       <- cache(AA_aln, map=features, query=query, target=target)
+  set.seed(42) # This is needed to avoid cached and new ids from differing
+  searchset <- c(
+    query$orphans,
+    setdiff(names(query$aa), query$orphans) %>% sample(1000)
+  )
+  map <- features$CDS[features$CDS$query %in% searchset, ]
+
+  message('---aligning')
+  aln       <- cache(cds_to_AA_aln, map=map, query=query, target=target)
+  message('---calculating stats')
   aln.stats <- cache(AA_aln_stats, aln, query)
-  prot2prot.scores <- features$CDS %>%
+  message('---extracting scores')
+  prot2prot.scores <- map %>%
     dplyr::mutate(score = score(aln$aln))
-  rm(aln)
-  gc()
 
   # B7 - Queries whose protein matches an ORF in an SI
+  message('--finding orfs in search intervals')
   query2orf <- cache(get_query2orf, target) 
+  message('--aligning orphans to orfs that overlap their search intervals')
   orfmap    <- cache(get_orfmap, query2orf, query, target)
 
+  message('--aligning orphans to the full sequences of their search intervals')
   # B8 - Queries whose gene matches (DNA-DNA) an SI 
   orp2dna <- cache(get_orphan_dna_hits, query, target)
 
+  gc()
+
   list(
     species=species,
-    target=target,
     synteny=synteny,
+    syn=target$syn,
     ind=ind,
     ind.stats=ind.stats,
     ind.sumar=ind.sumar,

@@ -530,7 +530,7 @@ LoadTarget <- function(species, config, l_seqinfo){
                             qinfo=qinfo,
                             tinfo=tinfo) 
   gff <- LoadGFF(gfffile, seqinfo=tinfo)
-  # syn <- LoadSyntenyMap(synfile, qinfo=qinfo, tinfo=tinfo)
+  syn <- LoadSyntenyMap(synfile, qinfo=qinfo, tinfo=tinfo)
   nstring <- LoadNString(config$f_nstrings, l_seqinfo)[[species]]
 
   # Just to check that LoadGFF correctly renamed the fields
@@ -540,7 +540,7 @@ LoadTarget <- function(species, config, l_seqinfo){
 
   si.seq_name  <- si$target  %>% seqnames %>% levels
   gff.seq_name <- gff        %>% seqnames %>% levels
-  # syn.seq_name <- syn$target %>% seqnames %>% levels
+  syn.seq_name <- syn$target %>% seqnames %>% levels
 
   # the scaffolds in si and gff may vary, but they should be drawn from
   # the same pool, so there should be more than 0 in common.
@@ -551,7 +551,7 @@ LoadTarget <- function(species, config, l_seqinfo){
   # indicates queries that have no known location or where the scaffold they
   # are on is ambiguous. These cases should be filtered out in the
   # LoadSyntenyMap function.
-  # stopifnot(si.seq_name %in% syn.seq_name)
+  stopifnot(si.seq_name %in% syn.seq_name)
 
   list(
     aa=aa,
@@ -560,7 +560,7 @@ LoadTarget <- function(species, config, l_seqinfo){
     orffaa.file=orffaa.file,
     si=si,
     gff=gff,
-    # syn=syn,
+    syn=syn,
     nstring=nstring
   )
 }

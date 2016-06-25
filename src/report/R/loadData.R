@@ -118,7 +118,7 @@ LoadSeqinfoList <- function(config){
   require(GenomicRanges)
   scaflen <- read.table(config$f_scaflen, header=TRUE, stringsAsFactors=FALSE)
   stopifnot(c('species', 'scaffold', 'length') %in% names(scaflen))
-  stopifnot(setequal(scaflen$species, config$species))
+  stopifnot(config$species %in% scaflen$species)
   lapply(
     config$species,
     function(s) {
@@ -165,16 +165,45 @@ MakeGI <- function(starts, stops, scaffolds, strands=NULL, metadata=NULL, seqinf
 #' 
 LoadGFF <- function(gfffile, features=NULL, ...){
   require(dplyr)
-  g <- read.table(gfffile, stringsAsFactors=FALSE) %>% dplyr::rename(seqid=V9, type=V3)
-  if(!is.null(features)){
-    g <- g[g[[3]] %in% features, ]
+
+  g <- read.table(gfffile, comment="#", sep="\t", quote='', stringsAsFactors=FALSE) %>%
+    dplyr::rename(
+      scaffold=V1,
+      source=V2,
+      type=V3,
+      start=V4,
+      stop=V5,
+      score=V6,
+      strand=V7,
+      phase=V8,
+      attribute=V9
+    ) %>%
+    mutate(
+      seqid=grepl('ID=[^;]', attribute) %>% ifelse(attribute, NA),
+      parent=grepl('Parent=[^;]', attribute) %>% ifelse(attribute, NA)
+    ) %>%
+    mutate(
+      seqid=sub('.*ID=([^;]+).*', '\\1', seqid),
+      parent=sub('.*Parent=([^;]+).*', '\\1', parent)
+    )
+
+  if(any(is.na(g$seqid))){
+    warning(sprintf(
+      '%d GFF entries are missing ids (ID=<id> labels in attribute column)',
+      sum(is.na(g$seqid))
+    ))
   }
-  MakeGI(
-    starts    = g[[4]],
-    stops     = g[[5]],
-    scaffolds = g[[1]],
-    strands   = g[[7]],
-    metadata  = g[c(3,9)],
+
+  if(!is.null(features)){
+    g <- subset(g, type %in% features)
+  }
+
+  gg <- MakeGI(
+    starts    = g$start,
+    stops     = g$stop,
+    scaffolds = g$scaffold,
+    strands   = g$strand,
+    metadata  = select(g, type, seqid, parent),
     ...
   ) 
 }
@@ -381,6 +410,52 @@ LoadFASTA <- function(filename, isAA=TRUE){
   }
 }
 
+check_gene_aa_agreement <- function(genes, aa){
+  isgood=TRUE
+  if(!setequal(names(aa), names(genes))){
+    warning(
+    'Protein names do not match gene model names. This probably means you are
+    not bypassing the input methods I wrote (e.g. 2_extract_fasta.sh). Not
+    cool.'
+    )
+    isgood=FALSE
+  }
+  toobig <- sum(3*(width(aa) - 1) > width(genes[names(aa)]))
+  if(toobig > 0){
+    warning(sprintf(
+      '%d genes appear to be too short the contain their proteins. This could
+      result if there is a mismatch in sequence names, or if the proteins
+      include stops.', toobig
+    ))
+    isgood=FALSE
+  }
+  isgood
+}
+
+force_gff_aa_agreement <- function(gff=gff, aa=aa){
+  # GFF mRNA ids should correspond to protein names
+  gff.unique <- setdiff(subset(gff, type == "mRNA")$seqid, names(aa))
+  if(length(gff.unique) > 0){
+    warning(sprintf(
+      '%s GFF mRNA seqids match no seqid in the protein file. These entries
+      will be deleted from the features table: %s',
+      length(gff.unique), paste0(gff.unique, collapse=', '))
+    )
+    gff <- subset(gff, ! seqid %in% gff.unique)
+  }
+  aa.unique <- setdiff(names(aa), subset(gff, type == "mRNA")$seqid)
+  if(length(aa.unique) > 0){
+    warning(sprintf(
+      '%s proteins are not represented in the GFF file. This is bad. It means
+      you were not following protocol. These entries will be deleted from the
+      protein file: %s',
+      length(aa.unique), paste0(aa.unique, collapse=', '))
+    )
+    aa <- aa[! names %in% aa.unique]
+  }
+  gff
+}
+
 #' Load all focal species data needed for classification
 #'
 #' This data includes:
@@ -404,11 +479,16 @@ LoadQuery <- function(config, l_seqinfo)
   # Query gene sequences (including UTR and introns)
   genes   <- LoadFASTA(genefile, isAA=FALSE)
   gff     <- LoadGFF(gfffile, seqinfo=seqinfo)
+
+  gff <- force_gff_aa_agreement(gff=gff, aa=aa)
+
+  check_gene_aa_agreement(genes=genes, aa=aa)
+
   orphans <- read.table(orphanfile, stringsAsFactors=FALSE)[[1]]
+
   # all orphans should be associated with a protein sequence
   stopifnot(orphans %in% names(aa))
-  # all GFF seqids be associated with a protein sequence
-  stopifnot(gff$seqid %in% names(aa))
+
   list(aa=aa, gff=gff, genes=genes, orphans=orphans)
 }
 
@@ -447,18 +527,17 @@ LoadTarget <- function(species, config, l_seqinfo){
                             qinfo=qinfo,
                             tinfo=tinfo) 
   gff <- LoadGFF(gfffile, seqinfo=tinfo)
-  syn <- LoadSyntenyMap(synfile, qinfo=qinfo, tinfo=tinfo)
+  # syn <- LoadSyntenyMap(synfile, qinfo=qinfo, tinfo=tinfo)
   nstring <- LoadNString(config$f_nstrings, l_seqinfo)[[species]]
 
   # Just to check that LoadGFF correctly renamed the fields
   stopifnot('seqid' %in% names(mcols(gff)))
 
-  # all GFF seqids be associated with a protein sequence
-  stopifnot(gff$seqid %in% names(aa))
+  gff <- force_gff_aa_agreement(gff=gff, aa=aa)
 
   si.seq_name  <- si$target  %>% seqnames %>% levels
   gff.seq_name <- gff        %>% seqnames %>% levels
-  syn.seq_name <- syn$target %>% seqnames %>% levels
+  # syn.seq_name <- syn$target %>% seqnames %>% levels
 
   # the scaffolds in si and gff may vary, but they should be drawn from
   # the same pool, so there should be more than 0 in common.
@@ -469,7 +548,7 @@ LoadTarget <- function(species, config, l_seqinfo){
   # indicates queries that have no known location or where the scaffold they
   # are on is ambiguous. These cases should be filtered out in the
   # LoadSyntenyMap function.
-  stopifnot(si.seq_name %in% syn.seq_name)
+  # stopifnot(si.seq_name %in% syn.seq_name)
 
   list(
     aa=aa,
@@ -478,7 +557,7 @@ LoadTarget <- function(species, config, l_seqinfo){
     orffaa.file=orffaa.file,
     si=si,
     gff=gff,
-    syn=syn,
+    # syn=syn,
     nstring=nstring
   )
 }

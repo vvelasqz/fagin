@@ -404,10 +404,13 @@ LoadTree <- function(treefile='~/src/git/cadmium/input/tree'){
 LoadFASTA <- function(filename, isAA=TRUE){
   require(Biostrings)
   if(isAA){
-    readAAStringSet(filename)
+    fa <- readAAStringSet(filename)
   } else {
-    readDNAStringSet(filename)
+    fa <- readDNAStringSet(filename)
   }
+  # Remove any comments that follow the sequence name in the header
+  names(fa) <- gsub(' .*', '', names(fa))
+  fa
 }
 
 check_gene_aa_agreement <- function(genes, aa){

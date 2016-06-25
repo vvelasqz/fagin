@@ -35,9 +35,14 @@ mkdir -p $INPUT/gene
 for s in $species
 do
     cat $INPUT/gff/$s.gff |
-        awk '$3 == "mRNA"' |
-        grep -v '#' |
-        awk 'BEGIN{OFS="\t"} {$3 = $9; print}' |
+        awk '
+            BEGIN{OFS="\t"; FS=OFS}
+            $3 == "mRNA" {
+                # pull out ID tag
+                $3 = gensub(/.*ID=([^;]+).*/, "\\1", 1, $9)
+                print
+            }
+        ' |
         bedtools getfasta         \
             -fi $INPUT/fna/$s.fna \
             -bed /dev/stdin       \
@@ -45,10 +50,18 @@ do
             -name > $INPUT/gene/$s.gene.fna
 
     cat $INPUT/gff/$s.gff |
-        awk '$3 == "CDS"' |
-        grep -v '#' |
+        awk '
+            BEGIN{FS="\t"; OFS="\t"}
+            $3 == "CDS" {
+                $9 = gensub(/.*Parent=([^;]+).*/, "\\1", 1, $9)
+                print
+            }
+        ' |
         sort -k3n -k9 |
-        awk 'BEGIN{FS="\t";OFS="\t"}{$3 = $9" "$7; print}' |
+        awk '
+            BEGIN{FS="\t";OFS="\t"}
+            {$3 = $9" "$7; print}
+        ' |
         bedtools getfasta        \
             -fi $INPUT/fna/$s.fna \
             -bed /dev/stdin      \
@@ -61,6 +74,7 @@ do
         smof clean -sux > $INPUT/faa/$s.faa
     rm x
 done
+
 
 # Get open reading frames from each input genome
 mkdir -p $INPUT/orf-faa

@@ -22,11 +22,17 @@ config <- LoadConfig(configfile='~/src/git/cadmium/cadmium.cfg')
 
 l_seqinfo <- LoadSeqinfoList(config)
 
-que <- LoadQuery(config, l_seqinfo)
+query.cache <- sprintf('%s/query.Rdat', config$d_cache)
+if(file.exists(query.cache)){
+  load(query.cache)
+} else {
+  que <- LoadQuery(config, l_seqinfo)
+  save(que, file=query.cache)
+}
 
 results <- list()
 for(s in config$species){
-  if(s %in% c(config$focal_species, 'Brassica_rapa')){
+  if(s %in% c(config$focal_species)){
     next
   }
   results[[s]] <- getTargetResults(
@@ -87,7 +93,7 @@ Syntenic flags:
 \end{description}
 
 <<message=FALSE, cache=FALSE>>=
-m <- lapply(results, function(x) x$bittbl) %>%
+m <- lapply(results, function(x) x$synteny$bittbl) %>%
   lapply(dplyr::rename, orphan=orp_prop, non_orphan=non_orp_prop) %>%
   melt(id.vars='bit', value.name='proportion', variable.name='class') %>%
   subset(class %in% c('orphan', 'non_orphan')) %>%

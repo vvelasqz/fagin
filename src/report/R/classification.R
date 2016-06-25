@@ -1,28 +1,3 @@
-initializeOrigins <- function(query, target){
-  genelist <- query$gff$seqid %>% unique
-
-  tgenes <- target$gff$seqid %>% unique
-
-  stopifnot(genelist %in% names(query$aa))
-  stopifnot(tgenes %in% names(target$aa))
-
-  # The pipeline builds the protein sequences from the GFF and genome files, so
-  # the sequence ids in the faa and search interval files should be the same.  It
-  # is perfectly plausible that some proteins are known from mRNAs but are not
-  # placed in the genome (due to missing sequence, ambiguities or curator error).
-  # It is also reasonable that the user might try to bypass my helpful protein
-  # file preparations. They might try to slip in some of their own pet proteins.
-  # I could accomadate them, but I choose not to. Indeed, I would die first:
-  stopifnot(genelist %in% names(query$aa))
-
-  data.frame(
-    seqid  = genelist,
-    orphan = genelist %in% query$orphans,
-    class  = rep('Unknown', length(genelist)),
-    stringsAsFactors=FALSE
-  )
-}
-
 getTargetResults <- function(species, query, config, l_seqinfo, use_cache=TRUE){
 
   cache <- function(x, ...){
@@ -47,30 +22,30 @@ getTargetResults <- function(species, query, config, l_seqinfo, use_cache=TRUE){
   # TODO: Fix the out-of-range bugs
   target <- cache(LoadTarget, species=species, config=config, l_seqinfo=l_seqinfo)
 
-  sflags <- cache(summarize.flags, target$si)
-
-  origins <- cache(initializeOrigins, query, target)
-
   # B1 - Queries of scrambled origin
-  origins <- cache(syntenicState, origins, sflags)
-
-  bittbl <- cache(getBitTable, origins)
+  synteny <- cache(summarize.flags, si=target$si, query=query)
 
   # B2 - Queries overlap an indel in a target SI
   ind       <- cache(findIndels, target, indel.threshold=0.05)
   ind.stats <- cache(indelStats, ind)
   ind.sumar <- cache(indelSummaries, ind)
 
+  # B3 and B4 (CDS and mRNA overlaps)
+
+  # TODO: I do not currently use features other than CDS and mRNA, so I could
+  # save memory by filtering them out
   features <- cache(analyzeTargetFeature, query, target)
 
   # B5 - Queries whose SI overlap an N-string
   query2gap <- cache(findQueryGaps, nstring=target$nstring, target=target)
 
   # B6 - Queries whose protein seq matches a target protein in the SI
-  aln       <- cache(AA_aln, map=features$CDS, query=query, target=target)
+  aln       <- cache(AA_aln, map=features, query=query, target=target)
   aln.stats <- cache(AA_aln_stats, aln, query)
   prot2prot.scores <- features$CDS %>%
     dplyr::mutate(score = score(aln$aln))
+  rm(aln)
+  gc()
 
   # B7 - Queries whose protein matches an ORF in an SI
   query2orf <- cache(get_query2orf, target) 
@@ -80,11 +55,9 @@ getTargetResults <- function(species, query, config, l_seqinfo, use_cache=TRUE){
   orp2dna <- cache(get_orphan_dna_hits, query, target)
 
   list(
-    species=s,
+    species=species,
     target=target,
-    sflags=sflags,
-    origins=origins,
-    bittbl=bittbl,
+    synteny=synteny,
     ind=ind,
     ind.stats=ind.stats,
     ind.sumar=ind.sumar,
@@ -101,12 +74,10 @@ getTargetResults <- function(species, query, config, l_seqinfo, use_cache=TRUE){
 growAPair <- function(result, query){
   orphans <- query$orphans 
 
-  orp.origins <- subset(result$origins, orphan)
-
   # Synteny is scrambled
-  scr <- orp.origins$bit == '00001'
+  scr <- synteny$bits[orphans] == '00001'
   # synteny is reliable
-  rel <- orp.origins$bit == '10000'
+  rel <- synteny$bits[orphans] == '10000'
   # at least one search interval overlaps a target CDS
   cds <- orphans %in% (result$features$CDS$query %>% unique)
   # at least one search interval overlaps a target mRNA
@@ -123,7 +94,6 @@ growAPair <- function(result, query){
   orf <- orphans %in% (result$orfmap %>% subset(score > 100) %$% query)
   # nuc - has nucleotide match in SI
   nuc <- orphans %in% (result$orp2dna$hits %>% subset(score > 60) %$% seqid)
-
   
   labels <- data.frame(
     scr=scr,

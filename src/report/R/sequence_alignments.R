@@ -2,14 +2,28 @@
 # Search sequence - AA-AA - Query genes against target genes
 # ============================================================================
 
-AA_aln <- function(map, query, target){
+AA_aln <- function(features, query, target){
   require(dplyr)
   data(BLOSUM80)
 
+  map <- merge(
+    features$CDS,
+    mcols(target$gff)[c('seqid', 'parent')],
+    by.x='target', by.y='seqid'
+  ) %>%
+  as.data.frame %>%
+  select(query, parent) %>%
+  rename(target=parent) %>%
+  unique
+
+  tarseq <- target$aa[map$target]
+
+  queseq <- query$aa[map$query]
+
   # Align all orphans that possibly overlap a coding sequence
   aln <- pairwiseAlignment(
-    pattern=query$aa[map$query],
-    subject=target$aa[map$target],
+    pattern=queseq,
+    subject=tarseq,
     type='local',
     substitutionMatrix=BLOSUM80
   )
@@ -22,7 +36,7 @@ AA_aln <- function(map, query, target){
       n.orth = sum(ortholog)
     )
 
-  list(
+  aln=list(
     scores=map,
     aln=aln,
     alnsum=alnsum

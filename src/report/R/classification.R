@@ -59,9 +59,7 @@ getTargetResults <- function(species, query, config, l_seqinfo, use_cache=TRUE){
   aln       <- cache(cds_to_AA_aln, map=map, query=query, target=target)
   message('---calculating stats')
   aln.stats <- cache(AA_aln_stats, aln, query)
-  message('---extracting scores')
-  prot2prot.scores <- map %>%
-    dplyr::mutate(score = score(aln$aln))
+  prot2prot <- aln$scores %>% dplyr::rename(score=scores) # TODO: unify names
 
   # B7 - Queries whose protein matches an ORF in an SI
   message('--finding orfs in search intervals')
@@ -85,7 +83,7 @@ getTargetResults <- function(species, query, config, l_seqinfo, use_cache=TRUE){
     features=features,
     query2gap=query2gap,
     aln.stats=aln.stats,
-    prot2prot.scores=prot2prot.scores,
+    prot2prot=prot2prot,
     orfmap=orfmap,
     orp2dna=orp2dna
   )
@@ -104,7 +102,7 @@ growAPair <- function(result, query){
   # at least one search interval overlaps a target mRNA
   rna <- orphans %in% (result$features$mRNA$query %>% unique)
   # the query has an ortholog in the target
-  gen <- orphans %in% (result$prot2prot.scores %>% filter(score > 60) %$% query)
+  gen <- orphans %in% (result$prot2prot %>% filter(score > 60) %$% query)
   # at least search interval overlaps a N-string
   nst <- orphans %in% result$query2gap$query
   # number of confirmed indels (based on search interval size)

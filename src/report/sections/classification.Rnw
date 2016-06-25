@@ -334,7 +334,7 @@ results %>%
 <<message=FALSE, cache=TRUE>>=
 
 m <- results %>% 
-  lapply(function(x) x$prot2prot.scores[c('query', 'score')]) %>%
+  lapply(function(x) x$prot2prot[c('query', 'score')]) %>%
   melt(id.vars=c('query', 'score')) %>%
   dplyr::rename(species=L1) %>%
   dplyr::mutate(orphan = (query %in% query$orphans))
@@ -351,10 +351,13 @@ ggplot() +
          dplyr::group_by(query, species) %>%
          dplyr::summarize(score=max(score)) %>%
          as.data.frame,
-    position=position_jitter(width=1),
+    position=position_jitter(width=0.3),
     color='red'
   ) +
   xlab('Raw alignment score (BLOSUM80)') +
+  theme(
+    axis.text.x = element_text(angle=325, hjust=0, vjust=1)
+  ) +
   scale_y_continuous(
     trans='log2',
     breaks=trans_breaks('log2', function(x) round(2^x))
@@ -419,6 +422,9 @@ ggplot(m) +
     position=position_jitter(width=0.8),
     alpha=0.3
   ) +
+  theme(
+    axis.text.x = element_text(angle=325, hjust=0, vjust=1)
+  ) +
   xlab('Raw alignment score (BLOSUM80)') +
   scale_y_continuous(
     trans='log2',
@@ -461,6 +467,7 @@ ggplot(m) +
     trans='log2',
     breaks=trans_breaks('log2', function(x) round(2^x))
   ) +
+  coord_flip() +
   facet_grid(group~.)
 @
 \caption{\

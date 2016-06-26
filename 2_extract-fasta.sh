@@ -10,6 +10,10 @@ Arguments
 Extract
  1. protein sequences for each species
  2. nucleotide sequences for each search interval
+ 3. all ORF GFF file
+ 4. all ORF translations
+ 5. all transcript ORFs
+ 6. all transcript ORF translations
 
 REQUIRES:
     bedtools v2.23.0
@@ -31,9 +35,40 @@ species=$(cat $INPUT/species)
 
 mkdir -p $INPUT/faa
 mkdir -p $INPUT/gene
+mkdir -p $INPUT/trans-orf
 
 for s in $species
 do
+
+    # Get transcript ORFs
+    cat $INPUT/gff/$s.gff |
+    awk '
+        BEGIN{FS="\t"; OFS="\t"}
+        $3 == "exon" {
+            $9 = gensub(/.*ID=([^;]+).*Parent=([^;]+).*/, "\\1\t\\2", 1, $9)
+            print
+        }
+    ' |
+    sort -k10 -k4n |
+    awk '
+        BEGIN{FS="\t"; OFS="\t"}
+        {$3 = $10}
+        {print}
+    ' |
+    cut -f1-9 |
+    bedtools getfasta         \
+        -fi $INPUT/fna/$s.fna \
+        -bed /dev/stdin       \
+        -fo /dev/stdout       \
+        -name |
+    awk '
+        $1 ~ /^>/ && $1 in a { next }
+        {a[$1]++; print}
+    ' |
+    getorf -filter -find 1 -minsize 30 |
+    smof clean -s > $INPUT/trans-orf/$s.faa
+
+    # Prepare FASTA file of genes, regions potentially include UTRs and introns
     cat $INPUT/gff/$s.gff |
         awk '
             BEGIN{OFS="\t"; FS=OFS}
@@ -49,6 +84,7 @@ do
             -fo /dev/stdout       \
             -name > $INPUT/gene/$s.gene.fna
 
+    # Prepare protein fassta files including all predicted coding genes
     cat $INPUT/gff/$s.gff |
         awk '
             BEGIN{FS="\t"; OFS="\t"}

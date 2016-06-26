@@ -61,14 +61,17 @@ getTargetResults <- function(species, query, config, l_seqinfo, use_cache=TRUE){
   aln.stats <- cache(AA_aln_stats, aln, query)
   prot2prot <- aln$scores %>% dplyr::rename(score=scores) # TODO: unify names
 
-  # B7 - Queries whose protein matches an ORF in an SI
+  # B7 - Queries matching ORFs on spliced mRNA
+  prot2transorf <- cache(orphan_cds_to_transorf_AA_aln, query, target, features)
+
+  # B8 - Queries whose protein matches an ORF in an SI
   message('--finding orfs in search intervals')
   query2orf <- cache(get_query2orf, target) 
   message('--aligning orphans to orfs that overlap their search intervals')
   orfmap    <- cache(get_orfmap, query2orf, query, target)
 
   message('--aligning orphans to the full sequences of their search intervals')
-  # B8 - Queries whose gene matches (DNA-DNA) an SI 
+  # B9 - Queries whose gene matches (DNA-DNA) an SI 
   orp2dna <- cache(get_orphan_dna_hits, query, target)
 
   gc()
@@ -83,6 +86,7 @@ getTargetResults <- function(species, query, config, l_seqinfo, use_cache=TRUE){
     features=features,
     query2gap=query2gap,
     aln.stats=aln.stats,
+    prot2transorf=prot2transorf,
     prot2prot=prot2prot,
     orfmap=orfmap,
     orp2dna=orp2dna

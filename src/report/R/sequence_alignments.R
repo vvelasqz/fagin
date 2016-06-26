@@ -94,6 +94,37 @@ mrna_to_AA_aln <- function(map, query, target){
   AA_aln(map, target, query)
 }
 
+orphan_cds_to_transorf_AA_aln <- function(query, target, features){
+
+  require(tidyr)
+
+  tarseq <- LoadFASTA(target$transorf.file, isAA=TRUE)
+
+  orfmap <- data.frame(
+    target=gsub('_[0-9]+$', '', names(tarseq)),
+    id=1:length(tarseq)
+  )
+
+  map <- features$mRNA[features$mRNA$query %in% query$orphans, ] %>%
+    merge(orfmap, by='target')
+
+  queseq <- query$aa[map$query]
+  tarseq <- tarseq[map$id]
+
+  # Align all orphans that possibly overlap a coding sequence
+  data(BLOSUM80)
+  aln <- pairwiseAlignment(
+    pattern=queseq,
+    subject=tarseq,
+    type='local',
+    substitutionMatrix=BLOSUM80
+  )
+
+  map %>%
+    mutate(score = score(aln)) %>%
+    select(query, target, score)
+}
+
 # ============================================================================
 # Search sequence - DNA-DNA - Query genes against target seach intervals
 # ============================================================================

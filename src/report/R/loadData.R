@@ -5,11 +5,12 @@
 #' R_GFF_DIR        |
 #' R_SYN_DIR        |
 #' R_GENE_DIR       |
-#' R_GENOME_DIR     | data directories
-#' R_SI_DIR         |
+#' R_GENOME_DIR     |
+#' R_SI_DIR         | data directories
 #' R_ORFGFF         |
 #' R_CACHE          |
-#' R_ORFFAA         /
+#' R_ORFFAA         |
+#' R_TRANS_ORF      /
 #' R_SPECIES_FILE   \
 #' R_SCAFLEN        |
 #' R_NSTRINGS       | individual data files
@@ -28,6 +29,7 @@
 #'  d_si
 #'  d_orfgff
 #'  d_orffaa
+#'  d_trans_orf
 #'  d_cache
 #'  f_scaflen
 #'  f_nstrings
@@ -58,6 +60,7 @@ LoadConfig <- function(configfile='~/src/git/cadmium/cadmium.cfg'){
         'R_SI_DIR',
         'R_ORFGFF',
         'R_ORFFAA',
+        'R_TRANS_ORF',
         'R_SPECIES_FILE',
         'R_SCAFLEN',
         'R_NSTRINGS',
@@ -72,13 +75,13 @@ LoadConfig <- function(configfile='~/src/git/cadmium/cadmium.cfg'){
         }
     }
     # Check existence of directories
-    for(v in expected.vars[1:9]){
+    for(v in expected.vars[1:10]){
         if(!dir.exists(eval(parse(text=v)))){
             warning(sprintf("Variable '%s' does not point to a valid directory", v))
         }
     }
     # Check existence of files
-    for(v in expected.vars[10:14]){
+    for(v in expected.vars[11:15]){
         if(!file.exists(eval(parse(text=v)))){
             warning(sprintf("Variable '%s' does not point to a readable file", v))
         }
@@ -102,6 +105,7 @@ LoadConfig <- function(configfile='~/src/git/cadmium/cadmium.cfg'){
         d_si          = R_SI_DIR,
         d_orfgff      = R_ORFGFF,
         d_orffaa      = R_ORFFAA,
+        d_trans_orf   = R_TRANS_ORF,
         d_cache       = R_CACHE,
         f_scaflen     = R_SCAFLEN,
         f_nstrings    = R_NSTRINGS,
@@ -519,9 +523,10 @@ LoadTarget <- function(species, config, l_seqinfo){
   sifile  <- sprintf('%s/%s.vs.%s.map.tab', config$d_si, config$focal_species, species)
   synfile <- sprintf('%s/%s.vs.%s.syn', config$d_syn, config$focal_species, species)
 
-  dna.file    <- sprintf('%s/%s.fna', config$d_genome, species)
-  orfgff.file <- sprintf('%s/%s.gff', config$d_orfgff, species)
-  orffaa.file <- sprintf('%s/%s.faa', config$d_orffaa, species)
+  dna.file      <- sprintf('%s/%s.fna', config$d_genome,    species)
+  orfgff.file   <- sprintf('%s/%s.gff', config$d_orfgff,    species)
+  orffaa.file   <- sprintf('%s/%s.faa', config$d_orffaa,    species)
+  transorf.file <- sprintf('%s/%s.faa', config$d_trans_orf, species)
 
   aa <- LoadFASTA(aafile, isAA=TRUE)
   si <- LoadSearchIntervals(sifile,
@@ -558,6 +563,7 @@ LoadTarget <- function(species, config, l_seqinfo){
     dna.file=dna.file,
     orfgff.file=orfgff.file,
     orffaa.file=orffaa.file,
+    transorf.file=transorf.file,
     si=si,
     gff=gff,
     syn=syn,

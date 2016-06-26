@@ -526,13 +526,7 @@ m %>%
 \subsection{Leaf labels}
 
 <<results='asis', cache=TRUE>>=
-labels$summary %>%
-  arrange(description, species, count) %>%
-  select(description, species, count) %>%
-  tidyr::complete(description, species, fill=list(count=0)) %>%
-  as.data.frame %>%
-  dplyr::mutate(count = as.integer(count)) %>%
-  xtable
+labels$summary %>% xtable
 @
 
 \begin{description}

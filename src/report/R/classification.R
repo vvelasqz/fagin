@@ -137,26 +137,27 @@ buildFeatureTable <- function(result, query){
 }
 
 buildLabels <- function(feats){
-  feats %>%
-    dplyr::mutate( l.g        =  gen                                                  ) %>%
-    dplyr::mutate( l.Gt       = !gen &  trn                                           ) %>%
-    dplyr::mutate( l.GTo      = !gen & !trn &  orf                                    ) %>%
-    dplyr::mutate( l.GTONd    = !gen & !trn & !orf & !nuc &  ind                      ) %>%
-    dplyr::mutate( l.GTONDu   = !gen & !trn & !orf & !nuc & !ind &  nst               ) %>%
-    dplyr::mutate( l.GTONDUr  = !gen & !trn & !orf & !nuc & !ind & !nst &  res        ) %>%
-    dplyr::mutate( l.GTONDURs = !gen & !trn & !orf & !nuc & !ind & !nst & !res &  scr ) %>%
-    dplyr::mutate( l.GTONDURS = !gen & !trn & !orf & !nuc & !ind & !nst & !res & !scr ) %>%
-    dplyr::mutate( l.GTOnR    = !gen & !trn & !orf &  nuc & !rna                      ) %>%
-    dplyr::mutate( l.GTOnrc   = !gen & !trn & !orf &  nuc &  rna &  cds               ) %>%
-    dplyr::mutate( l.GTOnrC   = !gen & !trn & !orf &  nuc &  rna & !cds               ) %>%
-
-    # merge results
-    dplyr::select(starts_with('l.'), seqid) %>%
+  require(tidyr)
+  with(feats,
+    data.frame(
+      seqid = seqid,
+      gen.g        =  gen                                                  ,
+      gen.Gt       = !gen &  trn                                           ,
+      gen.GTo      = !gen & !trn &  orf                                    ,
+      unk.GTONd    = !gen & !trn & !orf & !nuc &  ind                      ,
+      unk.GTONDu   = !gen & !trn & !orf & !nuc & !ind &  nst               ,
+      unk.GTONDUr  = !gen & !trn & !orf & !nuc & !ind & !nst &  res        ,
+      unk.GTONDURs = !gen & !trn & !orf & !nuc & !ind & !nst & !res &  scr ,
+      unk.GTONDURS = !gen & !trn & !orf & !nuc & !ind & !nst & !res & !scr ,
+      non.GTOnR    = !gen & !trn & !orf &  nuc & !rna                      ,
+      non.GTOnrc   = !gen & !trn & !orf &  nuc &  rna &  cds               ,
+      non.GTOnrC   = !gen & !trn & !orf &  nuc &  rna & !cds               
+    )
+  ) %>%
     melt(id.vars='seqid') %>%
     dplyr::filter(value) %>%
     dplyr::select(seqid, variable) %>%
-    dplyr::rename(label=variable) %>%
-    dplyr::mutate(label=sub('l\\.', '', label))
+    tidyr::separate(variable, c('primary', 'secondary'), sep='\\.')
 }
 
 #' Merge labels for all species
@@ -181,12 +182,15 @@ determineLabels <- function(query, results){
   labels <- lapply(features, buildLabels)
 
   label.summary <- labels %>%
-    lapply(count, label) %>%
-    melt(id.vars='label') %>%
-    dplyr::select(label, value, L1) %>%
+    lapply(count, primary, secondary) %>%
+    melt(id.vars=c('primary', 'secondary')) %>%
     dplyr::rename(species=L1, count=value) %>%
-    dplyr::mutate(description = descriptions[label]) %>%
-    dplyr::select(-label)
+    dplyr::mutate(description = descriptions[secondary]) %>%
+    dplyr::select(description, species, count) %>%
+    tidyr::complete(description, species, fill=list(count=0)) %>%
+    dplyr::mutate(count = as.integer(count)) %>%
+    dplyr::arrange(description, species, count) %>%
+    as.data.frame
 
   list(
     labels=labels,

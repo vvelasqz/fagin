@@ -115,8 +115,10 @@ buildFeatureTable <- function(result, query){
   res <- orphans %in% result$ind.stats$resized.queries
   # ORF match in SI
   orf <- orphans %in% (result$orfmap %>% subset(score > 100) %$% query)
-  # nuc - has nucleotide match in SI
+  # has nucleotide match in SI
   nuc <- orphans %in% (result$orp2dna$hits %>% subset(score > 60) %$% seqid)
+  # ORF match to spliced transcript (possibly multi-exonic)
+  trn <- orphans %in% (result$prot2transorf %>% subset(score > 60) %$% query)
   
   labels <- data.frame(
     seqid=orphans,
@@ -129,26 +131,25 @@ buildFeatureTable <- function(result, query){
     ind=ind,
     res=res,
     orf=orf,
-    nuc=nuc
+    nuc=nuc,
+    trn=trn
   )
 }
 
 buildLabels <- function(feats){
   feats %>%
-    # is genic
-    dplyr::mutate(l.g  =  gen      ) %>%
-    # matches ORF
-    dplyr::mutate(l.Go = !gen & orf) %>%
-    # has no DNA similarity (kinds of unknown)
-    dplyr::mutate(l.GONd    = !gen & !orf & !nuc &  ind                     ) %>%
-    dplyr::mutate(l.GONDu   = !gen & !orf & !nuc & !ind &  nst              ) %>%
-    dplyr::mutate(l.GONDUr  = !gen & !orf & !nuc & !ind & !nst &  res       ) %>%
-    dplyr::mutate(l.GONDURs = !gen & !orf & !nuc & !ind & !nst & !res &  scr) %>%
-    dplyr::mutate(l.GONDURS = !gen & !orf & !nuc & !ind & !nst & !res & !scr) %>%
-    # has DNA similarity (kinds of potential non-genic)
-    dplyr::mutate(l.GOnR  = !gen & !orf & nuc & !rna       ) %>%
-    dplyr::mutate(l.GOnrc = !gen & !orf & nuc &  rna &  cds) %>%
-    dplyr::mutate(l.GOnrC = !gen & !orf & nuc &  rna & !cds) %>%
+    dplyr::mutate( l.g        =  gen                                                  ) %>%
+    dplyr::mutate( l.Gt       = !gen &  trn                                           ) %>%
+    dplyr::mutate( l.GTo      = !gen & !trn &  orf                                    ) %>%
+    dplyr::mutate( l.GTONd    = !gen & !trn & !orf & !nuc &  ind                      ) %>%
+    dplyr::mutate( l.GTONDu   = !gen & !trn & !orf & !nuc & !ind &  nst               ) %>%
+    dplyr::mutate( l.GTONDUr  = !gen & !trn & !orf & !nuc & !ind & !nst &  res        ) %>%
+    dplyr::mutate( l.GTONDURs = !gen & !trn & !orf & !nuc & !ind & !nst & !res &  scr ) %>%
+    dplyr::mutate( l.GTONDURS = !gen & !trn & !orf & !nuc & !ind & !nst & !res & !scr ) %>%
+    dplyr::mutate( l.GTOnR    = !gen & !trn & !orf &  nuc & !rna                      ) %>%
+    dplyr::mutate( l.GTOnrc   = !gen & !trn & !orf &  nuc &  rna &  cds               ) %>%
+    dplyr::mutate( l.GTOnrC   = !gen & !trn & !orf &  nuc &  rna & !cds               ) %>%
+
     # merge results
     dplyr::select(starts_with('l.'), seqid) %>%
     melt(id.vars='seqid') %>%
@@ -162,16 +163,17 @@ buildLabels <- function(feats){
 determineLabels <- function(query, results){
 
   descriptions <- c(
-    g       = 'confirmed genic',
-    Go      = 'homologous to unannotated ORF',
-    GONd    = 'unknown: maps to indel',
-    GONDu   = 'unknown: maps to N-string',
-    GONDUr  = 'unknown: maps to resized interval',
-    GONDURs = 'unknown: syntenically scrambled',
-    GONDURS = 'unknown: really unknown',
-    GOnR    = 'non-genic: no gene in SI',
-    GOnrc   = 'non-genic: CDS in SI',
-    GOnrC   = 'non-genic: mRNA but not CDS in SI'
+    g        = 'genic: known gene',
+    Gt       = 'genic: unknown ORF on known mRNA',
+    GTo      = 'genic: unknown ORF off known mRNA',
+    GTONd    = 'unknown: possible indel',
+    GTONDu   = 'unknown: possible N-string',
+    GTONDUr  = 'unknown: possible resized',
+    GTONDURs = 'unknown: syntenically scrambled',
+    GTONDURS = 'unknown: seriously unknown',
+    GTOnR    = 'non-genic: no gene in SI',
+    GTOnrc   = 'non-genic: CDS in SI',
+    GTOnrC   = 'non-genic: mRNA but not CDS in SI'
   )
 
   features <- lapply(results, buildFeatureTable, query)

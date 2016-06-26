@@ -148,19 +148,21 @@ alignToGenome <- function(query.seqs, genome, gr, ...){
 
   search.intervals <- seqFromGenomicRange(gr=gr, fa=genome, ...)
 
-  # Retrieve only the maximum scores
+  # Search + and - strands
   nuc.scores <- pairwiseAlignment(
-    pattern=query.seqs,
-    subject=search.intervals,
+    pattern=c(query.seqs, reverseComplement(query.seqs)),
+    subject=search.intervals %>% rep(2),
     type='local',
     scoreOnly=TRUE
   )
 
+
   data.frame(
-    seqid = query.seqs %>% names,
-    qwidth = query.seqs %>% width,
-    twidth = search.intervals %>% width,
+    seqid = query.seqs %>% names %>% rep(2),
+    qwidth = query.seqs %>% width %>% rep(2),
+    twidth = search.intervals %>% width %>% rep(2),
     score = nuc.scores,
+    strand = rep(c('+', '-'), each=length(query.seqs)),
     stringsAsFactors=FALSE
   )
 }

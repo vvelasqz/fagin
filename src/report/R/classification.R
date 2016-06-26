@@ -89,14 +89,14 @@ getTargetResults <- function(species, query, config, l_seqinfo, use_cache=TRUE){
   )
 }
 
-#' Build label set for a single pair of species
-growAPair <- function(result, query){
+#' Build table of binary features
+buildFeatureTable <- function(result, query){
   orphans <- query$orphans 
 
   # Synteny is scrambled
-  scr <- synteny$bits[orphans] == '00001'
+  scr <- result$synteny$bits[orphans] == '00001'
   # synteny is reliable
-  rel <- synteny$bits[orphans] == '10000'
+  rel <- result$synteny$bits[orphans] == '10000'
   # at least one search interval overlaps a target CDS
   cds <- orphans %in% (result$features$CDS$query %>% unique)
   # at least one search interval overlaps a target mRNA
@@ -115,6 +115,7 @@ growAPair <- function(result, query){
   nuc <- orphans %in% (result$orp2dna$hits %>% subset(score > 60) %$% seqid)
   
   labels <- data.frame(
+    seqid=orphans,
     scr=scr,
     rel=rel,
     cds=cds,
@@ -125,34 +126,64 @@ growAPair <- function(result, query){
     res=res,
     orf=orf,
     nuc=nuc
-  ) %>%
-  set_rownames(orphans)
+  )
+}
+
+buildLabels <- function(feats){
+  feats %>%
+    # is genic
+    dplyr::mutate(l.g  =  gen      ) %>%
+    # matches ORF
+    dplyr::mutate(l.Go = !gen & orf) %>%
+    # has no DNA similarity (kinds of unknown)
+    dplyr::mutate(l.GONd    = !gen & !orf & !nuc &  ind                     ) %>%
+    dplyr::mutate(l.GONDu   = !gen & !orf & !nuc & !ind &  nst              ) %>%
+    dplyr::mutate(l.GONDUr  = !gen & !orf & !nuc & !ind & !nst &  res       ) %>%
+    dplyr::mutate(l.GONDURs = !gen & !orf & !nuc & !ind & !nst & !res &  scr) %>%
+    dplyr::mutate(l.GONDURS = !gen & !orf & !nuc & !ind & !nst & !res & !scr) %>%
+    # has DNA similarity (kinds of potential non-genic)
+    dplyr::mutate(l.GOnR  = !gen & !orf & nuc & !rna       ) %>%
+    dplyr::mutate(l.GOnrc = !gen & !orf & nuc &  rna &  cds) %>%
+    dplyr::mutate(l.GOnrC = !gen & !orf & nuc &  rna & !cds) %>%
+    # merge results
+    dplyr::select(starts_with('l.'), seqid) %>%
+    melt(id.vars='seqid') %>%
+    dplyr::filter(value) %>%
+    dplyr::select(seqid, variable) %>%
+    dplyr::rename(label=variable) %>%
+    dplyr::mutate(label=sub('l\\.', '', label))
 }
 
 #' Merge labels for all species
 determineLabels <- function(query, results){
 
-  lapply(results, growAPair, query)
- 
-  # orfhits <- result$orfmap %>%
-  #   group_by(query) %>%
-  #   summarize(orf_top_score=max(score), N.orf=length(score)) 
-  #
-  # stopifnot(which(gen) %in% which(cds))
-  # stopifnot(which(cds) %in% which(rna))
-  # stopifnot(intersect(which(scr), which(rel)) == 0)
-  #
-  # label <- rep('unknown', nrow(orp.origins))
-  #
-  # label[       !(rna | scr) ] <- 'possible-intergenic'
-  # label[ rel & !(rna | scr) ] <- 'intergenic'
-  # label[ rna & !cds         ] <- 'possible-hitchhiker'
-  # label[ cds & !gen         ] <- 'possible-genic'
-  # label[ gen                ] <- 'confirmed-genic'
-  # label[ ind                ] <- 'indel'
-  # label[ orf & !gen         ] <- 'candidate-gene'
-  #
-  # label[label == 'unknown' & nst ] <- 'unknown-gapped'
-  # label[label == 'unknown' & scr ] <- 'unknown-scrambled'
-}
+  descriptions <- c(
+    g       = 'confirmed genic',
+    Go      = 'homologous to unannotated ORF',
+    GONd    = 'unknown: maps to indel',
+    GONDu   = 'unknown: maps to N-string',
+    GONDUr  = 'unknown: maps to resized interval',
+    GONDURs = 'unknown: syntenically scrambled',
+    GONDURS = 'unknown: really unknown',
+    GOnR    = 'non-genic: no gene in SI',
+    GOnrc   = 'non-genic: CDS in SI',
+    GOnrC   = 'non-genic: mRNA but not CDS in SI'
+  )
 
+  features <- lapply(results, buildFeatureTable, query)
+
+  labels <- lapply(features, buildLabels)
+
+  label.summary <- labels %>%
+    lapply(count, label) %>%
+    melt(id.vars='label') %>%
+    dplyr::select(label, value, L1) %>%
+    dplyr::rename(species=L1, count=value) %>%
+    dplyr::mutate(description = descriptions[label]) %>%
+    dplyr::select(-label)
+
+  list(
+    labels=labels,
+    summary=label.summary
+  )
+}

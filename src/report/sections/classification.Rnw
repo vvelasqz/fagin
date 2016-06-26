@@ -30,22 +30,27 @@ if(file.exists(query.cache)){
   save(query, file=query.cache)
 }
 
-results <- list()
-for(s in config$species){
-  if(s %in% c(config$focal_species)){
-    next
+results.cache <- sprintf('%s/results.Rdat', config$d_cache)
+if(file.exists(results.cache)){
+  load(results.cache)
+} else {
+  results <- list()
+  for(s in config$species){
+    if(s %in% c(config$focal_species)){
+      next
+    }
+    results[[s]] <- getTargetResults(
+      species   = s,
+      query     = query,
+      config    = config,
+      l_seqinfo = l_seqinfo,
+      use_cache = TRUE
+    )
   }
-  results[[s]] <- getTargetResults(
-    species   = s,
-    query     = query,
-    config    = config,
-    l_seqinfo = l_seqinfo,
-    use_cache = TRUE
-  )
-  gc()
+  save(results, file=results.cache)
 }
 
-# labels <- determineLabels(query, results)
+labels <- determineLabels(query, results)
 @
 
 \subsection{Data input}
@@ -93,7 +98,7 @@ Syntenic flags:
   \item[4] neither edge of the search interval is reliable
 \end{description}
 
-<<message=FALSE, cache=FALSE>>=
+<<message=FALSE, cache=TRUE>>=
 m <- lapply(results, function(x) x$synteny$bittbl) %>%
   lapply(dplyr::rename, orphan=orp_prop, non_orphan=non_orp_prop) %>%
   melt(id.vars='bit', value.name='proportion', variable.name='class') %>%
@@ -102,7 +107,7 @@ m <- lapply(results, function(x) x$synteny$bittbl) %>%
 @
 \begin{figure}[!ht]
     \centering
-<<message=FALSE, cache=FALSE>>=
+<<message=FALSE, cache=TRUE>>=
 ggplot(m) +
     geom_line(aes(x=bit, y=proportion, group=class)) +
     geom_point(aes(x=bit, y=proportion, color=class)) +
@@ -121,7 +126,7 @@ ggplot(m) +
     \textbf{(4)} syntenically unreliable}.
   \label{fig:synflags}
 \end{figure}
-<<results='asis', cache=FALSE>>=
+<<results='asis', cache=TRUE>>=
 m %>%
   dplyr::mutate(proportion = signif(proportion * 100, 2)) %>%
   dcast(class + bit ~ species, mean, value.var='proportion') %>%
@@ -249,7 +254,7 @@ ggplot(m2) +
 % --------------------------------------
 % summarize mRNA and CDS in common table
 % --------------------------------------
-<<results='asis'>>=
+<<results='asis', cache=TRUE>>=
 merge(
   results %>%
     lapply(function(x) x$features$CDS$query) %>%
@@ -268,7 +273,7 @@ merge(
 
 \subsection{Find indel events}
 
-<<results='asis'>>=
+<<results='asis', cache=TRUE>>=
 results %>%
   lapply(function(x) x$ind.stats[1:2]) %>%
   melt %>%
@@ -304,7 +309,7 @@ results %>%
 
 \subsection{Find queries overlapping N-strings}
 
-<<results='asis'>>=
+<<results='asis', cache=TRUE>>=
 results %>%
   lapply(function(x) unique(x$query2gap$query)) %>%
   melt %>%
@@ -373,7 +378,7 @@ ggplot() +
   }
 \end{figure}
 
-<<results='asis'>>=
+<<results='asis', cache=TRUE>>=
 m %>%
   subset(score > 64) %>%
   dplyr::mutate(orphan = ifelse(orphan, 'orphan', 'non-orphan') %>% factor) %>%
@@ -444,7 +449,7 @@ ggplot(m) +
 
 \begin{figure}[!ht]
   \centering
-<<message=FALSE, warning=FALSE>>=
+<<message=FALSE, warning=FALSE, cache=TRUE>>=
 m <- results %>%
   lapply(function(x) x$orp2dna) %>%
   melt(id.vars=c('score', 'qwidth', 'twidth', 'seqid')) %>%
@@ -480,7 +485,7 @@ ggplot(m) +
 
 \begin{figure}[!ht]
   \centering
-<<>>=
+<<cache=TRUE>>=
 m %>%
   group_by(seqid, group, species) %>%
   summarize(
@@ -520,12 +525,15 @@ m %>%
 
 \subsection{Leaf labels}
 
-  % require(xtable)
-  % label %>%
-  %   factor %>%
-  %   summary %>%
-  %   as.data.frame %>%
-  %   set_names('count') %>%
+<<results='asis', cache=TRUE>>=
+labels$summary %>%
+  arrange(description, species, count) %>%
+  select(description, species, count) %>%
+  tidyr::complete(description, species, fill=list(count=0)) %>%
+  as.data.frame %>%
+  dplyr::mutate(count = as.integer(count)) %>%
+  xtable
+@
 
 \begin{description}
 

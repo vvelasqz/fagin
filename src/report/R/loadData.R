@@ -304,12 +304,54 @@ LoadNString <- function(nstring.file, l_seqinfo){
 #' 5. tchr   - target chromosome
 #' 6. tstart - target start
 #' 7. tstop  - target stop
-#' 8. flag   - syntenic flag, one of the following:
-#'    * 0 - query is fully within the target interval
-#'    * 1 - query starts outside the interval but stops inside
-#'    * 2 - query stops outside the interval but starts inside 
-#'    * 3 - query fully contains the target interval (start and stop unbounded)
-#'    * 4 - query does not overlap the target interval (unbound and unanchored)
+#' 8. flag   - syntenic flag [0-5]
+#'
+#' The flag must be one of the following:
+#'    0 - query is fully within the target interval
+#'        B ------      -------
+#'        S   |   [::::]   |   
+#'        A ------      -------
+#'        Q        ----        
+#'
+#'          B ------      -------    
+#'          S       [:::::::::::]    
+#'          A ------          -------
+#'          Q              -----     
+#' B - target genome, A - query genome, S - search interval, Q - query interval
+#'
+#'    1 - query starts outside the interval but stops inside
+#'        B       -------  -------
+#'        S       [:::::]         
+#'        S*  [:::::::::]         
+#'        A       -------  -------
+#'        Q     ----              
+#' S* I extend the search interval by a length equal to the query length
+#'
+#'    2 - query stops outside the interval but starts inside 
+#'        B       -------  -------
+#'        S                [:::::]
+#'        S*               [:::::::::]
+#'        A       -------  -------
+#'        Q                     ----
+#'    3 - query fully contains the target interval (start and stop unbounded)
+#'        B                 ---  ---
+#'        S                 [::::::]
+#'        S*    [:::::::::::::::::::::::::::::::]
+#'        A                 ---  ---
+#'        Q               ------------
+#' S* I extend this interval by a query length on both sides of the target interval
+#'    4 - query ends before target interval
+#'        B                    --- ---
+#'        S             [:::::]
+#'        S*        [:::::::::]
+#'        A                    --- ---
+#'        Q             ---    
+#'    5 - query begins after target interval
+#'        B    --- ---
+#'        S           [:::::]
+#'        S*          [:::::::::]
+#'        A    --- ---
+#'        Q               ---    
 #'
 #' If the *extend* option is set, then unbounded edges of search intervals are
 #' extended by the length of the query gene times *extend_factor*.
@@ -336,6 +378,11 @@ LoadSearchIntervals <- function(sifile, extend=FALSE, extend_factor=1, qinfo=NUL
   si$tstart <- as.numeric(si$tstart)
   si$tstop <- as.numeric(si$tstop)
 
+  if(any(si$tstop < si$tstart)){
+    warning('Found search with stop < start. Possible bug in Synder. You should
+    NOT proceed.')
+  }
+
   #TODO: need a more elegant solution to the initial index problem
   # But the Synder output is 0-based, Bioconductor is 1-based
   si$qstart <- si$qstart + 1
@@ -349,21 +396,36 @@ LoadSearchIntervals <- function(sifile, extend=FALSE, extend_factor=1, qinfo=NUL
   }
 
   if(extend){
-    extend_length <- with(si, qstop - qstart + 1) * extend_factor
-    el <- si$flag == 1 | si$flag == 3
-    er <- si$flag == 2 | si$flag == 3
-    si$tstart[el] <- (si$tstart[el] - extend_length[el]) %>% pmax(1)
+    # Extend right and left flanks as needed for flags 1, 2, and 3
+    e13 <- si$flag == 1 | si$flag == 3 # extend left by k query lengths
+    e23 <- si$flag == 2 | si$flag == 3 # extend right by k query lengths
+    qlen <- with(si, qstop - qstart + 1)
+    extend_length_123 <- qlen * extend_factor
+
+    # Extend right and left flanks as needed for flags 4 and 5
+    e4 <- si$flag == 4 # extend left by distance to target interval
+    e5 <- si$flag == 5 # extend right by distance to target interval
+    # B                    --- ---
+    # S             [:::::]
+    # S*        [:::::::::]
+    # A                    --- ---
+    #                  ++++
+    # Q             ---    
+    # So here, I am getting the ++++ region
+    extend_length_45 <- with(si, (tstop - tstart) - (qstop - qstart))
+
+    si$tstart[e13] <- (si$tstart[e13] - extend_length_123[e13]) %>% pmax(1)
+    si$tstart[e4] <- (si$tstart[e4] - extend_length_45[e4]) %>% pmax(1)
     if(is.null(tinfo)){
       maxend = Inf
     } else {
-      maxend = seqlengths(tinfo)[si$tchr][er]
+      maxend = seqlengths(tinfo)[si$tchr]
     }
-    si$tstop[er] <- (si$tstop[er] + extend_length[er]) %>% pmin(maxend)
+    si$tstop[e23] <- (si$tstop[e23] + extend_length_123[e23]) %>% pmin(maxend[e23])
+    si$tstop[e5] <- (si$tstop[e5] + extend_length_45[e5]) %>% pmin(maxend[e5])
   }
 
-  si$tmax <- seqlengths(tinfo)[si$tchr]
-
-  stopifnot(si$flag %in% 0:4)
+  stopifnot(si$flag %in% 0:5)
 
   query <- MakeGI(
     starts=si$qstart,

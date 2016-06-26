@@ -98,9 +98,9 @@ buildFeatureTable <- function(result, query){
   orphans <- query$orphans 
 
   # Synteny is scrambled
-  scr <- result$synteny$bits[orphans] == '00001'
+  scr <- result$synteny$bits[orphans] %in% c('000010', '000001', '000011')
   # synteny is reliable
-  rel <- result$synteny$bits[orphans] == '10000'
+  rel <- result$synteny$bits[orphans] == '100000'
   # at least one search interval overlaps a target CDS
   cds <- orphans %in% (result$features$CDS$query %>% unique)
   # at least one search interval overlaps a target mRNA

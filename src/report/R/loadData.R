@@ -16,30 +16,14 @@
 #' R_NSTRINGS       | individual data files
 #' R_ORPHAN_LIST    |
 #' R_TREE           /
-#' R_FOCAL_SPECIES  - string
-#' R_EXTEND         - boolean
-#' R_EXTEND_FACTOR  - numeric
-#'
-#' These variables are loaded into the following R list entries:
-#'  d_faa
-#'  d_gff
-#'  d_syn
-#'  d_gene
-#'  d_genome
-#'  d_si
-#'  d_orfgff
-#'  d_orffaa
-#'  d_trans_orf
-#'  d_cache
-#'  f_scaflen
-#'  f_nstrings
-#'  f_orphan
-#'  f_tree
-#'  species
-#'  focal_species
-#'  extend
-#'  extend_factor
-#'
+#' R_FOCAL_SPECIES          - string
+#' R_EXTEND                 - boolean
+#' R_EXTEND_FACTOR          \
+#' R_PROT2PROT_MINSCORE     |
+#' R_PROT2ALLORF_MINSCORE   | numeric
+#' R_PROT2TRANSORF_MINSCORE |
+#' R_GENE2SI_MINSCORE       /
+
 #' Where d_* are directories, and f_* are files. `species` is loaded as a
 #' character string where `focal_species` is a required member.
 #' 
@@ -66,7 +50,11 @@ LoadConfig <- function(configfile='~/src/git/cadmium/cadmium.cfg'){
         'R_NSTRINGS',
         'R_ORPHAN_LIST',
         'R_TREE',
-        'R_FOCAL_SPECIES'
+        'R_FOCAL_SPECIES',
+        'R_PROT2PROT_MINSCORE',
+        'R_PROT2ALLORF_MINSCORE',
+        'R_PROT2TRANSORF_MINSCORE',
+        'R_GENE2SI_MINSCORE'
     )
     # Check for existence of all required variables
     for(v in expected.vars){
@@ -87,34 +75,34 @@ LoadConfig <- function(configfile='~/src/git/cadmium/cadmium.cfg'){
         }
     }
 
-    extend = as.logical(R_EXTEND)
-
-    extend_factor = as.numeric(R_EXTEND_FACTOR)
-
     species <- read.table(R_SPECIES_FILE, stringsAsFactors=FALSE)[[1]]
     if(!R_FOCAL_SPECIES %in% species){
       warning(sprintf("Focal species '%s' not found in the species list: [%s]",
                   R_FOCAL_SPECIES, paste(species, collapse=", ")))
     }
     list(
-        d_faa         = R_FAA_DIR,
-        d_gff         = R_GFF_DIR,
-        d_syn         = R_SYN_DIR,
-        d_gene        = R_GENE_DIR,
-        d_genome      = R_GENOME_DIR,
-        d_si          = R_SI_DIR,
-        d_orfgff      = R_ORFGFF,
-        d_orffaa      = R_ORFFAA,
-        d_trans_orf   = R_TRANS_ORF,
-        d_cache       = R_CACHE,
-        f_scaflen     = R_SCAFLEN,
-        f_nstrings    = R_NSTRINGS,
-        f_orphan      = R_ORPHAN_LIST,
-        f_tree        = R_TREE,
-        species       = species,
-        focal_species = R_FOCAL_SPECIES,
-        extend        = extend,
-        extend_factor = extend_factor
+        d_faa                  = R_FAA_DIR,
+        d_gff                  = R_GFF_DIR,
+        d_syn                  = R_SYN_DIR,
+        d_gene                 = R_GENE_DIR,
+        d_genome               = R_GENOME_DIR,
+        d_si                   = R_SI_DIR,
+        d_orfgff               = R_ORFGFF,
+        d_orffaa               = R_ORFFAA,
+        d_trans_orf            = R_TRANS_ORF,
+        d_cache                = R_CACHE,
+        f_scaflen              = R_SCAFLEN,
+        f_nstrings             = R_NSTRINGS,
+        f_orphan               = R_ORPHAN_LIST,
+        f_tree                 = R_TREE,
+        species                = species,
+        focal_species          = R_FOCAL_SPECIES,
+        extend                 = as.logical(R_EXTEND),
+        extend_factor          = as.numeric(R_EXTEND_FACTOR),
+        prot2prot_minscore     = as.numeric(R_PROT2PROT_MINSCORE),
+        prot2allorf_minscore   = as.numeric(R_PROT2ALLORF_MINSCORE),
+        prot2transorf_minscore = as.numeric(R_PROT2TRANSORF_MINSCORE),
+        gene2si_minscore       = as.numeric(R_GENE2SI_MINSCORE)       
     )
 }
 

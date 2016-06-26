@@ -94,7 +94,7 @@ getTargetResults <- function(species, query, config, l_seqinfo, use_cache=TRUE){
 }
 
 #' Build table of binary features
-buildFeatureTable <- function(result, query){
+buildFeatureTable <- function(result, query, config){
   orphans <- query$orphans 
 
   # Synteny is scrambled
@@ -105,20 +105,20 @@ buildFeatureTable <- function(result, query){
   cds <- orphans %in% (result$features$CDS$query %>% unique)
   # at least one search interval overlaps a target mRNA
   rna <- orphans %in% (result$features$mRNA$query %>% unique)
-  # the query has an ortholog in the target
-  gen <- orphans %in% (result$prot2prot %>% filter(score > 60) %$% query)
   # at least search interval overlaps a N-string
   nst <- orphans %in% result$query2gap$query
   # number of confirmed indels (based on search interval size)
   ind <- orphans %in% result$ind.stats$indeled.queries
   # number of confirmed resized (based on search interval size)
   res <- orphans %in% result$ind.stats$resized.queries
+  # the query has an ortholog in the target
+  gen <- orphans %in% (result$prot2prot %>% subset(score > config$prot2prot_minscore) %$% query)
   # ORF match in SI
-  orf <- orphans %in% (result$orfmap %>% subset(score > 100) %$% query)
+  orf <- orphans %in% (result$orfmap %>% subset(score > config$prot2allorf_minscore) %$% query)
   # has nucleotide match in SI
-  nuc <- orphans %in% (result$orp2dna$hits %>% subset(score > 60) %$% seqid)
+  nuc <- orphans %in% (result$orp2dna$hits %>% subset(score > config$gene2si_minscore) %$% seqid)
   # ORF match to spliced transcript (possibly multi-exonic)
-  trn <- orphans %in% (result$prot2transorf %>% subset(score > 60) %$% query)
+  trn <- orphans %in% (result$prot2transorf %>% subset(score > config$prot2transorf_minscore) %$% query)
   
   labels <- data.frame(
     seqid=orphans,
@@ -161,7 +161,7 @@ buildLabels <- function(feats){
 }
 
 #' Merge labels for all species
-determineLabels <- function(query, results){
+determineLabels <- function(query, results, config){
 
   descriptions <- c(
     g        = 'genic: known gene',
@@ -177,7 +177,7 @@ determineLabels <- function(query, results){
     GTOnrC   = 'non-genic: mRNA but not CDS in SI'
   )
 
-  features <- lapply(results, buildFeatureTable, query)
+  features <- lapply(results, buildFeatureTable, query, config)
 
   labels <- lapply(features, buildLabels)
 

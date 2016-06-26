@@ -50,7 +50,7 @@ if(file.exists(results.cache)){
   save(results, file=results.cache)
 }
 
-labels <- determineLabels(query, results)
+labels <- determineLabels(query, results, config)
 @
 
 \subsection{Data input}

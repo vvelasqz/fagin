@@ -98,9 +98,10 @@ buildFeatureTable <- function(result, query, config){
   orphans <- query$orphans 
 
   # Synteny is scrambled
-  scr <- result$synteny$bits[orphans] %in% c('000010', '000001', '000011')
+  # scr <- result$synteny$bits[orphans] %in% c('000010', '000001', '000011')
+  scr <- result$synteny$bits[orphans] == '00001'
   # synteny is reliable
-  rel <- result$synteny$bits[orphans] == '100000'
+  rel <- result$synteny$bits[orphans] == '10000'
   # at least one search interval overlaps a target CDS
   cds <- orphans %in% (result$features$CDS$query %>% unique)
   # at least one search interval overlaps a target mRNA
@@ -196,4 +197,47 @@ determineLabels <- function(query, results, config){
     labels=labels,
     summary=label.summary
   )
+}
+
+#' Given a species tree and a set of labels, determine orphan origin
+determineOrigins <- function(labels, config){
+  require(ape)
+  require(data.tree)
+  
+  root <- read.tree(config$f_tree) %>% as.Node(replaceUnderscores=FALSE)
+
+  classify <- function(node){
+      if(node$isLeaf){
+        node$cls <- labels$labels[[node$name]]$primary
+      } else {
+        child_cls <- lapply(node$children, classify)
+        if(length(child_cls) != 2){
+          warning('Species tree must be bifurcating')
+        }
+        a <- child_cls[[1]]
+        b <- child_cls[[2]]
+        if(!is.null(a) && !is.null(b)){
+          node$cls <- ifelse(a == "gen" | b == "gen", "gen", "unk")
+          node$cls <- ifelse(a == "non" & b == "non", "non", node$cls)
+        } else if(!is.null(a)){
+          node$cls <- a
+        } else if(!is.null(b)){
+          node$cls <- b
+        }
+      }
+      if(is.null(node$cls)){
+        node$gen <- nrow(labels$labels[[1]])
+        node$non <- 0
+        node$unk <- 0
+      } else {
+        node$gen <- sum(node$cls == 'gen')
+        node$non <- sum(node$cls == 'non')
+        node$unk <- sum(node$cls == 'unk')
+      }
+      invisible(node$cls)
+  }
+
+  classify(root)
+
+  return(root)
 }

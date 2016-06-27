@@ -51,6 +51,8 @@ if(file.exists(results.cache)){
 }
 
 labels <- determineLabels(query, results, config)
+
+origin.tree <- determineOrigins(labels, config)
 @
 
 \subsection{Data input}
@@ -562,5 +564,26 @@ labels$summary %>% xtable
 
 \subsection{Final Classifications}
 
-Recursively merge all leaf labels to form final predictions of ancenstral
-classes.
+\begin{table}[!ht]
+  \centering
+  \begin{tabular}{| l | c c c |}
+    \hline
+    leaf states & gen & non & unk \\
+    \hline
+    gen gen & 1 & 0 & 0 \\
+    gen non & 1 & 0 & 0 \\
+    gen unk & 1 & 0 & 0 \\
+    non non & 0 & 1 & 0 \\
+    non unk & 0 & 0 & 1 \\
+    unk unk & 0 & 0 & 1 \\
+    \hline
+  \end{tabular}
+  \caption{Inference of parent based on child leaves. Assumes a bifurcating
+    tree. \textbf{gen} is genic, \textbf{non} is non-genic, and \textbf{unk} is
+    unknown.}
+  \label{tab:label}
+\end{table}
+
+<<>>=
+print(origin.tree, 'gen', 'non', 'unk')
+@

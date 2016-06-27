@@ -97,6 +97,7 @@ mrna_to_AA_aln <- function(map, query, target){
 orphan_cds_to_transorf_AA_aln <- function(query, target, features){
 
   require(tidyr)
+  require(dplyr)
 
   tarseq <- LoadFASTA(target$transorf.file, isAA=TRUE)
 
@@ -121,7 +122,7 @@ orphan_cds_to_transorf_AA_aln <- function(query, target, features){
   )
 
   map %>%
-    mutate(score = score(aln)) %>%
+    dplyr::mutate(score = score(aln)) %>%
     select(query, target, score)
 }
 

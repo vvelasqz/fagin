@@ -23,6 +23,8 @@ source('~/src/git/cadmium/src/report/R/indels.R')
 source('~/src/git/cadmium/src/report/R/syntenic_stats.R')
 source('~/src/git/cadmium/src/report/R/sequence_alignments.R')
 source('~/src/git/cadmium/src/report/R/feature_overlaps.R')
+require(tidyr)
+require(dplyr)
 
 config <- LoadConfig(configfile='~/src/git/cadmium/cadmium.cfg')
 

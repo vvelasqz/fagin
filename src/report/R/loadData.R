@@ -347,7 +347,6 @@ LoadNString <- function(nstring.file, l_seqinfo){
 #' Output consists of a list of three items:
 #' 1. query - (GRanges) query intervals, gene names, and common link key
 #' 2. target - (GRanges) search intervals, flags, and common link key
-#' 3. scrambled - Query seqids mapping to no search interval (flag == 4)
 #'
 #' @param sifile input TAB delimited file
 #' @param extend (bool) if anchored (flag [123]), extend flanks by query length
@@ -358,16 +357,15 @@ LoadSearchIntervals <- function(sifile, extend=FALSE, extend_factor=1, qinfo=NUL
   stopifnot(ncol(si) == 8)
   names(si) <- c('gene', 'qchr', 'qstart', 'qstop', 'tchr', 'tstart', 'tstop', 'flag')
 
-  missing.interval <- si$tstart == '.' | si$tstop == '.' | si$tchr == '.'
-
-  scrambled <- si[missing.interval, 'gene']
-
-  si <- si[!missing.interval, ]
   si$tstart <- as.numeric(si$tstart)
   si$tstop <- as.numeric(si$tstop)
 
   if(any(si$tstop < si$tstart)){
     warning('Found search with stop < start. Possible bug in Synder. You should
+    NOT proceed.')
+  }
+  if(any(si$qstop < si$qstart)){
+    warning('Found query with stop < start. Possible bug in Synder. You should
     NOT proceed.')
   }
 
@@ -377,6 +375,30 @@ LoadSearchIntervals <- function(sifile, extend=FALSE, extend_factor=1, qinfo=NUL
   si$qstop  <- si$qstop  + 1
   si$tstart <- si$tstart + 1
   si$tstop  <- si$tstop  + 1
+
+
+  if(is.null(tinfo)){
+    maxend = Inf
+  } else {
+    maxend = seqlengths(tinfo)[si$tchr]
+    hi_start <- si$tstart > maxend
+    hi_stop <- si$tstop > maxend
+    if(any(hi_start)){
+      warning(sprintf('%d target intervals begin after expected terminus of the
+      target chromosome. This should NOT happen. May be a bug in synder. I am
+      going to set these start positions intervals to the chromosome end, BUT
+      PROCEED AT YOUR OWN RISK.', sum(hi_start)))
+      si[hi_start, ]$tstart <- maxend[hi_start]
+    }
+    if(any(hi_stop)){
+      warning(sprintf('%d target intervals end after expected terminus of the
+      target chromosome. This may happen when Synder estimates search intervals
+      for flag==5 cases. I am setting these positions to equal the chromosome
+      terminal position.', sum(hi_stop)))
+      si[hi_stop, ]$tstop <- maxend[hi_stop]
+    }
+  }
+
 
   if(!all(si$tchr %in% seqnames(tinfo))){
     warning("The search interval file contains scaffolds not in the genome
@@ -400,17 +422,13 @@ LoadSearchIntervals <- function(sifile, extend=FALSE, extend_factor=1, qinfo=NUL
     #                  ++++
     # Q             ---    
     # So here, I am getting the ++++ region
-    extend_length_45 <- with(si, (tstop - tstart) - (qstop - qstart))
+    extend_length_45 <- with(si, ((tstop - tstart) - (qstop - qstart)) %>% pmax(qstop - qstart)) 
 
     si$tstart[e13] <- (si$tstart[e13] - extend_length_123[e13]) %>% pmax(1)
-    si$tstart[e4] <- (si$tstart[e4] - extend_length_45[e4]) %>% pmax(1)
-    if(is.null(tinfo)){
-      maxend = Inf
-    } else {
-      maxend = seqlengths(tinfo)[si$tchr]
-    }
+    si$tstart[e4]  <- (si$tstart[e4]  - extend_length_45[e4]  ) %>% pmax(1)
+    
     si$tstop[e23] <- (si$tstop[e23] + extend_length_123[e23]) %>% pmin(maxend[e23])
-    si$tstop[e5] <- (si$tstop[e5] + extend_length_45[e5]) %>% pmin(maxend[e5])
+    si$tstop[e5]  <- (si$tstop[e5]  + extend_length_45[e5]  ) %>% pmin(maxend[e5])
   }
 
   stopifnot(si$flag %in% 0:5)
@@ -438,7 +456,7 @@ LoadSearchIntervals <- function(sifile, extend=FALSE, extend_factor=1, qinfo=NUL
     seqinfo=tinfo
   )
 
-  list(query=query, target=target, scrambled=scrambled)
+  list(query=query, target=target)
 }
 
 #' Load a newick format phylogenetic tree

@@ -62,6 +62,7 @@ getTargetResults <- function(species, query, config, l_seqinfo, use_cache=TRUE){
   prot2prot <- aln$scores %>% dplyr::rename(score=scores) # TODO: unify names
 
   # B7 - Queries matching ORFs on spliced mRNA
+  message('--finding orfs in spliced mRNAs overlapping search intervals')
   prot2transorf <- cache(orphan_cds_to_transorf_AA_aln, query, target, features)
 
   # B8 - Queries whose protein matches an ORF in an SI

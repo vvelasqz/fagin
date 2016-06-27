@@ -203,9 +203,9 @@ determineLabels <- function(query, results, config){
 determineOrigins <- function(labels, config){
   require(ape)
   require(data.tree)
-  
-  root <- read.tree(config$f_tree) %>% as.Node(replaceUnderscores=FALSE)
 
+  root <- read.tree(config$f_tree) %>% as.Node(replaceUnderscores=FALSE)
+  #
   classify <- function(node){
       if(node$isLeaf){
         node$cls <- labels$labels[[node$name]]$primary
@@ -225,19 +225,68 @@ determineOrigins <- function(labels, config){
           node$cls <- b
         }
       }
-      if(is.null(node$cls)){
+      node$gen <- sum(node$cls == 'gen')
+      node$non <- sum(node$cls == 'non')
+      node$unk <- sum(node$cls == 'unk')
+      invisible(node$cls)
+  }
+  #
+  findFocalSpecies <- function(node){
+    if(node$name == config$focal_species){
+      return(node)
+    }
+    if(!node$isLeaf){
+      for(child in node$children){
+        n <- findFocalSpecies(child)
+        if(!is.null(n)){
+          return(n)
+        }
+      }
+    }
+    return(NULL)
+  }
+  #
+  setAncestor <- function(node){
+    if(node$isLeaf){
+      if(node$name == config$focal_species){
         node$gen <- nrow(labels$labels[[1]])
         node$non <- 0
         node$unk <- 0
       } else {
-        node$gen <- sum(node$cls == 'gen')
-        node$non <- sum(node$cls == 'non')
-        node$unk <- sum(node$cls == 'unk')
+        warning('You should start setAncestor from the focal species')
       }
-      invisible(node$cls)
+    } else {
+      for(child in node$children){
+        if(is.null(child$gen)){
+          node$cls <- classify(child)
+          node$gen <- sum(node$cls == 'gen')
+          node$non <- sum(node$cls == 'non')
+          node$unk <- sum(node$cls == 'unk')
+        }
+      }
+    }
+    if(!node$isRoot){
+      setAncestor(node$parent)
+    }
   }
+  fs <- findFocalSpecies(root)
+  setAncestor(fs)
 
-  classify(root)
+  d <- fs$Get('cls', traversal='ancestor')
+  d[[1]] <- NULL
+  names(d) <- paste0('ps', 1:length(d))
+  d <- d %>%
+    melt %>%
+    mutate(seqid = rep(labels$labels[[1]]$seqid, length(d))) %>%
+    dcast(seqid ~ L1)
 
-  return(root)
+  d.sum <- data.frame(
+    seqid = d$seqid,
+    class = apply(d[, 2:4], 1, paste0, collapse='-')
+  )
+
+  list(
+    root=root,
+    final_class=d.sum
+  )
 }

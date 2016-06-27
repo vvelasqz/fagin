@@ -58,7 +58,7 @@ if(file.exists(results.cache)){
 
 labels <- determineLabels(query, results, config)
 
-origin.tree <- determineOrigins(labels, config)
+origin <- determineOrigins(labels, config)
 @
 
 \subsection{Data input}
@@ -548,7 +548,7 @@ ggplot(labels$summary, aes(description, count)) +
 \end{figure}
 
 \begin{description}
-  \item[Genic]
+  \item[CLASS 1: Genic]
     \begin{description}
 
       \item[known gene] Query has strong protein sequence similarity to a known
@@ -564,7 +564,7 @@ ggplot(labels$summary, aes(description, count)) +
         a known genic ORF).
 
     \end{description}
-  \item[Non-genic]
+  \item[CLASS 2: Non-genic]
     \begin{description}
 
       \item[CDS in SI] One of more known coding sequences (CDS) are in the
@@ -582,7 +582,7 @@ ggplot(labels$summary, aes(description, count)) +
       %   intervals is unbounded.
 
     \end{description}
-  \item[Unknown]
+  \item[CLASS 3: Unknown]
     \begin{description}
 
       \item[possible indel] Query maps to bounded search interval that is less
@@ -642,5 +642,11 @@ ggplot(labels$summary, aes(description, count)) +
 \end{table}
 
 <<>>=
-print(origin.tree, 'gen', 'non', 'unk')
+print(origin$root, 'gen', 'non', 'unk')
+@
+
+<<results='asis'>>=
+origin$final_class %>%
+  count(class) %>%
+  xtable(caption='Counts of primaries labels in youngest to oldest strata')
 @

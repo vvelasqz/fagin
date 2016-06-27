@@ -11,6 +11,12 @@ require(xtable)
 <<results, message=FALSE, warning=FALSE, cache=TRUE>>=
 # TODO: check all inputs, and handle missing files appropriately
 
+# TODO: the ranges for GFFs and SI are off by 1, e.g.
+# $ target$si$query[1]
+# $ query$gff[which(query$gff$seqid == target$si$query[1]$seqid)]
+
+# TODO: in Arabidopsis lyrata, at least, there are out of bound intervals
+
 source('~/src/git/cadmium/src/report/R/classification.R')
 source('~/src/git/cadmium/src/report/R/loadData.R')
 source('~/src/git/cadmium/src/report/R/indels.R')
@@ -531,34 +537,82 @@ m %>%
 labels$summary %>% xtable
 @
 
+\begin{figure}[!ht]
+  \centering
+<<>>=
+ggplot(labels$summary, aes(description, count)) +
+  geom_bar(aes(fill=species), stat='identity', position='dodge') +
+  coord_flip()
+@
+  \label{fig:}
+\end{figure}
+
 \begin{description}
+  \item[Genic]
+    \begin{description}
 
-  \item[Candidate-gene] Query maps to an unannotated ORF with a high sequence
-    similarity score. Currently I do not have a statistically sound method for
-    selecting a threshold score and am just using a conservative 100 bit
-    threshold.
+      \item[known gene] Query has strong protein sequence similarity to a known
+        target protein in the search interval.
 
-  \item[Confirmed-genic] Query maps to one or more CDSs, and is significantly
-    similar to at least one of the annotated target genes.
+      \item[unknown ORF off known mRNA] Query has strong protein sequence
+        similarity to an unannotated open reading frame (ORF), bound by a STOP
+        and START codon, that is in the search interval but that is NOT on a
+        region known to be transcribed.
 
-  \item[Indel] Query maps to bounded search interval that are less than 5\% the
-    query gene length. AND the query maps to no other intervals.
+      \item[unknown ORF on known mRNA] Query has strong protein sequence
+        similarity to an unannotated ORF on a spliced mRNA (but does not match
+        a known genic ORF).
 
-  \item[Intergenic] Query maps to no mRNAs and ALL search intervals are
-    bounded. The query overlaps no \textit{annotated} target gene.
+    \end{description}
+  \item[Non-genic]
+    \begin{description}
 
-  \item[Possible-genic] Query maps to one or more CDSs, but there is no
-    predicted protein sequence similarity. 
+      \item[CDS in SI] One of more known coding sequences (CDS) are in the
+        search interval, but there is no predicted protein sequence similarity.
 
-  \item[Possible-hitchhiker] Query maps to one or more mRNAs but to no CDSs.
+      \item[mRNA but not CDS in SI] One of more transcribed regions are in the
+        search interval, but no CDS.
 
-  \item[Possible-intergenic] Query maps to no mRNAs, but one or more search
-    intervals is unbounded.
+      \item[no gene in SI] No annotated coding genes are within the search interval.
 
-  \item[Unknown-gapped] The gene is of unknown origin and overlaps an
-    unassembled regions (N-string).
+      % \item[Intergenic] Query maps to no mRNAs and ALL search intervals are
+      %   bounded. The query overlaps no \textit{annotated} target gene.
+      %
+      % \item[Possible-intergenic] Query maps to no mRNAs, but one or more search
+      %   intervals is unbounded.
 
-  \item[Unknown-scrambled] No search intervals could be predicted for the query.
+    \end{description}
+  \item[Unknown]
+    \begin{description}
+
+      \item[possible indel] Query maps to bounded search interval that is less
+        than 5\% the query search interval length. AND the query maps to no other
+        intervals.
+
+      \item[possible N-string] The gene is of unknown origin and overlaps an
+        unassembled regions (N-string).
+
+      \item[possible resized] Query maps to bounded search interval that is
+        5-100\% the query length. AND the query maps to no other intervals.
+        These could correspond to indels, or expansions in the query search
+        interval. I distinguish between resized and indeled because by the most
+        common case where the search interval is smaller than the query is a
+        full deletion, where the search interval length is 0. The 5\% cutoff is
+        just to allow for inaccuracies in alignment. The true deletions have
+        such a strong. My gerrymandering of the target intervals has obfuscated
+        the query/target relation, I may need to rethink this.
+
+      \item[syntenically scrambled] The query maps to target intervals that are
+        unbounded and unanchored. Error in our search space estimates is a
+        likely cause for not identifying the gene.
+
+      \item[unknown] The synteny is reliable and there is no evidence of
+        indels, but there is no sequence similarity of any sort to any of the
+        search intervals. This could be caused be mutation completely past
+        detectability, or by undetected deletions, or by transposition of the
+        gene to a new context.
+
+    \end{description}
 
 \end{description}
 
@@ -578,9 +632,12 @@ labels$summary %>% xtable
     unk unk & 0 & 0 & 1 \\
     \hline
   \end{tabular}
+
   \caption{Inference of parent based on child leaves. Assumes a bifurcating
     tree. \textbf{gen} is genic, \textbf{non} is non-genic, and \textbf{unk} is
-    unknown.}
+    unknown. 1 and 0 are ancestor asignments, e.g. if the leafs are 'gen' and
+    'gen', the ancestor is classified as 'gen' (as in column 1 row 1).}
+
   \label{tab:label}
 \end{table}
 

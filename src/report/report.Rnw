@@ -1,4 +1,5 @@
 \documentclass{article}
+\usepackage[utf8]{inputenc}
 \usepackage{graphicx}
 \usepackage{fullpage}
 \usepackage{wrapfig}
@@ -11,6 +12,9 @@
     linkcolor=blue,
     urlcolor=blue
 }
+
+\DeclareUnicodeCharacter{00A6}{|}
+\DeclareUnicodeCharacter{00B0}{*}
 
 % Prevent floats from crossing section or subsection boundaries
 \usepackage[section]{placeins}
@@ -34,6 +38,8 @@ deps <- c(
     "devtools",
     "magrittr",
     "ggplot2",
+    "reshape2",
+    "tidyr",
     "dplyr",
     "ape",
     "scales",

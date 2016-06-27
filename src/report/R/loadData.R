@@ -399,7 +399,6 @@ LoadSearchIntervals <- function(sifile, extend=FALSE, extend_factor=1, qinfo=NUL
     }
   }
 
-
   if(!all(si$tchr %in% seqnames(tinfo))){
     warning("The search interval file contains scaffolds not in the genome
     file. This is a vary bad sign. Soooooo bad.")
@@ -432,6 +431,15 @@ LoadSearchIntervals <- function(sifile, extend=FALSE, extend_factor=1, qinfo=NUL
   }
 
   stopifnot(si$flag %in% 0:5)
+
+  i <- si$tstop - si$tstart + 1 > 1e5
+  if(any(i)){
+    warning(sprintf("Found %d search intervals of unusual size. Setting its size to a nice
+    even 0. The great size of the input is consistent with serious problems on
+    the Synder side. YOU SHOULD NOT PROCEED.", sum(i)))
+    # TODO: don't do this
+    si$tstop[i] <- si$tstart[i]
+  }
 
   query <- MakeGI(
     starts=si$qstart,

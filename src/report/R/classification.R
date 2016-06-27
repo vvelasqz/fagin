@@ -71,8 +71,8 @@ getTargetResults <- function(species, query, config, l_seqinfo, use_cache=TRUE){
   message('--aligning orphans to orfs that overlap their search intervals')
   orfmap    <- cache(get_orfmap, query2orf, query, target)
 
-  message('--aligning orphans to the full sequences of their search intervals')
   # B9 - Queries whose gene matches (DNA-DNA) an SI 
+  message('--aligning orphans to the full sequences of their search intervals')
   orp2dna <- cache(get_orphan_dna_hits, query, target)
 
   gc()

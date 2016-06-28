@@ -229,6 +229,11 @@ LoadSyntenyMap <- function(synmap, qinfo=NULL, tinfo=NULL){
   g <- g[order(g$tchr, g$tstart), ]
   g$tarid <- 1:nrow(g)
 
+  maxend = seqlengths(tinfo)[g$tchr]
+  if(any(g$tstart > g$tend) && any(g$qstart > g$qend) && any(g$tend > maxend)){
+    warning('Somthing is VERY WRONG HERE. The synteny file is totally screwed.')
+  }
+
   target <- MakeGI(
     starts=g$tstart,
     stops=g$tend,
@@ -280,6 +285,88 @@ LoadNString <- function(nstring.file, l_seqinfo){
       )
     }
   ) %>% set_names(names(g))
+}
+
+testSI <- function(si, tinfo, qinfo){
+  if(any(si$tstop < si$tstart)){
+    i <- si$tstop < si$tstart
+    warning(sprintf('Found %d search intervals with stop < start. Possible bug
+    in Synder. You should NOT proceed.', sum(i)))
+  }
+  if(any(si$qstop < si$qstart)){
+    i <- si$qstop < si$qstart
+    warning(sprintf('Found %d queries with stop < start. Possible bug in Synder. You should
+    NOT proceed.', sum(i)))
+  }
+
+  if(is.null(tinfo)){
+    maxend = Inf
+  } else {
+    maxend = seqlengths(tinfo)[si$tchr]
+    hi_start <- si$tstart - maxend > 1
+    hi_stop <- si$tstop > maxend
+    if(any(hi_start)){
+
+      warning(sprintf('%d target intervals begin more than 1 base after
+      expected terminus of the target chromosome. This should NOT happen. May
+      be a bug in synder.', sum(hi_start)))
+
+      # a <- subset(si, hi_start)
+      # a$flag %>% factor %>% summary
+      # with(si, tstart[hi_start] - maxend[hi_start]) %>% summary
+      # with(si, tstart[hi_start] - maxend[hi_start]) %>% names %>% factor %>% summary
+    }
+    if(any(hi_stop)){
+      warning(sprintf('%d target intervals end after expected terminus of the
+      target chromosome. This may happen when Synder estimates search intervals
+      for flag==5 cases.', sum(hi_stop)))
+      # a <- subset(si, hi_stop & !hi_start)
+      # a$flag %>% factor %>% summary
+    }
+  }
+
+  if(!all(si$tchr %in% seqnames(tinfo))){
+    warning("The search interval file contains scaffolds not in the genome
+    file. This is a vary bad sign. Soooooo bad.")
+  }
+
+  # que_gt_tar <- with(si, (flag == 4 | flag == 5) & ((tstop - tstart) < (qstop - qstart))) 
+  que_gt_tar <- with(si, (flag >= 4) & ((tstop - tstart) < (qstop - qstart))) 
+  if(any(que_gt_tar)){
+    # term0 <- que_gt_tar & si$tstart == 0
+    # termBig <- que_gt_tar & si$tstart > 0
+    #
+    # # get length summaries for terminal cases
+    # subset(si, term0) %$% tstop %>% summary
+    # subset(si, termBig) %>% with(tstop - tstart + 1) %>% summary
+    # subset(si, termBig & !hi_stop)
+      # b <- subset(si, que_gt_tar)
+      # b$flag %>% factor %>% summary
+      # subset(b, tstart == 0)
+      # subset(b, tstart != 0)
+      # subset(b, tstart == 0) %$% flag %>% factor %>% summary
+      # subset(b, tstart != 0) %$% flag %>% factor %>% summary
+      # subset(b, tstart != 0 & flag == 5)
+      # with(b, tstart)
+      # with(subset(b, tstart != 0), tstart)
+      # with(b, (qstop - qstart) - (tstop - tstart)) %>% summary
+      # with(subset(b, tstart != 0), (qstop - qstart) - (tstop - tstart)) %>% summary
+      # with(subset(b, tstart == 0), (qstop - qstart) - (tstop - tstart)) %>% summary
+      # with(si, tstart[que_gt_tar] - maxend[que_gt_tar]) %>% names %>% factor %>% summary
+    warning(sprintf("%d target intervals for flag equals 4 or 5 are shorter
+    than the queries, this should be possible only if they are at the termini
+    of the contigs", sum(que_gt_tar)))
+  }
+
+  data.frame(
+    hi_start = hi_start %>% as.numeric %>% factor,
+    hi_stop  = hi_stop %>% as.numeric %>% factor,
+    que_gt_tar = (que_gt_tar & si$tstart > 0) %>% as.numeric %>% factor,
+    flag = si$flag %>% factor
+  ) %>%
+  count(hi_start, hi_stop, que_gt_tar, flag) %>%
+  arrange(hi_start, hi_stop, que_gt_tar, flag) %>%
+  write.table(file='log', sep="\t", quote=FALSE, row.names=FALSE) 
 }
 
 #' Load search intervals
@@ -360,15 +447,6 @@ LoadSearchIntervals <- function(sifile, extend=FALSE, extend_factor=1, qinfo=NUL
   si$tstart <- as.numeric(si$tstart)
   si$tstop <- as.numeric(si$tstop)
 
-  if(any(si$tstop < si$tstart)){
-    warning('Found search with stop < start. Possible bug in Synder. You should
-    NOT proceed.')
-  }
-  if(any(si$qstop < si$qstart)){
-    warning('Found query with stop < start. Possible bug in Synder. You should
-    NOT proceed.')
-  }
-
   #TODO: need a more elegant solution to the initial index problem
   # But the Synder output is 0-based, Bioconductor is 1-based
   si$qstart <- si$qstart + 1
@@ -376,32 +454,25 @@ LoadSearchIntervals <- function(sifile, extend=FALSE, extend_factor=1, qinfo=NUL
   si$tstart <- si$tstart + 1
   si$tstop  <- si$tstop  + 1
 
+  testSI(si, tinfo, qinfo)
 
   if(is.null(tinfo)){
     maxend = Inf
   } else {
     maxend = seqlengths(tinfo)[si$tchr]
-    hi_start <- si$tstart > maxend
-    hi_stop <- si$tstop > maxend
-    if(any(hi_start)){
-      warning(sprintf('%d target intervals begin after expected terminus of the
-      target chromosome. This should NOT happen. May be a bug in synder. I am
-      going to set these start positions intervals to the chromosome end, BUT
-      PROCEED AT YOUR OWN RISK.', sum(hi_start)))
-      si[hi_start, ]$tstart <- maxend[hi_start]
-    }
-    if(any(hi_stop)){
-      warning(sprintf('%d target intervals end after expected terminus of the
-      target chromosome. This may happen when Synder estimates search intervals
-      for flag==5 cases. I am setting these positions to equal the chromosome
-      terminal position.', sum(hi_stop)))
-      si[hi_stop, ]$tstop <- maxend[hi_stop]
-    }
   }
 
-  if(!all(si$tchr %in% seqnames(tinfo))){
-    warning("The search interval file contains scaffolds not in the genome
-    file. This is a vary bad sign. Soooooo bad.")
+  outside <- ((si$tstart - maxend) == 1) | (si$tstop == 1)
+  if(any(outside)){
+    unassembled <- subset(si, outside)$gene %>% unique
+    message(sprintf('%d intervals begin immediately after the end of the scaffold.
+    The one case where this can occur is for flag==5 cases where the end of the
+    contiguous block on the target side is flush with the end of the
+    scaffold.', sum(outside)))
+    si <- subset(si, !outside)
+    maxend <- maxend[!outside]
+  } else {
+    unassembled <- c()
   }
 
   if(extend){
@@ -434,12 +505,23 @@ LoadSearchIntervals <- function(sifile, extend=FALSE, extend_factor=1, qinfo=NUL
 
   i <- si$tstop - si$tstart + 1 > 1e5
   if(any(i)){
-    warning(sprintf("Found %d search intervals of unusual size. Setting its size to a nice
-    even 0. The great size of the input is consistent with serious problems on
-    the Synder side. YOU SHOULD NOT PROCEED.", sum(i)))
-    # TODO: don't do this
-    si$tstop[i] <- si$tstart[i]
+    warning(sprintf("Found %d search intervals of length greater than 100Kb.
+    This may or may not be a problem.", sum(i)))
   }
+
+  i <- si$tstop - si$tstart + 1 > 1e6
+  if(any(i)){
+    warning(sprintf("Found %d search intervals of length greater than 1Mb.
+    This is certainly a problem.", sum(i)))
+  }
+
+  i <- with(si, (qstop - qstart + 1) * (tstop - tstart + 1) > 1e9)
+  if(any(i)){
+    warning(sprintf("Found %d cases where query length X search interval length
+    is greater than 1e9. This will cause minor problems in the current
+    implementation of query-vs-search interval DNA search.", sum(i)))
+  }
+
 
   query <- MakeGI(
     starts=si$qstart,
@@ -464,7 +546,7 @@ LoadSearchIntervals <- function(sifile, extend=FALSE, extend_factor=1, qinfo=NUL
     seqinfo=tinfo
   )
 
-  list(query=query, target=target)
+  list(query=query, target=target, unassembled=unassembled)
 }
 
 #' Load a newick format phylogenetic tree

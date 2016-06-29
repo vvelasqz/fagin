@@ -362,17 +362,16 @@ ggplot() +
   ) +
   geom_point(
     mapping=aes(x=species, y=score, color=orphan),
-    data=subset(m, score > 64 & orphan) %>%
+    data=subset(m, score > config$prot2prot_minscore & orphan) %>%
          dplyr::group_by(query, species) %>%
          dplyr::summarize(score=max(score)) %>%
          as.data.frame,
     position=position_jitter(width=0.3),
     color='red'
   ) +
+  geom_hline(yintercept=config$prot2prot_minscore, color='red') +
   xlab('Raw alignment score (BLOSUM80)') +
-  theme(
-    axis.text.x = element_text(angle=325, hjust=0, vjust=1)
-  ) +
+  coord_flip() +
   scale_y_continuous(
     trans='log2',
     breaks=trans_breaks('log2', function(x) round(2^x))
@@ -383,19 +382,21 @@ ggplot() +
     Non-orphan genes are expected to have at a highscoring homolog, so there
     should be many high scoring hits. There should also be many low scoring
     ones, from the searches against genes that overlap the search interval but
-    are not homologous. \textbf{In red:} the orphan genes with scores above 64
-    against genic targets within their search intervals.
+    are not homologous. \textbf{In red:} the orphan genes with scores above
+    \Sexpr{config$prot2prot_minscore} against genic targets within their search
+    intervals.
   }
 \end{figure}
 
 <<results='asis', cache=TRUE>>=
 m %>%
-  subset(score > 64) %>%
+  subset(score > config$prot2prot_minscore) %>%
   dplyr::mutate(orphan = ifelse(orphan, 'orphan', 'non-orphan') %>% factor) %>%
   count(species, orphan) %>%
   xtable(
-    caption='The number of query orphans and non-orphans with significant
-    ($score > 64$) similarity to annotated genes in each target genome.'
+    caption=sprintf('The number of query orphans and non-orphans with
+    significant ($score > %d$) similarity to annotated genes in each target
+    genome.', config$prot2prot_minscore)
   )
 @
 % <<>>=
@@ -416,13 +417,15 @@ m %>%
 %  and %s\\%% have identified orthologs.', perc.with.over, perc.with.orth))
 % @
 
-\subsection{Detect protein hit to ORF}
+
+\subsection{Detect protein hits to spliced ORFs}
 
 \begin{figure}[!ht]
   \centering
 <<message=FALSE, cache=TRUE>>=
+
 m <- results %>% 
-  lapply(function(x) x$orfmap[c('query', 'score')]) %>%
+  lapply(function(x) x$prot2transorf[c('query', 'score')]) %>%
   melt(id.vars=c('query', 'score')) %>%
   dplyr::rename(species=L1)
 ggplot(m) +
@@ -433,24 +436,65 @@ ggplot(m) +
   ) +
   geom_point(
     mapping=aes(x=species, y=score),
-    data=subset(m, score > 64),
+    data=subset(m, score > config$prot2transorf_minscore),
     position=position_jitter(width=0.8),
     alpha=0.3
   ) +
-  theme(
-    axis.text.x = element_text(angle=325, hjust=0, vjust=1)
-  ) +
+  geom_hline(yintercept=config$prot2transorf_minscore, color='red') +
+  coord_flip() +
   xlab('Raw alignment score (BLOSUM80)') +
   scale_y_continuous(
     trans='log2',
     breaks=trans_breaks('log2', function(x) round(2^x))
   )
+
 @
   \caption{
     \textbf{Orphan genes hits against target ORFs}. All START/STOP bound open
     reading frames in the target genome were extracted. All orphan proteins
     were aligned against the ORFs that overlap one of their search intervals.
-    Dots correspond to hits above 64.
+    Dots correspond to hits above \Sexpr{config$prot2allorf_minscore}.
+  }
+\end{figure}
+
+
+\subsection{Detect protein hit to ORF}
+
+\begin{figure}[!ht]
+  \centering
+<<message=FALSE, cache=TRUE>>=
+
+m <- results %>% 
+  lapply(function(x) x$orfmap[c('query', 'score')]) %>%
+  melt(id.vars=c('query', 'score')) %>%
+  dplyr::rename(species=L1)
+
+ggplot(m) +
+  geom_violin(
+    mapping=aes(x=species, y=score),
+    data=m,
+    alpha=0.3
+  ) +
+  geom_point(
+    mapping=aes(x=species, y=score),
+    data=subset(m, score > config$prot2allorf_minscore),
+    position=position_jitter(width=0.8),
+    alpha=0.3
+  ) +
+  geom_hline(yintercept=config$prot2allorf_minscore, color='red') +
+  coord_flip() +
+  xlab('Raw alignment score (BLOSUM80)') +
+  scale_y_continuous(
+    trans='log2',
+    breaks=trans_breaks('log2', function(x) round(2^x))
+  )
+
+@
+  \caption{
+    \textbf{Orphan genes hits against target ORFs}. All START/STOP bound open
+    reading frames in the target genome were extracted. All orphan proteins
+    were aligned against the ORFs that overlap one of their search intervals.
+    Dots correspond to hits above \Sexpr{config$prot2allorf_minscore}.
   }
 \end{figure}
 
@@ -469,33 +513,37 @@ ggplot(m) +
   geom_violin(
     mapping=aes(x=species, y=score),
     data=m,
-    alpha=0.3
+    alpha=0.5
   ) +
   geom_point(
     mapping=aes(x=species, y=score),
-    data=subset(m, score > 64),
+    data=subset(m, score > config$gene2si_minscore),
     position=position_jitter(width=1),
-    alpha=0.2
+    alpha=0.1
   ) +
   xlab('Raw alignment score (BLOSUM80)') +
   scale_y_continuous(
     trans='log2',
     breaks=trans_breaks('log2', function(x) round(2^x))
   ) +
+  geom_hline(yintercept=config$gene2si_minscore, color='red') +
   coord_flip() +
   facet_grid(group~.)
+
 @
 \caption{\
   Scores of orphan genes against their search intervals. In \textbf{ctrl}, the
   starting positions of the orphan genes were permuted while preserving their
   gene length. By chance, a few of these permuted indices may start on their
-  original place, so there will be a few highscoring values.
+  original place, so there will be a few highscoring values. Dots correspond to
+  orphans with scores above \Sexpr{config$gene2si_minscore}.
 }
 \end{figure}
 
 \begin{figure}[!ht]
   \centering
 <<cache=TRUE>>=
+
 m %>%
   group_by(seqid, group, species) %>%
   summarize(
@@ -503,7 +551,7 @@ m %>%
     qwidth=max(qwidth),
     twidth=max(twidth)
   ) %>%
-  dplyr::mutate(signif=score > 64) %>%
+  dplyr::mutate(signif=score > config$gene2si_minscore) %>%
   ggplot +
       geom_point(
         aes(
@@ -525,11 +573,13 @@ m %>%
         trans='log2',
         breaks=trans_breaks('log2', function(x) round(2^x))
       )
+
 @
 \caption{\
   \textbf{Query gene length versus target search interval length}. The size of
   the points is proportional to score of the gene's best hit. A hit is
-  considered significant if it is above a certain threshold (64 bits for now).
+  considered significant if it is above a certain threshold
+  (\Sexpr{config$gene2si_minscore}).
 }
 \end{figure}
 

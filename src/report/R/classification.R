@@ -24,7 +24,6 @@ getTargetResults <- function(species, query, config, l_seqinfo, use_cache=TRUE){
   message('--loading target')
   # TODO: Fix the out-of-range bugs
   target <- cache(LoadTarget, species=species, config=config, l_seqinfo=l_seqinfo)
-
   message('--summarizing synteny')
   # B1 - Queries of scrambled origin
   synteny <- cache(summarize.flags, si=target$si, query=query)
@@ -59,7 +58,10 @@ getTargetResults <- function(species, query, config, l_seqinfo, use_cache=TRUE){
   aln       <- cache(cds_to_AA_aln, map=map, query=query, target=target)
   message('---calculating stats')
   aln.stats <- cache(AA_aln_stats, aln, query)
-  prot2prot <- aln$scores %>% dplyr::rename(score=scores) # TODO: unify names
+  # TODO: unify variable names, e.g. prot2prot, orfmap, etc
+  prot2prot <- aln$scores %>% dplyr::rename(score=scores)
+
+  rm(aln); gc()
 
   # B7 - Queries matching ORFs on spliced mRNA
   message('--finding orfs in spliced mRNAs overlapping search intervals')
@@ -67,15 +69,13 @@ getTargetResults <- function(species, query, config, l_seqinfo, use_cache=TRUE){
 
   # B8 - Queries whose protein matches an ORF in an SI
   message('--finding orfs in search intervals')
-  query2orf <- cache(get_query2orf, target) 
+  query2orf <- cache(get_query2orf, target, query) ; gc()
   message('--aligning orphans to orfs that overlap their search intervals')
-  orfmap    <- cache(get_orfmap, query2orf, query, target)
+  orfmap <- cache(get_orfmap, query2orf, query, target) ; gc()
 
   # B9 - Queries whose gene matches (DNA-DNA) an SI 
   message('--aligning orphans to the full sequences of their search intervals')
-  orp2dna <- cache(get_orphan_dna_hits, query, target)
-
-  gc()
+  orp2dna <- cache(get_orphan_dna_hits, query, target, maxspace=1e7)
 
   list(
     species=species,

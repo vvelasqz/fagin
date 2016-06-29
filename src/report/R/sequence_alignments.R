@@ -144,6 +144,14 @@ seqFromGenomicRange <- function(gr, fa, scramble=FALSE){
   d$name <- seqnames(gr) %>% as.character
   d$end <- NULL
 
+  stopifnot(d$name %in% names(fa))
+
+  a <- width(fa)
+  names(a) <- names(fa)
+  d$maxlen <- a[d$name]
+
+  any(with(d, start + width > maxlen))
+
   # Randomize the starts and scaffolds (preserving linkage), but preserve width
   if(scramble){
     random.indices <- sample(1:nrow(d))
@@ -180,6 +188,13 @@ alignToGenome <- function(query.seqs, genome, gr, ...){
 
   search.intervals <- seqFromGenomicRange(gr=gr, fa=genome, ...)
 
+  i <- width(search.intervals) > (1e9 / width(query.seqs)) 
+  if(any(i)){
+    warning('The DNA alignment for query versus search interval runs in N*M
+    memory. The input sizes for %d query/SI pairs is greaterh than 1e9. This
+    may cause memory problems')
+  }
+
   # Search + and - strands
   nuc.scores <- pairwiseAlignment(
     pattern=c(query.seqs, reverseComplement(query.seqs)),
@@ -199,13 +214,27 @@ alignToGenome <- function(query.seqs, genome, gr, ...){
   )
 }
 
-get_orphan_dna_hits <- function(query, target){
+get_orphan_dna_hits <- function(query, target, maxspace=1e8){
   genseq <- LoadFASTA(target$dna.file, isAA=FALSE)
   # Get orphan intervals
+
   orfgff <- target$si$target[target$si$query$seqid %in% query$orphans] 
-  set.seed(42)
   ogen <- query$genes[target$si$query[orfgff$id]$seqid]
+  too.big <- ((orfgff %>% width) * width(ogen)) > maxspace
+  if(any(too.big)){
+    warning(sprintf('%d(%.1f%%) query / SI pairs are very large, N*M>%d. These
+    pairs are ignored. Dealing with them will require a heuristic aligment
+    program, such as BLAST, which is not currently implemented.',
+    sum(too.big), signif(100*sum(too.big)/length(too.big), 2), maxspace))
+    orfgff <- orfgff[!too.big]
+    ogen <- ogen[!too.big]
+  }
+
+  message(sprintf('This may require on the order of %.1f minutes',
+    ((orfgff %>% width) * width(ogen) * (3/9e8)) %>% sum %>% signif(1)))
+
   hits <- alignToGenome(query.seqs=ogen, genome=genseq, gr=orfgff)
+  set.seed(42)
   ctrl <- alignToGenome(query.seqs=ogen, genome=genseq, gr=orfgff, scramble=TRUE)
   list(
     hits=hits,
@@ -219,7 +248,7 @@ get_orphan_dna_hits <- function(query, target){
 # Search sequence - AA-AA - Query proteins against all target translated ORFs
 # ============================================================================
 
-get_query2orf <- function(target){
+get_query2orf <- function(target, query){
   require(GenomicRanges)
   
   # o.orf is a list, where:
@@ -230,10 +259,14 @@ get_query2orf <- function(target){
     subject=LoadGFF(target$orfgff.file)
   )
 
+  # extract the orphans
+  o.orf <- o.orf[target$si$query$seqid[from(o.orf)] %in% query$orphans] 
+
   data.frame(
     query = target$si$query$seqid[from(o.orf)],
     siid  = from(o.orf),
-    orfid = to(o.orf)
+    orfid = to(o.orf),
+    stringsAsFactors=FALSE
   )
 }
 
@@ -246,12 +279,12 @@ get_orfmap <- function(query2orf, query, target){
   orfmap <- query2orf[query2orf$query %in% query$orphan, ]
   require(Biostrings)
   data(BLOSUM80)
-  orfaln <- pairwiseAlignment(
+  orfmap$score <- pairwiseAlignment(
     pattern=query$aa[orfmap$query],
     subject=orffaa[orfmap$orfid],
     type='local',
+    scoreOnly=TRUE,
     substitutionMatrix=BLOSUM80
   )
-  orfmap$score <- score(orfaln)
   orfmap
 }

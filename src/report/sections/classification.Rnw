@@ -5,16 +5,16 @@ require(ggplot2)
 require(reshape2)
 require(scales)
 require(dplyr)
+require(tidyr)
 require(xtable)
+require(data.tree)
 @
 
 <<results, message=FALSE, warning=FALSE, cache=TRUE>>=
 # TODO: check all inputs, and handle missing files appropriately
-
 # TODO: the ranges for GFFs and SI are off by 1, e.g.
 # $ target$si$query[1]
 # $ query$gff[which(query$gff$seqid == target$si$query[1]$seqid)]
-
 # TODO: in Arabidopsis lyrata, at least, there are out of bound intervals
 
 source('~/src/git/cadmium/src/report/R/classification.R')
@@ -23,13 +23,9 @@ source('~/src/git/cadmium/src/report/R/indels.R')
 source('~/src/git/cadmium/src/report/R/syntenic_stats.R')
 source('~/src/git/cadmium/src/report/R/sequence_alignments.R')
 source('~/src/git/cadmium/src/report/R/feature_overlaps.R')
-require(tidyr)
-require(dplyr)
 
 config <- LoadConfig(configfile='~/src/git/cadmium/cadmium.cfg')
-
 l_seqinfo <- LoadSeqinfoList(config)
-
 query.cache <- sprintf('%s/query.Rdat', config$d_cache)
 if(file.exists(query.cache)){
   load(query.cache)
@@ -97,17 +93,18 @@ ggplot +
 
 
 \subsection{Search interval overview}
-
+%
 Syntenic flags:
-
+%
 \begin{description}
   \item[0] the search interval is reliable
   \item[1] the start edge is unreliable
   \item[2] the stop edge is unreliable
   \item[3] both edges are unreliable, but there is an overlap
-  \item[4] neither edge of the search interval is reliable
+  \item[4] query is to the left of a contig, no overlap
+  \item[5] query is to the right of a contig, no overlap
 \end{description}
-
+%
 <<message=FALSE, cache=TRUE>>=
 m <- lapply(results, function(x) x$synteny$bittbl) %>%
   lapply(dplyr::rename, orphan=orp_prop, non_orphan=non_orp_prop) %>%
@@ -142,7 +139,6 @@ m %>%
   dcast(class + bit ~ species, mean, value.var='proportion') %>%
   xtable(caption=sprintf('Percent of genes in each syntenic class.'))
 @
-
 \begin{figure}[!ht]
   \centering
 <<cache=TRUE, message=FALSE>>=
@@ -172,63 +168,56 @@ lapply(results, function(x) x$synteny$flags) %>%
   \label{fig:flag-vs-length}
 \end{figure}
 
+<<>>=
+melt_seqaln <- function(field){
+  results %>%
+    lapply(function(x) x[[field]][which(names(x[[field]]) %in% c('map', 'sam'))]) %>%
+    melt(level=2, id.vars=c('score', 'score.adj', 'pval', 'query')) %>%
+    dplyr::select(-variable, -value) %>%
+    dplyr::rename(group=L3, species=L2) %>%
+    dplyr::group_by(query) %>%
+    dplyr::filter(score.adj==max(score.adj)) %>%
+    dplyr::filter(score.adj > 0)
+}
+
+plot_seqaln <- function(d, cutoff){
+  ggplot(d) +
+    geom_violin(
+      mapping=aes(x=species, y=-1*log2(pval)),
+      data=m,
+      alpha=0.3
+    ) +
+    geom_point(
+      mapping=aes(x=species, y=-1*log2(pval)),
+      data=subset(m, pval < cutoff) %>%
+           dplyr::group_by(query, species) %>%
+           dplyr::filter(score.adj==max(score.adj)) %>%
+           as.data.frame,
+      position=position_jitter(width=0.3),
+      color='red'
+    ) +
+    geom_hline(yintercept=-1*log2(cutoff), color='red') +
+    xlab('Raw alignment score (BLOSUM80)') +
+    ylab('-log2(p)') +
+    coord_flip() +
+    facet_wrap(~group)
+}
+@
 
 
-\subsection{Mapping features between GFF given scaffold}
+\subsection{Mapping to known target genes}
+<<>>=
+  m <- melt_seqaln('prot2prot')
+  prot2prot.cutoff <- config$prot2prot_pval / (m$query %>% unique %>% length)
+  plot_seqaln(m, prot2prot.cutoff)
+@
 
 
-% ----------------------
-% summarize CDS overlaps
-% ----------------------
-
-% \begin{figure}[!ht]
-%     \centering
-% <<fig.width=6, fig.height=4, message=FALSE, cache=TRUE>>=
-% # featureCountTable <- function(feat){
-% #   lapply(feat$overlaps, length) %>% 
-% #       unlist %>% factor %>% summary(maxsum=Inf) %>%
-% #       data.frame(.) %>%
-% #       set_names('Count')
-% # }
-%
-% # TODO: rewrite this with 
-% lapply(results, function(x) x$features$CDS) %>%
-%   melt %>%
-%   dplyr::rename(species=L1) %>%
-%   # TODO: convert target to CDS count
-%   count(query, species) %>%
-%   dplyr::rename(N.cds=n) %>%
-%   count(species, N.cds)
-%
-%
-%   featureCountTable(x$features$CDS) %>%
-%     {data.frame(
-%       N.cds=as.numeric(row.names(.)),
-%       count=.$Count)
-%     }
-%   %>% melt(id.vars=c('N.cds', 'count')) %>% dplyr::rename(species=L1) %>%
-%   ggplot +
-%     geom_point(aes(x=N.cds, y=count), size=0.2) +
-%     xlab('Number of overlapped CDSs') +
-%     ylab('Number of search intervals') +
-%     scale_y_continuous(
-%       trans='log2',
-%       breaks=trans_breaks('log2', function(x) round(2^x))
-%     ) +
-%     facet_wrap(~species)
-% @
-%   \caption{Number of CDS's overlapped by a single search interval}.
-% \end{figure}
-
-
-% -----------------------
-% summarize mRNA overlaps
-% -----------------------
+\subsection{Mapping to unknown ORFs on known mRNAs}
 \begin{figure}[!ht]
   \centering
 <<fig.width=6, fig.height=4, message=FALSE, cache=TRUE>>=
 require(tidyr)
-
 m <- lapply(results, function(x) x$features) %>%
     melt(id.vars=c('query', 'target'), level=2) %>%
     dplyr::rename(species=L2, type=L3) %>%
@@ -244,7 +233,6 @@ m.zero <- m %>%
     n = length(query$aa) - n
   )
 m2 <- rbind(m, m.zero)
-
 ggplot(m2) +
   geom_point(aes(x=n.feature, y=n), size=0.2) +
   geom_line(aes(x=n.feature, y=n), alpha=0.05) +
@@ -255,15 +243,9 @@ ggplot(m2) +
     breaks=trans_breaks('log2', function(x) round(2^x))
   ) +
   facet_grid(type~species)
-
 @
   \caption{Number of target mRNAs overlapping one search interval}
 \end{figure}
-
-
-% --------------------------------------
-% summarize mRNA and CDS in common table
-% --------------------------------------
 <<results='asis', cache=TRUE>>=
 merge(
   results %>%
@@ -281,8 +263,60 @@ merge(
 ) %>% xtable(caption='Number of orphans with search intervals overlapping given features')
 @
 
-\subsection{Find indel events}
+\begin{figure}[!ht]
+<<>>=
+  m <- melt_seqaln('prot2transorf')
+  prot2transorf.cutoff <- config$prot2transorf_pval / (m$query %>% unique %>% length)
+  plot_seqaln(m, prot2transorf.cutoff)
+@
+  \caption{
+    \textbf{Orphan genes hits against target ORFs}. All START/STOP bound open
+    reading frames in the target genome were extracted. All orphan proteins
+    were aligned against the ORFs that overlap one of their search intervals.
+    Dots correspond to hits above \Sexpr{config$prot2allorf_minscore}.
+  }
+  \centering
+\end{figure}
 
+
+\subsection{Mapping to unknown ORFs outside known mRNAs}
+
+\begin{figure}[!ht]
+  \centering
+<<>>=
+  m <- melt_seqaln('prot2allorf')
+  prot2allorf.cutoff <- config$prot2allorf_pval / (m$query %>% unique %>% length)
+  plot_seqaln(m, prot2allorf.cutoff)
+@
+  \caption{
+    \textbf{Orphan genes hits against target ORFs}. All START/STOP bound open
+    reading frames in the target genome were extracted. All orphan proteins
+    were aligned against the ORFs that overlap one of their search intervals.
+    Dots correspond to hits above \Sexpr{prot2allorf.cutoff}.
+  }
+\end{figure}
+
+
+\subsection{Mapping to any DNA region in the search interval}
+\begin{figure}[!ht]
+  \centering
+<<message=FALSE, warning=FALSE, cache=TRUE>>=
+<<>>=
+  m <- melt_seqaln('dna2dna')
+  dna2dna.cutoff <- config$dna2dna_pval / (m$query %>% unique %>% length)
+  plot_seqaln(m, dna2dna.cutoff)
+@
+\caption{\
+  Scores of orphan genes against their search intervals. In \textbf{ctrl}, the
+  starting positions of the orphan genes were permuted while preserving their
+  gene length. By chance, a few of these permuted indices may start on their
+  original place, so there will be a few highscoring values. Dots correspond to
+  orphans with scores above \Sexpr{dna2dna.cutoff}.
+}
+\end{figure}
+
+
+\subsection{Find indel events}
 <<results='asis', cache=TRUE>>=
 results %>%
   lapply(function(x) x$ind.stats[1:2]) %>%
@@ -310,15 +344,9 @@ results %>%
       interval length upper bounds the length of any contained homolog.'
   )
 @
-% At least in the Arabidopsis thaliana versus Arabidopsis lyrata, all indel and
-% resize events occur in no more than one search interval for a given query. In
-% \Sexpr{length(q.res)} cases, the gene maps to only 1 search interval and is
-% resized in it. Similarly for the \Sexpr{length(q.ind)} cases of indels. There
-% are \Sexpr{nrow(d.irr)} cases where a gene maps to multiple search intervals,
-% but still, only one of them is reduced or resized.
+
 
 \subsection{Find queries overlapping N-strings}
-
 <<results='asis', cache=TRUE>>=
 results %>%
   lapply(function(x) unique(x$query2gap$query)) %>%
@@ -341,247 +369,6 @@ results %>%
     represent the gap of unknown length.'
   )
 @
-
-\subsection{Find protein matches}
-
-\begin{figure}[!ht]
-  \centering
-<<message=FALSE, cache=TRUE>>=
-
-m <- results %>% 
-  lapply(function(x) x$prot2prot[c('query', 'score')]) %>%
-  melt(id.vars=c('query', 'score')) %>%
-  dplyr::rename(species=L1) %>%
-  dplyr::mutate(orphan = (query %in% query$orphans))
-
-ggplot() +
-  geom_violin(
-    mapping=aes(x=species, y=score),
-    data=m,
-    alpha=0.3
-  ) +
-  geom_point(
-    mapping=aes(x=species, y=score, color=orphan),
-    data=subset(m, score > config$prot2prot_minscore & orphan) %>%
-         dplyr::group_by(query, species) %>%
-         dplyr::summarize(score=max(score)) %>%
-         as.data.frame,
-    position=position_jitter(width=0.3),
-    color='red'
-  ) +
-  geom_hline(yintercept=config$prot2prot_minscore, color='red') +
-  xlab('Raw alignment score (BLOSUM80)') +
-  coord_flip() +
-  scale_y_continuous(
-    trans='log2',
-    breaks=trans_breaks('log2', function(x) round(2^x))
-  )
-
-@
-  \caption{\
-    Non-orphan genes are expected to have at a highscoring homolog, so there
-    should be many high scoring hits. There should also be many low scoring
-    ones, from the searches against genes that overlap the search interval but
-    are not homologous. \textbf{In red:} the orphan genes with scores above
-    \Sexpr{config$prot2prot_minscore} against genic targets within their search
-    intervals.
-  }
-\end{figure}
-
-<<results='asis', cache=TRUE>>=
-m %>%
-  subset(score > config$prot2prot_minscore) %>%
-  dplyr::mutate(orphan = ifelse(orphan, 'orphan', 'non-orphan') %>% factor) %>%
-  count(species, orphan) %>%
-  xtable(
-    caption=sprintf('The number of query orphans and non-orphans with
-    significant ($score > %d$) similarity to annotated genes in each target
-    genome.', config$prot2prot_minscore)
-  )
-@
-% <<>>=
-% m <- data.frame(
-%   group = c(rep('Ortholog', length(s.orth)),
-%             rep('Overlapping', length(s.over)+1)),
-%   N = c(names(s.orth), '0', names(s.over)) %>% as.integer,
-%   count = c(s.orth, n.missing, s.over)
-% )
-% @
-% <<results='asis'>>=
-% require(xtable)
-% m %>% xtable(caption=sprintf(
-%  '\\textbf{Ortholog}: the number of query genes (count) where N target genes
-%  both overlap a search interval AND have a high protein sequence similarity
-%  score.  \\textbf{Overlapping}: the number of query genes (count) where N
-%  target genes overlap a search interval.  %s\\%% of query genes have overlaps
-%  and %s\\%% have identified orthologs.', perc.with.over, perc.with.orth))
-% @
-
-
-\subsection{Detect protein hits to spliced ORFs}
-
-\begin{figure}[!ht]
-  \centering
-<<message=FALSE, cache=TRUE>>=
-
-m <- results %>% 
-  lapply(function(x) x$prot2transorf[c('query', 'score')]) %>%
-  melt(id.vars=c('query', 'score')) %>%
-  dplyr::rename(species=L1)
-ggplot(m) +
-  geom_violin(
-    mapping=aes(x=species, y=score),
-    data=m,
-    alpha=0.3
-  ) +
-  geom_point(
-    mapping=aes(x=species, y=score),
-    data=subset(m, score > config$prot2transorf_minscore),
-    position=position_jitter(width=0.8),
-    alpha=0.3
-  ) +
-  geom_hline(yintercept=config$prot2transorf_minscore, color='red') +
-  coord_flip() +
-  xlab('Raw alignment score (BLOSUM80)') +
-  scale_y_continuous(
-    trans='log2',
-    breaks=trans_breaks('log2', function(x) round(2^x))
-  )
-
-@
-  \caption{
-    \textbf{Orphan genes hits against target ORFs}. All START/STOP bound open
-    reading frames in the target genome were extracted. All orphan proteins
-    were aligned against the ORFs that overlap one of their search intervals.
-    Dots correspond to hits above \Sexpr{config$prot2allorf_minscore}.
-  }
-\end{figure}
-
-
-\subsection{Detect protein hit to ORF}
-
-\begin{figure}[!ht]
-  \centering
-<<message=FALSE, cache=TRUE>>=
-
-m <- results %>% 
-  lapply(function(x) x$orfmap[c('query', 'score')]) %>%
-  melt(id.vars=c('query', 'score')) %>%
-  dplyr::rename(species=L1)
-
-ggplot(m) +
-  geom_violin(
-    mapping=aes(x=species, y=score),
-    data=m,
-    alpha=0.3
-  ) +
-  geom_point(
-    mapping=aes(x=species, y=score),
-    data=subset(m, score > config$prot2allorf_minscore),
-    position=position_jitter(width=0.8),
-    alpha=0.3
-  ) +
-  geom_hline(yintercept=config$prot2allorf_minscore, color='red') +
-  coord_flip() +
-  xlab('Raw alignment score (BLOSUM80)') +
-  scale_y_continuous(
-    trans='log2',
-    breaks=trans_breaks('log2', function(x) round(2^x))
-  )
-
-@
-  \caption{
-    \textbf{Orphan genes hits against target ORFs}. All START/STOP bound open
-    reading frames in the target genome were extracted. All orphan proteins
-    were aligned against the ORFs that overlap one of their search intervals.
-    Dots correspond to hits above \Sexpr{config$prot2allorf_minscore}.
-  }
-\end{figure}
-
-
-\subsection{Find DNA hit}
-
-\begin{figure}[!ht]
-  \centering
-<<message=FALSE, warning=FALSE, cache=TRUE>>=
-m <- results %>%
-  lapply(function(x) x$orp2dna) %>%
-  melt(id.vars=c('score', 'qwidth', 'twidth', 'seqid')) %>%
-  dplyr::rename(group=L2, species=L1)
-
-ggplot(m) +
-  geom_violin(
-    mapping=aes(x=species, y=score),
-    data=m,
-    alpha=0.5
-  ) +
-  geom_point(
-    mapping=aes(x=species, y=score),
-    data=subset(m, score > config$gene2si_minscore),
-    position=position_jitter(width=1),
-    alpha=0.1
-  ) +
-  xlab('Raw alignment score (BLOSUM80)') +
-  scale_y_continuous(
-    trans='log2',
-    breaks=trans_breaks('log2', function(x) round(2^x))
-  ) +
-  geom_hline(yintercept=config$gene2si_minscore, color='red') +
-  coord_flip() +
-  facet_grid(group~.)
-
-@
-\caption{\
-  Scores of orphan genes against their search intervals. In \textbf{ctrl}, the
-  starting positions of the orphan genes were permuted while preserving their
-  gene length. By chance, a few of these permuted indices may start on their
-  original place, so there will be a few highscoring values. Dots correspond to
-  orphans with scores above \Sexpr{config$gene2si_minscore}.
-}
-\end{figure}
-
-\begin{figure}[!ht]
-  \centering
-<<cache=TRUE>>=
-
-m %>%
-  group_by(seqid, group, species) %>%
-  summarize(
-    score=max(score),
-    qwidth=max(qwidth),
-    twidth=max(twidth)
-  ) %>%
-  dplyr::mutate(signif=score > config$gene2si_minscore) %>%
-  ggplot +
-      geom_point(
-        aes(
-          x=qwidth,
-          y=twidth,
-          color=signif,
-          size=score
-        ),
-        alpha=0.5
-      ) +
-      xlab('Query gene width') +
-      ylab('Target search interval width') +
-      facet_wrap(~species) +
-      scale_x_continuous(
-        trans='log2',
-        breaks=trans_breaks('log2', function(x) round(2^x))
-      ) +
-      scale_y_continuous(
-        trans='log2',
-        breaks=trans_breaks('log2', function(x) round(2^x))
-      )
-
-@
-\caption{\
-  \textbf{Query gene length versus target search interval length}. The size of
-  the points is proportional to score of the gene's best hit. A hit is
-  considered significant if it is above a certain threshold
-  (\Sexpr{config$gene2si_minscore}).
-}
-\end{figure}
 
 \subsection{Leaf labels}
 

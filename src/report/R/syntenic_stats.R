@@ -1,5 +1,6 @@
 summarize.flags <- function(si, query){
   require(reshape2)
+  require(dplyr)
   flags <- data.frame(
     seqid=c(si$query$seqid, si$scrambled),
     flag=c(si$target$flag, rep(4, length(si$scrambled))) %>% as.factor,
@@ -7,7 +8,9 @@ summarize.flags <- function(si, query){
   ) %>%
   dcast(seqid ~ flag)
   
-  flags <- flags %>% set_rownames(flags$seqid) %>% select(-seqid)
+  flags <- flags %>%
+    set_rownames(flags$seqid) %>%
+    dplyr::select(-seqid)
   names(flags) <- paste0('f', names(flags))
 
   bits <- apply(flags, 1, function(x) paste0(as.numeric(x > 0), collapse=''))
@@ -21,7 +24,7 @@ summarize.flags <- function(si, query){
   ) %>% 
   dplyr::count(group, bit) %>%
   dcast(bit ~ group, fill=0) %>%
-  mutate(
+  dplyr::mutate(
     orp_prop = orphan / sum(orphan, na.rm=TRUE),
     non_orp_prop = non_orphan / sum(non_orphan, na.rm=TRUE)
   ) %>%

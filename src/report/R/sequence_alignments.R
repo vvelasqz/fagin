@@ -1,69 +1,104 @@
 # ============================================================================
+# Statistics
+# ============================================================================
+
+require(fitdistrplus)
+
+dgumbel <- function(x, mu, s){
+  z <- (mu - x) / s
+  exp( z-exp(z) ) / s
+}
+
+pgumbel <- function(q, mu, s){
+  z <- (q - mu) / s
+  exp(-exp(-z))
+}
+
+qgumbel <- function(p, mu, s){
+  mu - s*log(-log(p))
+}
+
+fit.gumbel <- function(sam){
+  gumbel.fit <- fitdist(sam, "gumbel", start=list(mu=mean(sam), s=sd(sam)), method="mle")
+
+  mu <- gumbel.fit$estimate['mu']
+  s  <- gumbel.fit$estimate['s']
+
+  p <- function(q){
+    z <- (q - mu) / s
+    exp(-exp(-z))
+  }
+
+  q <- function(p){
+    mu - s*log(-log(p))
+  }
+
+  d <- function(x){
+    z <- (mu - x) / s
+    exp( z-exp(z) ) / s
+  }
+  list(fit=gumbel.fit, p=p, d=d, q=q)
+}
+
+
+# ============================================================================
 # Search sequence - AA-AA - Query genes against target genes
 # ============================================================================
 
-AA_aln <- function(map, target, query){
-  data(BLOSUM80)
-
-  tarseq <- target$aa[map$target]
-  queseq <- query$aa[map$query]
-
-  # Align all orphans that possibly overlap a coding sequence
-  aln <- pairwiseAlignment(
-    pattern=queseq,
-    subject=tarseq,
-    type='local',
-    substitutionMatrix=BLOSUM80
+aln_xy <- function(x, y){
+  a <- data.frame(
+    query = names(x),
+    target = names(y),
+    score = pairwiseAlignment(
+      pattern=x,
+      subject=y,
+      type='local',
+      substitutionMatrix=BLOSUM80,
+      scoreOnly=TRUE
+    ),
+    qwidth=width(x),
+    twidth=width(y)
   )
-  map$scores <- score(aln)
-
-  alnsum <- dplyr::mutate(map, ortholog = scores > 60) %>%
-    group_by(query) %>%
-    summarize(
-      n.over = length(query),
-      n.orth = sum(ortholog)
-    )
-
-  aln=list(
-    scores=map,
-    aln=aln,
-    alnsum=alnsum
-  )
+  dplyr::group_by(a, query) %>%
+    # Calculate adjusted score
+    dplyr::summarize(adj=log2(qwidth[1]) + log2(sum(twidth))) %>%
+    base::merge(a) %>%
+    dplyr::mutate(score.adj = score - adj) %>%
+    dplyr::select(query, score, score.adj)
 }
 
-AA_aln_stats <- function(aln, query){
-  # TODO: Check how many of the missing genes reside on the scaffolds that are
-  # not covered by SI
-  # TODO: Fit two normal distributions: one for the noise, one for the signal.
+AA_aln <- function(queseq, tarseq, nsims=10000){
+  data(BLOSUM80)
 
-  old.qname <- setdiff(names(query$genes), query$orphans)
+  map <- aln_xy(queseq, tarseq)
+  map$target <- names(tarseq)
 
-  # total number of old genes
-  n.total <- length(old.qname)
+  # Simulate best hit for each query against randomized and reversed target sequences
+  times <- names(queseq) %>%
+      factor %>%
+      summary(maxsum=Inf) %>%
+      as.numeric %>%
+      sample(nsims, replace=TRUE) 
+  simids <- sample(1:length(queseq), nsims, replace=TRUE) %>% rep(times=times)
+  simnames <- paste0('t', 1:nsims) %>% rep(times=times)
+  sam <- aln_xy(
+    queseq[simids] %>% set_names(simnames),
+    tarseq %>% base::sample(length(simnames), replace=TRUE) %>% reverse
+  ) %>%
+    # Filter out maximum score for each query
+    dplyr::group_by(query) %>%
+    dplyr::filter(score.adj==max(score.adj)) %>%
+    dplyr::summarize(score=mean(score), score.adj=mean(score.adj)) # to remove ties
 
-  # number of old genes that do not overlap a CDS
-  n.missing <- old.qname %in% aln$alnsum$query %>% not %>% sum
-  d <- aln$alnsum[aln$alnsum$query %in% old.qname, ]
+  gum <- fit.gumbel(sam$score.adj)
 
-  # Proportion of genes whose search intervals overlap at least 1 CDS
-  perc.with.over <- signif(nrow(d) / n.total, 3) * 100 
-
-  # Proportion of genes that link to given number of orthologs
-  perc.with.orth <- signif(sum(d$n.orth > 0) / n.total, 3) * 100 
-
-  # summary of the number of orthologs found
-  s.orth <- d$n.orth %>% factor %>% summary
-
-  # summary of the number of overlapping genes found
-  s.over <- d$n.over %>% factor %>% summary
+  map$pval <- 1 - gum$p(map$score.adj)
+  sam$pval <- 1 - gum$p(sam$score.adj)
 
   list(
-    n.old.gene=n.total,
-    n.old.missing=n.missing,
-    perc.with.over=perc.with.over,
-    perc.with.orth=perc.with.orth,
-    s.orth=s.orth,
-    s.over=s.over
+    map=map,
+    dis=gum,
+    sam=sam
   )
 }
 
@@ -73,8 +108,10 @@ AA_aln_stats <- function(aln, query){
 #' map - [ query | target ] where target is a CDS id
 #' query - full query dataset
 #' target - full target dataset
-cds_to_AA_aln <- function(map, query, target){
+cds_to_AA_aln <- function(query, target, features, ...){
   require(dplyr)
+
+  map <- features$CDS[features$CDS$query %in% query$orphans, ]
 
   map <- merge(
     map,
@@ -85,16 +122,23 @@ cds_to_AA_aln <- function(map, query, target){
   dplyr::select(query, parent) %>%
   dplyr::rename(target=parent) %>%
   unique
+ 
+  queseq <- query$aa[map$query]
+  tarseq <- target$aa[map$target]
 
-  AA_aln(map, target, query)
+  AA_aln(queseq=queseq, tarseq=tarseq, ...)
 }
 
-mrna_to_AA_aln <- function(map, query, target){
+mrna_to_AA_aln <- function(map, query, target, ...){
   map <- unique(map)
-  AA_aln(map, target, query)
+
+  tarseq <- target$aa[map$target]
+  queseq <- query$aa[map$query]
+
+  AA_aln(queseq=queseq, tarseq=tarseq, ...)
 }
 
-orphan_cds_to_transorf_AA_aln <- function(query, target, features){
+cds_to_transorf_AA_aln <- function(query, target, features, ...){
 
   require(tidyr)
   require(dplyr)
@@ -112,18 +156,7 @@ orphan_cds_to_transorf_AA_aln <- function(query, target, features){
   queseq <- query$aa[map$query]
   tarseq <- tarseq[map$id]
 
-  # Align all orphans that possibly overlap a coding sequence
-  data(BLOSUM80)
-  aln <- pairwiseAlignment(
-    pattern=queseq,
-    subject=tarseq,
-    type='local',
-    substitutionMatrix=BLOSUM80
-  )
-
-  map %>%
-    dplyr::mutate(score = score(aln)) %>%
-    select(query, target, score)
+  AA_aln(queseq=queseq, tarseq=tarseq, ...)
 }
 
 # ============================================================================
@@ -203,7 +236,6 @@ alignToGenome <- function(query.seqs, genome, gr, ...){
     scoreOnly=TRUE
   )
 
-
   data.frame(
     seqid = query.seqs %>% names %>% rep(2),
     qwidth = query.seqs %>% width %>% rep(2),
@@ -214,13 +246,24 @@ alignToGenome <- function(query.seqs, genome, gr, ...){
   )
 }
 
-get_orphan_dna_hits <- function(query, target, maxspace=1e8){
+
+adjust_DNA_scores <- function(d){
+  dplyr::group_by(d, seqid) %>%
+    # Calculate adjusted score
+    dplyr::filter(twidth > 1 & qwidth > 1) %>%
+    dplyr::summarize(adj=log2(qwidth[1]) + log2(sum(twidth))) %>%
+    base::merge(d) %>%
+    dplyr::mutate(score.adj = score - adj) %>%
+    dplyr::select(-adj)
+}
+
+get_query_dna_hits <- function(query, target, maxspace=1e8){
   genseq <- LoadFASTA(target$dna.file, isAA=FALSE)
   # Get orphan intervals
 
   orfgff <- target$si$target[target$si$query$seqid %in% query$orphans] 
   ogen <- query$genes[target$si$query[orfgff$id]$seqid]
-  too.big <- ((orfgff %>% width) * width(ogen)) > maxspace
+  too.big <- log(width(orfgff)) + log(width(ogen)) > log(maxspace)
   if(any(too.big)){
     warning(sprintf('%d(%.1f%%) query / SI pairs are very large, N*M>%d. These
     pairs are ignored. Dealing with them will require a heuristic aligment
@@ -233,12 +276,42 @@ get_orphan_dna_hits <- function(query, target, maxspace=1e8){
   message(sprintf('This may require on the order of %.1f minutes',
     ((orfgff %>% width) * width(ogen) * (3/9e8)) %>% sum %>% signif(1)))
 
-  hits <- alignToGenome(query.seqs=ogen, genome=genseq, gr=orfgff)
+  hits <- alignToGenome(
+    query.seqs=ogen,
+    genome=genseq,
+    gr=orfgff
+  ) %>%
+  adjust_DNA_scores
+
   set.seed(42)
-  ctrl <- alignToGenome(query.seqs=ogen, genome=genseq, gr=orfgff, scramble=TRUE)
+  # Align queries against random search intervals
+
+  stopifnot(target$si$target$id == target$si$query$id)
+
+  small <- log(width(target$si$target)) +
+           log(width(query$genes[target$si$query$seqid])) < log(maxspace)
+  sample.targets <- target$si$target[small] %>% sample(length(ogen))
+  ctrl <- alignToGenome(
+    query.seqs=ogen,
+    genome=genseq,
+    gr=sample.targets
+  ) %>%
+    adjust_DNA_scores %>%
+    group_by(seqid) %>%
+    filter(score.adj == max(score.adj))
+
+  gum <- fit.gumbel(ctrl$score.adj)
+  hits$pval <- 1 - gum$p(hits$score.adj)
+  ctrl$pval <- 1 - gum$p(ctrl$score.adj)
+  #
+  # subset(hits, pval < 0.001) %$% seqid %>% unique %>% length
+  # subset(ctrl, pval < 0.001) %$% seqid %>% unique %>% length
+
   list(
-    hits=hits,
-    ctrl=ctrl
+    map=hits,
+    dis=gum,
+    sam=ctrl,
+    maxspace=maxspace
   )
 }
 
@@ -270,21 +343,51 @@ get_query2orf <- function(target, query){
   )
 }
 
-# TODO: based off the distribution of scores, fit a normal to the noise.  Here
-# fit a normal distribution using the 1st and 3rd quantiles. This should work
-# since the number of true homologs expected is very low. The quantile based
-# fitting will be robust against the far outliers.
-get_orfmap <- function(query2orf, query, target){
+
+get_prot2allorf <- function(query2orf, query, target, ...){
+  require(Biostrings)
   orffaa <- LoadFASTA(target$orffaa.file, isAA=TRUE)
   orfmap <- query2orf[query2orf$query %in% query$orphan, ]
-  require(Biostrings)
-  data(BLOSUM80)
-  orfmap$score <- pairwiseAlignment(
-    pattern=query$aa[orfmap$query],
-    subject=orffaa[orfmap$orfid],
-    type='local',
-    scoreOnly=TRUE,
-    substitutionMatrix=BLOSUM80
-  )
-  orfmap
+
+  queseq <- query$aa[orfmap$query]
+  tarseq <- orffaa[orfmap$orfid]
+
+  AA_aln(queseq=queseq, tarseq=tarseq, ...) 
 }
+
+# AA_aln_stats <- function(aln, query){
+#   # TODO: Check how many of the missing genes reside on the scaffolds that are
+#   # not covered by SI
+#   # TODO: Fit two normal distributions: one for the noise, one for the signal.
+#
+#   old.qname <- setdiff(names(query$genes), query$orphans)
+#
+#   # total number of old genes
+#   n.total <- length(old.qname)
+#
+#   # number of old genes that do not overlap a CDS
+#   n.missing <- old.qname %in% aln$alnsum$query %>% not %>% sum
+#   d <- aln$alnsum[aln$alnsum$query %in% old.qname, ]
+#
+#   # Proportion of genes whose search intervals overlap at least 1 CDS
+#   perc.with.over <- signif(nrow(d) / n.total, 3) * 100 
+#
+#   # Proportion of genes that link to given number of orthologs
+#   perc.with.orth <- signif(sum(d$n.orth > 0) / n.total, 3) * 100 
+#
+#   # summary of the number of orthologs found
+#   s.orth <- d$n.orth %>% factor %>% summary
+#
+#   # summary of the number of overlapping genes found
+#   s.over <- d$n.over %>% factor %>% summary
+#
+#   list(
+#     n.old.gene=n.total,
+#     n.old.missing=n.missing,
+#     perc.with.over=perc.with.over,
+#     perc.with.orth=perc.with.orth,
+#     s.orth=s.orth,
+#     s.over=s.over
+#   )
+# }
+

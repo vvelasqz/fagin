@@ -1,3 +1,31 @@
+# require(GenomicRanges)
+# require(Biostrings)
+# require(ggplot2)
+# require(reshape2)
+# require(scales)
+# require(dplyr)
+# require(xtable)
+# require(tidyr)
+# require(dplyr)
+#
+# source('~/src/git/cadmium/src/report/R/loadData.R')
+# source('~/src/git/cadmium/src/report/R/indels.R')
+# source('~/src/git/cadmium/src/report/R/syntenic_stats.R')
+# source('~/src/git/cadmium/src/report/R/sequence_alignments.R')
+# source('~/src/git/cadmium/src/report/R/feature_overlaps.R')
+# config <- LoadConfig(configfile='~/src/git/cadmium/cadmium.cfg')
+#
+# l_seqinfo <- LoadSeqinfoList(config)
+# species='Capsella_rubella'
+# use_cache=TRUE
+# query.cache <- sprintf('%s/query.Rdat', config$d_cache)
+# if(file.exists(query.cache)){
+#   load(query.cache)
+# } else {
+#   query <- LoadQuery(config, l_seqinfo)
+#   save(query, file=query.cache)
+# }
+
 getTargetResults <- function(species, query, config, l_seqinfo, use_cache=TRUE){
 
   cache <- function(x, ...){
@@ -20,62 +48,60 @@ getTargetResults <- function(species, query, config, l_seqinfo, use_cache=TRUE){
   }
 
   message(sprintf('Loading data for %s', species))
-
+  #
   message('--loading target')
   # TODO: Fix the out-of-range bugs
   target <- cache(LoadTarget, species=species, config=config, l_seqinfo=l_seqinfo)
   message('--summarizing synteny')
+
   # B1 - Queries of scrambled origin
   synteny <- cache(summarize.flags, si=target$si, query=query)
-
+  #
   message('--processing indel and resize events')
   # B2 - Queries overlap an indel in a target SI
   ind       <- cache(findIndels, target, indel.threshold=0.05)
   ind.stats <- cache(indelStats, ind)
   ind.sumar <- cache(indelSummaries, ind)
+  #
+  # B5 - Queries whose SI overlap an N-string
+  message('--mapping to gaps in target genome')  
+  query2gap <- cache(findQueryGaps, nstring=target$nstring, target=target)
 
   # B3 and B4 (CDS and mRNA overlaps)
-
   message('--processing feature overlaps')
   # TODO: I do not currently use features other than CDS and mRNA, so I could
   # save memory by filtering them out
   features <- cache(analyzeTargetFeature, query, target)
-
-  message('--mapping to gaps in target genome')  
-  # B5 - Queries whose SI overlap an N-string
-  query2gap <- cache(findQueryGaps, nstring=target$nstring, target=target)
-
-  message('--selecting all orphans and 1000 non-orphans for protein alignment')
+  #
   # B6 - Queries whose protein seq matches a target protein in the SI
-  set.seed(42) # This is needed to avoid cached and new ids from differing
-  searchset <- c(
-    query$orphans,
-    setdiff(names(query$aa), query$orphans) %>% sample(1000)
-  )
-  map <- features$CDS[features$CDS$query %in% searchset, ]
-
   message('---aligning')
-  aln       <- cache(cds_to_AA_aln, map=map, query=query, target=target)
-  message('---calculating stats')
-  aln.stats <- cache(AA_aln_stats, aln, query)
-  # TODO: unify variable names, e.g. prot2prot, orfmap, etc
-  prot2prot <- aln$scores %>% dplyr::rename(score=scores)
-
-  rm(aln); gc()
+  prot2prot <- cache(cds_to_AA_aln,
+    query=query,
+    target=target,
+    features=features,
+    nsims=1e3)
 
   # B7 - Queries matching ORFs on spliced mRNA
   message('--finding orfs in spliced mRNAs overlapping search intervals')
-  prot2transorf <- cache(orphan_cds_to_transorf_AA_aln, query, target, features)
+  prot2transorf <- cache(cds_to_transorf_AA_aln,
+    query=query,
+    target=target,
+    features=features,
+    nsims=1e3)
 
   # B8 - Queries whose protein matches an ORF in an SI
   message('--finding orfs in search intervals')
   query2orf <- cache(get_query2orf, target, query) ; gc()
   message('--aligning orphans to orfs that overlap their search intervals')
-  orfmap <- cache(get_orfmap, query2orf, query, target) ; gc()
+  prot2allorf <- cache(get_prot2allorf,
+    query2orf=query2orf,
+    query=query,
+    target=target,
+    nsims=1e3)
 
   # B9 - Queries whose gene matches (DNA-DNA) an SI 
   message('--aligning orphans to the full sequences of their search intervals')
-  orp2dna <- cache(get_orphan_dna_hits, query, target, maxspace=1e7)
+  dna2dna <- cache(get_query_dna_hits, query, target, maxspace=1e7)
 
   list(
     species=species,
@@ -86,11 +112,10 @@ getTargetResults <- function(species, query, config, l_seqinfo, use_cache=TRUE){
     ind.sumar=ind.sumar,
     features=features,
     query2gap=query2gap,
-    aln.stats=aln.stats,
     prot2transorf=prot2transorf,
     prot2prot=prot2prot,
-    orfmap=orfmap,
-    orp2dna=orp2dna
+    prot2allorf=prot2allorf,
+    dna2dna=dna2dna
   )
 }
 
@@ -114,13 +139,13 @@ buildFeatureTable <- function(result, query, config){
   # number of confirmed resized (based on search interval size)
   res <- orphans %in% result$ind.stats$resized.queries
   # the query has an ortholog in the target
-  gen <- orphans %in% (result$prot2prot %>% subset(score > config$prot2prot_minscore) %$% query)
+  gen <- orphans %in% (result$prot2prot$map %>% subset(pval < config$prot2prot_pval) %$% query)
   # ORF match in SI
-  orf <- orphans %in% (result$orfmap %>% subset(score > config$prot2allorf_minscore) %$% query)
+  orf <- orphans %in% (result$prot2allorf$map %>% subset(pval < config$prot2allorf_pval) %$% query)
   # has nucleotide match in SI
-  nuc <- orphans %in% (result$orp2dna$hits %>% subset(score > config$gene2si_minscore) %$% seqid)
+  nuc <- orphans %in% (result$dna2dna$map %>% subset(pval < config$dna2dna_pval) %$% seqid)
   # ORF match to spliced transcript (possibly multi-exonic)
-  trn <- orphans %in% (result$prot2transorf %>% subset(score > config$prot2transorf_minscore) %$% query)
+  trn <- orphans %in% (result$prot2transorf$map %>% subset(pval < config$prot2transorf_pval) %$% query)
   
   labels <- data.frame(
     seqid=orphans,

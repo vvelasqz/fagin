@@ -19,11 +19,10 @@
 #' R_FOCAL_SPECIES          - string
 #' R_EXTEND                 - boolean
 #' R_EXTEND_FACTOR          \
-#' R_PROT2PROT_MINSCORE     |
-#' R_PROT2ALLORF_MINSCORE   | numeric
-#' R_PROT2TRANSORF_MINSCORE |
-#' R_GENE2SI_MINSCORE       /
-
+#' R_PROT2PROT_PVAL         |
+#' R_PROT2ALLORF_PVAL       | numeric
+#' R_PROT2TRANSORF_PVAL     |
+#' R_DNA2DNA_PVAL           /
 #' Where d_* are directories, and f_* are files. `species` is loaded as a
 #' character string where `focal_species` is a required member.
 #' 
@@ -51,15 +50,15 @@ LoadConfig <- function(configfile='~/src/git/cadmium/cadmium.cfg'){
         'R_ORPHAN_LIST',
         'R_TREE',
         'R_FOCAL_SPECIES',
-        'R_PROT2PROT_MINSCORE',
-        'R_PROT2ALLORF_MINSCORE',
-        'R_PROT2TRANSORF_MINSCORE',
-        'R_GENE2SI_MINSCORE'
+        'R_PROT2PROT_PVAL',
+        'R_PROT2ALLORF_PVAL',
+        'R_PROT2TRANSORF_PVAL',
+        'R_DNA2DNA_PVAL'
     )
     # Check for existence of all required variables
     for(v in expected.vars){
         if(!exists(v)){
-            warning(sprintf("Variable '%s' is not defined in the config file '%s'", f, configfile))
+            warning(sprintf("Variable '%s' is not defined in the config file '%s'", v, configfile))
         }
     }
     # Check existence of directories
@@ -81,28 +80,28 @@ LoadConfig <- function(configfile='~/src/git/cadmium/cadmium.cfg'){
                   R_FOCAL_SPECIES, paste(species, collapse=", ")))
     }
     list(
-        d_faa                  = R_FAA_DIR,
-        d_gff                  = R_GFF_DIR,
-        d_syn                  = R_SYN_DIR,
-        d_gene                 = R_GENE_DIR,
-        d_genome               = R_GENOME_DIR,
-        d_si                   = R_SI_DIR,
-        d_orfgff               = R_ORFGFF,
-        d_orffaa               = R_ORFFAA,
-        d_trans_orf            = R_TRANS_ORF,
-        d_cache                = R_CACHE,
-        f_scaflen              = R_SCAFLEN,
-        f_nstrings             = R_NSTRINGS,
-        f_orphan               = R_ORPHAN_LIST,
-        f_tree                 = R_TREE,
-        species                = species,
-        focal_species          = R_FOCAL_SPECIES,
-        extend                 = as.logical(R_EXTEND),
-        extend_factor          = as.numeric(R_EXTEND_FACTOR),
-        prot2prot_minscore     = as.numeric(R_PROT2PROT_MINSCORE),
-        prot2allorf_minscore   = as.numeric(R_PROT2ALLORF_MINSCORE),
-        prot2transorf_minscore = as.numeric(R_PROT2TRANSORF_MINSCORE),
-        gene2si_minscore       = as.numeric(R_GENE2SI_MINSCORE)       
+        d_faa              = R_FAA_DIR,
+        d_gff              = R_GFF_DIR,
+        d_syn              = R_SYN_DIR,
+        d_gene             = R_GENE_DIR,
+        d_genome           = R_GENOME_DIR,
+        d_si               = R_SI_DIR,
+        d_orfgff           = R_ORFGFF,
+        d_orffaa           = R_ORFFAA,
+        d_trans_orf        = R_TRANS_ORF,
+        d_cache            = R_CACHE,
+        f_scaflen          = R_SCAFLEN,
+        f_nstrings         = R_NSTRINGS,
+        f_orphan           = R_ORPHAN_LIST,
+        f_tree             = R_TREE,
+        species            = species,
+        focal_species      = R_FOCAL_SPECIES,
+        extend             = as.logical(R_EXTEND),
+        extend_factor      = as.numeric(R_EXTEND_FACTOR),
+        prot2prot_pval     = as.numeric(R_PROT2PROT_PVAL),
+        prot2allorf_pval   = as.numeric(R_PROT2ALLORF_PVAL),
+        prot2transorf_pval = as.numeric(R_PROT2TRANSORF_PVAL),
+        dna2dna_pval       = as.numeric(R_DNA2DNA_PVAL)       
     )
 }
 
@@ -170,11 +169,11 @@ LoadGFF <- function(gfffile, features=NULL, ...){
       phase=V8,
       attribute=V9
     ) %>%
-    mutate(
+    dplyr::mutate(
       seqid=grepl('ID=[^;]', attribute) %>% ifelse(attribute, NA),
       parent=grepl('Parent=[^;]', attribute) %>% ifelse(attribute, NA)
     ) %>%
-    mutate(
+    dplyr::mutate(
       seqid=sub('.*ID=([^;]+).*', '\\1', seqid),
       parent=sub('.*Parent=([^;]+).*', '\\1', parent)
     )
@@ -195,7 +194,7 @@ LoadGFF <- function(gfffile, features=NULL, ...){
     stops     = g$stop,
     scaffolds = g$scaffold,
     strands   = g$strand,
-    metadata  = select(g, type, seqid, parent),
+    metadata  = dplyr::select(g, type, seqid, parent),
     ...
   ) 
 }

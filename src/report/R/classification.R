@@ -1,31 +1,3 @@
-# require(GenomicRanges)
-# require(Biostrings)
-# require(ggplot2)
-# require(reshape2)
-# require(scales)
-# require(dplyr)
-# require(xtable)
-# require(tidyr)
-# require(dplyr)
-#
-# source('~/src/git/cadmium/src/report/R/loadData.R')
-# source('~/src/git/cadmium/src/report/R/indels.R')
-# source('~/src/git/cadmium/src/report/R/syntenic_stats.R')
-# source('~/src/git/cadmium/src/report/R/sequence_alignments.R')
-# source('~/src/git/cadmium/src/report/R/feature_overlaps.R')
-# config <- LoadConfig(configfile='~/src/git/cadmium/cadmium.cfg')
-#
-# l_seqinfo <- LoadSeqinfoList(config)
-# species='Capsella_rubella'
-# use_cache=TRUE
-# query.cache <- sprintf('%s/query.Rdat', config$d_cache)
-# if(file.exists(query.cache)){
-#   load(query.cache)
-# } else {
-#   query <- LoadQuery(config, l_seqinfo)
-#   save(query, file=query.cache)
-# }
-
 getTargetResults <- function(species, query, config, l_seqinfo, use_cache=TRUE){
 
   cache <- function(x, ...){
@@ -107,6 +79,7 @@ getTargetResults <- function(species, query, config, l_seqinfo, use_cache=TRUE){
     species=species,
     synteny=synteny,
     syn=target$syn,
+    unassembled=target$si$unassembled,
     ind=ind,
     ind.stats=ind.stats,
     ind.sumar=ind.sumar,
@@ -130,10 +103,9 @@ buildFeatureTable <- function(result, query, config){
   p2t_cutoff <- config$prot2transorf_pval / length(orphans)
 
   # Synteny is scrambled
-  # scr <- result$synteny$bits[orphans] %in% c('000010', '000001', '000011')
-  scr <- result$synteny$bits[orphans] == '00001'
+  scr <- result$synteny$bits[orphans] %in% c('000010', '000001', '000011')
   # synteny is reliable
-  rel <- result$synteny$bits[orphans] == '10000'
+  rel <- result$synteny$bits[orphans] == '100000'
   # at least one search interval overlaps a target CDS
   cds <- orphans %in% (result$features$CDS$query %>% unique)
   # at least one search interval overlaps a target mRNA
@@ -149,11 +121,13 @@ buildFeatureTable <- function(result, query, config){
   # ORF match in SI
   orf <- orphans %in% (result$prot2allorf$map %>% subset(pval < p2a_cutoff) %$% query)
   # has nucleotide match in SI
-  nuc <- orphans %in% (result$dna2dna$map %>% subset(pval < d2d_cutoff) %$% seqid)
+  nuc <- orphans %in% (result$dna2dna$map %>% subset(pval < d2d_cutoff) %$% query)
   # ORF match to spliced transcript (possibly multi-exonic)
   trn <- orphans %in% (result$prot2transorf$map %>% subset(pval < p2t_cutoff) %$% query)
+  # at least one search interval maps off scaffold (flag==4 or flag==5)
+  una <- orphans %in% result$unassembled
   
-  labels <- data.frame(
+  data.frame(
     seqid=orphans,
     scr=scr,
     rel=rel,
@@ -165,7 +139,8 @@ buildFeatureTable <- function(result, query, config){
     res=res,
     orf=orf,
     nuc=nuc,
-    trn=trn
+    trn=trn,
+    una=una
   )
 }
 
@@ -174,17 +149,18 @@ buildLabels <- function(feats){
   with(feats,
     data.frame(
       seqid = seqid,
-      gen.g        =  gen                                                  ,
-      gen.Gt       = !gen &  trn                                           ,
-      gen.GTo      = !gen & !trn &  orf                                    ,
-      unk.GTONd    = !gen & !trn & !orf & !nuc &  ind                      ,
-      unk.GTONDu   = !gen & !trn & !orf & !nuc & !ind &  nst               ,
-      unk.GTONDUr  = !gen & !trn & !orf & !nuc & !ind & !nst &  res        ,
-      unk.GTONDURs = !gen & !trn & !orf & !nuc & !ind & !nst & !res &  scr ,
-      unk.GTONDURS = !gen & !trn & !orf & !nuc & !ind & !nst & !res & !scr ,
-      non.GTOnR    = !gen & !trn & !orf &  nuc & !rna                      ,
-      non.GTOnrc   = !gen & !trn & !orf &  nuc &  rna &  cds               ,
-      non.GTOnrC   = !gen & !trn & !orf &  nuc &  rna & !cds               
+      gen.g         =  gen                                                         ,
+      gen.Gt        = !gen &  trn                                                  ,
+      gen.GTo       = !gen & !trn &  orf                                           ,
+      unk.GTONA     = !gen & !trn & !orf & !nuc &  una                             ,
+      unk.GTONad    = !gen & !trn & !orf & !nuc & !una &  ind                      ,
+      unk.GTONaDu   = !gen & !trn & !orf & !nuc & !una & !ind &  nst               ,
+      unk.GTONaDUr  = !gen & !trn & !orf & !nuc & !una & !ind & !nst &  res        ,
+      unk.GTONaDURs = !gen & !trn & !orf & !nuc & !una & !ind & !nst & !res &  scr ,
+      unk.GTONaDURS = !gen & !trn & !orf & !nuc & !una & !ind & !nst & !res & !scr ,
+      non.GTOnR     = !gen & !trn & !orf &  nuc & !rna                             ,
+      non.GTOnrc    = !gen & !trn & !orf &  nuc &  rna &  cds                      ,
+      non.GTOnrC    = !gen & !trn & !orf &  nuc &  rna & !cds               
     )
   ) %>%
     melt(id.vars='seqid') %>%
@@ -197,17 +173,18 @@ buildLabels <- function(feats){
 determineLabels <- function(query, results, config){
 
   descriptions <- c(
-    g        = 'genic: known gene',
-    Gt       = 'genic: unknown ORF on known mRNA',
-    GTo      = 'genic: unknown ORF off known mRNA',
-    GTONd    = 'unknown: possible indel',
-    GTONDu   = 'unknown: possible N-string',
-    GTONDUr  = 'unknown: possible resized',
-    GTONDURs = 'unknown: syntenically scrambled',
-    GTONDURS = 'unknown: seriously unknown',
-    GTOnR    = 'non-genic: no gene in SI',
-    GTOnrc   = 'non-genic: CDS in SI',
-    GTOnrC   = 'non-genic: mRNA but not CDS in SI'
+    g         = 'genic: known gene',
+    Gt        = 'genic: unknown ORF on known mRNA',
+    GTo       = 'genic: unknown ORF off known mRNA',
+    GTONA     = 'unknown: maps off the scaffold',
+    GTONad    = 'unknown: possible indel',
+    GTONaDu   = 'unknown: possible N-string',
+    GTONaDUr  = 'unknown: possible resized',
+    GTONaDURs = 'unknown: syntenically scrambled',
+    GTONaDURS = 'unknown: seriously unknown',
+    GTOnR     = 'non-genic: no gene in SI',
+    GTOnrc    = 'non-genic: CDS in SI',
+    GTOnrC    = 'non-genic: mRNA but not CDS in SI'
   )
 
   features <- lapply(results, buildFeatureTable, query, config)

@@ -254,6 +254,8 @@ get_dna2dna <- function(query, target, maxspace=1e8){
   genseq <- LoadFASTA(target$dna.file, isAA=FALSE)
   # Get orphan intervals
 
+  set.seed(42)
+
   orfgff <- target$si$target[target$si$query$seqid %in% query$orphans] 
   ogen <- query$genes[target$si$query[orfgff$id]$seqid]
   too.big <- log(width(orfgff)) + log(width(ogen)) > log(maxspace)
@@ -276,7 +278,6 @@ get_dna2dna <- function(query, target, maxspace=1e8){
   ) %>%
   adjust_DNA_scores
 
-  set.seed(42)
   # Align queries against random search intervals
 
   stopifnot(target$si$target$id == target$si$query$id)

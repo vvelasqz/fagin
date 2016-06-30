@@ -7,6 +7,8 @@ require(scales)
 require(dplyr)
 require(tidyr)
 require(xtable)
+require(fitdistrplus)
+require(ape)
 require(data.tree)
 @
 

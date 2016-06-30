@@ -74,8 +74,8 @@ getTargetResults <- function(species, query, config, l_seqinfo, use_cache=TRUE){
   features <- cache(analyzeTargetFeature, query, target)
   #
   # B6 - Queries whose protein seq matches a target protein in the SI
-  message('---aligning')
-  prot2prot <- cache(cds_to_AA_aln,
+  message('--find query matches against known genes')
+  prot2prot <- cache(get_prot2prot,
     query=query,
     target=target,
     features=features,
@@ -83,7 +83,7 @@ getTargetResults <- function(species, query, config, l_seqinfo, use_cache=TRUE){
 
   # B7 - Queries matching ORFs on spliced mRNA
   message('--finding orfs in spliced mRNAs overlapping search intervals')
-  prot2transorf <- cache(cds_to_transorf_AA_aln,
+  prot2transorf <- cache(get_prot2transorf,
     query=query,
     target=target,
     features=features,
@@ -101,7 +101,7 @@ getTargetResults <- function(species, query, config, l_seqinfo, use_cache=TRUE){
 
   # B9 - Queries whose gene matches (DNA-DNA) an SI 
   message('--aligning orphans to the full sequences of their search intervals')
-  dna2dna <- cache(get_query_dna_hits, query, target, maxspace=1e7)
+  dna2dna <- cache(get_dna2dna, query, target, maxspace=1e7)
 
   list(
     species=species,
@@ -123,6 +123,12 @@ getTargetResults <- function(species, query, config, l_seqinfo, use_cache=TRUE){
 buildFeatureTable <- function(result, query, config){
   orphans <- query$orphans 
 
+  # Perform bonferoni corrections on all pvalue cutoffs
+  p2p_cutoff <- config$prot2prot_pval     / length(orphans)
+  p2a_cutoff <- config$prot2allorf_pval   / length(orphans)
+  d2d_cutoff <- config$dna2dna_pval       / length(orphans)
+  p2t_cutoff <- config$prot2transorf_pval / length(orphans)
+
   # Synteny is scrambled
   # scr <- result$synteny$bits[orphans] %in% c('000010', '000001', '000011')
   scr <- result$synteny$bits[orphans] == '00001'
@@ -139,13 +145,13 @@ buildFeatureTable <- function(result, query, config){
   # number of confirmed resized (based on search interval size)
   res <- orphans %in% result$ind.stats$resized.queries
   # the query has an ortholog in the target
-  gen <- orphans %in% (result$prot2prot$map %>% subset(pval < config$prot2prot_pval) %$% query)
+  gen <- orphans %in% (result$prot2prot$map %>% subset(pval < p2p_cutoff) %$% query)
   # ORF match in SI
-  orf <- orphans %in% (result$prot2allorf$map %>% subset(pval < config$prot2allorf_pval) %$% query)
+  orf <- orphans %in% (result$prot2allorf$map %>% subset(pval < p2a_cutoff) %$% query)
   # has nucleotide match in SI
-  nuc <- orphans %in% (result$dna2dna$map %>% subset(pval < config$dna2dna_pval) %$% seqid)
+  nuc <- orphans %in% (result$dna2dna$map %>% subset(pval < d2d_cutoff) %$% seqid)
   # ORF match to spliced transcript (possibly multi-exonic)
-  trn <- orphans %in% (result$prot2transorf$map %>% subset(pval < config$prot2transorf_pval) %$% query)
+  trn <- orphans %in% (result$prot2transorf$map %>% subset(pval < p2t_cutoff) %$% query)
   
   labels <- data.frame(
     seqid=orphans,

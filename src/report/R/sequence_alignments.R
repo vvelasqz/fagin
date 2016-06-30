@@ -108,7 +108,7 @@ AA_aln <- function(queseq, tarseq, nsims=10000){
 #' map - [ query | target ] where target is a CDS id
 #' query - full query dataset
 #' target - full target dataset
-cds_to_AA_aln <- function(query, target, features, ...){
+get_prot2prot <- function(query, target, features, ...){
   require(dplyr)
 
   map <- features$CDS[features$CDS$query %in% query$orphans, ]
@@ -129,16 +129,7 @@ cds_to_AA_aln <- function(query, target, features, ...){
   AA_aln(queseq=queseq, tarseq=tarseq, ...)
 }
 
-mrna_to_AA_aln <- function(map, query, target, ...){
-  map <- unique(map)
-
-  tarseq <- target$aa[map$target]
-  queseq <- query$aa[map$query]
-
-  AA_aln(queseq=queseq, tarseq=tarseq, ...)
-}
-
-cds_to_transorf_AA_aln <- function(query, target, features, ...){
+get_prot2transorf <- function(query, target, features, ...){
 
   require(tidyr)
   require(dplyr)
@@ -158,6 +149,8 @@ cds_to_transorf_AA_aln <- function(query, target, features, ...){
 
   AA_aln(queseq=queseq, tarseq=tarseq, ...)
 }
+
+
 
 # ============================================================================
 # Search sequence - DNA-DNA - Query genes against target seach intervals
@@ -237,7 +230,7 @@ alignToGenome <- function(query.seqs, genome, gr, ...){
   )
 
   data.frame(
-    seqid = query.seqs %>% names %>% rep(2),
+    query = query.seqs %>% names %>% rep(2),
     qwidth = query.seqs %>% width %>% rep(2),
     twidth = search.intervals %>% width %>% rep(2),
     score = nuc.scores,
@@ -248,7 +241,7 @@ alignToGenome <- function(query.seqs, genome, gr, ...){
 
 
 adjust_DNA_scores <- function(d){
-  dplyr::group_by(d, seqid) %>%
+  dplyr::group_by(d, query) %>%
     # Calculate adjusted score
     dplyr::filter(twidth > 1 & qwidth > 1) %>%
     dplyr::summarize(adj=log2(qwidth[1]) + log2(sum(twidth))) %>%
@@ -257,7 +250,7 @@ adjust_DNA_scores <- function(d){
     dplyr::select(-adj)
 }
 
-get_query_dna_hits <- function(query, target, maxspace=1e8){
+get_dna2dna <- function(query, target, maxspace=1e8){
   genseq <- LoadFASTA(target$dna.file, isAA=FALSE)
   # Get orphan intervals
 
@@ -297,7 +290,7 @@ get_query_dna_hits <- function(query, target, maxspace=1e8){
     gr=sample.targets
   ) %>%
     adjust_DNA_scores %>%
-    group_by(seqid) %>%
+    group_by(query) %>%
     filter(score.adj == max(score.adj))
 
   gum <- fit.gumbel(ctrl$score.adj)

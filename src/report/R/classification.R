@@ -51,7 +51,7 @@ getTargetResults <- function(species, query, config, l_seqinfo, use_cache=TRUE){
     query=query,
     target=target,
     features=features,
-    nsims=1e3)
+    nsims=1e4)
 
   # B7 - Queries matching ORFs on spliced mRNA
   message('--finding orfs in spliced mRNAs overlapping search intervals')
@@ -59,7 +59,7 @@ getTargetResults <- function(species, query, config, l_seqinfo, use_cache=TRUE){
     query=query,
     target=target,
     features=features,
-    nsims=1e3)
+    nsims=1e4)
 
   # B8 - Queries whose protein matches an ORF in an SI
   message('--finding orfs in search intervals')
@@ -69,11 +69,11 @@ getTargetResults <- function(species, query, config, l_seqinfo, use_cache=TRUE){
     query2orf=query2orf,
     query=query,
     target=target,
-    nsims=1e3)
+    nsims=1e4)
 
   # B9 - Queries whose gene matches (DNA-DNA) an SI 
   message('--aligning orphans to the full sequences of their search intervals')
-  dna2dna <- cache(get_dna2dna, query, target, maxspace=1e7)
+  dna2dna <- cache(get_dna2dna, query, target, maxspace=5e7)
 
   list(
     species=species,
@@ -195,11 +195,11 @@ determineLabels <- function(query, results, config){
     lapply(count, primary, secondary) %>%
     melt(id.vars=c('primary', 'secondary')) %>%
     dplyr::rename(species=L1, count=value) %>%
-    dplyr::mutate(description = descriptions[secondary]) %>%
-    dplyr::select(description, species, count) %>%
-    tidyr::complete(description, species, fill=list(count=0)) %>%
+    dplyr::select(secondary, species, count) %>%
+    tidyr::complete(secondary, species, fill=list(count=0)) %>%
     dplyr::mutate(count = as.integer(count)) %>%
-    dplyr::arrange(description, species, count) %>%
+    dplyr::mutate(description = descriptions[secondary]) %>%
+    dplyr::arrange(description, secondary, species, count) %>%
     as.data.frame
 
   list(
@@ -217,7 +217,8 @@ determineOrigins <- function(labels, config){
   #
   classify <- function(node){
       if(node$isLeaf){
-        node$cls <- labels$labels[[node$name]]$primary
+        node$cls <- labels$labels[[node$name]] %>%
+          dplyr::arrange(seqid) %$% primary 
       } else {
         child_cls <- lapply(node$children, classify)
         if(length(child_cls) != 2){

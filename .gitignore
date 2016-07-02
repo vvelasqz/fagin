@@ -14,6 +14,8 @@ log
 
 *.RDat
 *.Rdat
+*.RData
+*.Rhistory
 
 **/.ropeproject/
 

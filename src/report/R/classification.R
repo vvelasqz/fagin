@@ -216,9 +216,15 @@ determineOrigins <- function(labels, config){
   root <- read.tree(config$f_tree) %>% as.Node(replaceUnderscores=FALSE)
   #
   classify <- function(node){
+print(node$name)
       if(node$isLeaf){
-        node$cls <- labels$labels[[node$name]] %>%
-          dplyr::arrange(seqid) %$% primary 
+        if(node$name == config$focal_species){
+          node$cls <- NULL
+        } else {
+          node_labels <- labels$labels[[node$name]] %>% dplyr::arrange(seqid)
+          node$cls <- node_labels$primary
+          names(node$cls) <- node_labels$seqid
+        }
       } else {
         child_cls <- lapply(node$children, classify)
         if(length(child_cls) != 2){
@@ -227,20 +233,25 @@ determineOrigins <- function(labels, config){
         a <- child_cls[[1]]
         b <- child_cls[[2]]
         if(!is.null(a) && !is.null(b)){
-          node$cls <- ifelse(a == "gen" | b == "gen", "gen", "unk")
-          node$cls <- ifelse(a == "non" & b == "non", "non", node$cls)
+          stopifnot(names(node$cls) == names(a))
+          stopifnot(names(node$cls) == names(b))
+          node$cls <- ifelse(a == "non" & b == "non", "non", "unk")
+          node$cls <- ifelse(a == "gen" | b == "gen", "gen", node$cls)
         } else if(!is.null(a)){
+          stopifnot(names(node$cls) == names(a))
           node$cls <- a
         } else if(!is.null(b)){
+          stopifnot(names(node$cls) == names(b))
           node$cls <- b
         }
       }
       node$gen <- sum(node$cls == 'gen')
       node$non <- sum(node$cls == 'non')
       node$unk <- sum(node$cls == 'unk')
+print(sprintf(" - %s", paste0(head(node$cls, 20), collapse=' ')))
       invisible(node$cls)
   }
-  #
+
   findFocalSpecies <- function(node){
     if(node$name == config$focal_species){
       return(node)
@@ -255,48 +266,45 @@ determineOrigins <- function(labels, config){
     }
     return(NULL)
   }
-  #
+
   setAncestor <- function(node){
+    # You should be at an leaf node only at the first level, and the leaf must
+    # be the focal species
+print(sprintf(":: %s", node$name))
     if(node$isLeaf){
-      if(node$name == config$focal_species){
-        node$gen <- nrow(labels$labels[[1]])
-        node$non <- 0
-        node$unk <- 0
-      } else {
+      if(node$name != config$focal_species){
         warning('You should start setAncestor from the focal species')
       }
     } else {
       for(child in node$children){
-        if(is.null(child$gen)){
-          node$cls <- classify(child)
+        if(child$visited == 0){
+          stopifnot(names(node$cls) == names(classify(child)))
+          node$cls <- child$cls
           node$gen <- sum(node$cls == 'gen')
           node$non <- sum(node$cls == 'non')
           node$unk <- sum(node$cls == 'unk')
         }
       }
     }
+    node$visited <- node$visited + 1
+print(sprintf(":: %s", paste0(head(node$cls, 20), collapse=' ')))
     if(!node$isRoot){
       setAncestor(node$parent)
     }
   }
   fs <- findFocalSpecies(root)
+  root$Set(visited=0)
   setAncestor(fs)
 
   d <- fs$Get('cls', traversal='ancestor')
   d[[1]] <- NULL
-  names(d) <- paste0('ps', 1:length(d))
-  d <- d %>%
-    melt %>%
-    mutate(seqid = rep(labels$labels[[1]]$seqid, length(d))) %>%
-    dcast(seqid ~ L1)
-
-  d.sum <- data.frame(
-    seqid = d$seqid,
-    class = apply(d[, 2:4], 1, paste0, collapse='-')
-  )
+  d <- do.call(cbind, d) %>%
+    as.data.frame %>%
+    set_names(paste0('ps', 1:(root$height-1))) %>%
+    apply(1, paste0, collapse='-')
 
   list(
     root=root,
-    final_class=d.sum
+    final_class=d
   )
 }

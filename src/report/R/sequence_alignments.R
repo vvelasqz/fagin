@@ -19,7 +19,12 @@ qgumbel <- function(p, mu, s){
 }
 
 fit.gumbel <- function(sam){
-  gumbel.fit <- fitdist(sam, "gumbel", start=list(mu=mean(sam), s=sd(sam)), method="mle")
+  gumbel.fit <- fitdist(
+    data=sam,
+    distr="gumbel",
+    start=list(mu=mean(sam), s=sd(sam)),
+    method="mle"
+  )
 
   mu <- gumbel.fit$estimate['mu']
   s  <- gumbel.fit$estimate['s']
@@ -95,10 +100,13 @@ AA_aln <- function(queseq, tarseq, nsims=10000){
   map$pval <- 1 - gum$p(map$score.adj)
   sam$pval <- 1 - gum$p(sam$score.adj)
 
+  sam <- dplyr::sample_n(sam, length(unique(map$query)))
+
   list(
     map=map,
     dis=gum,
-    sam=sam
+    sam=sam,
+    nsims=nsims
   )
 }
 

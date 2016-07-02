@@ -36,6 +36,7 @@ if(file.exists(query.cache)){
   save(query, file=query.cache)
 }
 
+use_cache=TRUE
 results.cache <- sprintf('%s/results.Rdat', config$d_cache)
 if(file.exists(results.cache)){
   load(results.cache)
@@ -50,7 +51,7 @@ if(file.exists(results.cache)){
       query     = query,
       config    = config,
       l_seqinfo = l_seqinfo,
-      use_cache = TRUE
+      use_cache = use_cache
     )
   }
   save(results, file=results.cache)
@@ -381,7 +382,9 @@ labels$summary %>% xtable
 \begin{figure}[!ht]
   \centering
 <<>>=
-ggplot(labels$summary, aes(description, count)) +
+labels$summary %>%
+  dplyr::select(-secondary) %>%
+  ggplot(aes(description, count)) +
   geom_bar(aes(fill=species), stat='identity', position='dodge') +
   coord_flip()
 @
@@ -487,7 +490,82 @@ print(origin$root, 'gen', 'non', 'unk')
 @
 
 <<results='asis'>>=
-origin$final_class %>%
-  count(class) %>%
+origin$backbone %>% dplyr::count(ps1, ps2, ps3) %>%
   xtable(caption='Counts of primaries labels in youngest to oldest strata')
 @
+
+
+% <<>>=
+% a <- labels$labels %>% melt %>% dplyr::rename(species=L1, query=seqid)
+% b <- results %>%
+%   lapply(
+%     function(x) {
+%       data.frame(
+%         bits=x$synteny$bits,
+%         query=names(x$synteny$bits)
+%       )
+%     }
+%   ) %>% melt %>%
+%   dplyr::rename(species=L1)
+% d <- merge(a, b, by=c('query', 'species')) %>%
+%  merge(labels$summary[c('description', 'secondary')]) %>%
+%  unique
+% @
+%
+% <<bit-summaries>>=
+% m <- split(d, d$bits) %>% lapply(function(x) x$description %>% factor %>% summary)
+% @
+%
+% <<GGG-analysis>>=
+% GGG <- origin$backbone %>%
+%   subset(ps1 == 'gen' & ps2 == 'gen' & ps3=='gen') %>%
+%   rownames
+%
+% GGG.labels <- labels$labels %>%
+%   melt(id.vars=c('seqid', 'secondary'))  %>%
+%   dplyr::rename(species=L1)
+%
+% GGG.gene.by.gene <- subset(d, query %in% GGG) %>%
+%   dplyr::select(query, species, description) %>% 
+%   {split(., f=factor(.$query))}
+%
+%   orphans <- query$orphans
+%   p2p_cutoff <- config$prot2prot_pval     / length(orphans)
+%   p2a_cutoff <- config$prot2allorf_pval   / length(orphans)
+%   d2d_cutoff <- config$dna2dna_pval       / length(orphans)
+%   p2t_cutoff <- config$prot2transorf_pval / length(orphans)
+%
+% # known aa seqs
+% kaa <- list()
+% # all ORF seqs
+% oaa <- list()
+% # all spliced ORF seqs
+% taa <- list()
+% for(s in config$species){
+%   if(s == config$focal_species){
+%     next
+%   }
+%   print(s)
+%   kfile <- sprintf('%s/%s.faa', config$d_faa,       s)
+%   kids <- results[[s]]$prot2prot$map     %>% subset(pval < 0.01) %$% target %>% unique
+%   print(length(kids))
+%   kaa[[s]] <- LoadFASTA(kfile, isAA=TRUE)[kids]
+%   ofile <- sprintf('%s/%s.faa', config$d_orffaa,    s)
+%   oids <- results[[s]]$prot2allorf$map   %>% subset(pval < 0.01) %$% target %>% unique
+%   print(length(oids))
+%   oaa[[s]] <- LoadFASTA(ofile, isAA=TRUE)[oids]
+%   tfile <- sprintf('%s/%s.faa', config$d_trans_orf, s)
+%   tids <- results[[s]]$prot2transorf$map %>% subset(pval < 0.01) %$% target %>% unique
+%   print(length(tids))
+%   taa[[s]] <- LoadFASTA(tfile, isAA=TRUE)[tids]
+% }
+%
+% gg <- results %>%
+%   lapply(function(x) x$prot2allorf$map %>% subset(pval < p2a_cutoff)) %>% 
+%   melt %>%
+%   dplyr::rename(species=L1) %>%
+%   dplyr::select(query, target, species)
+%
+%   count(class) %>%
+%   xtable(caption='Counts of primaries labels in youngest to oldest strata')
+% @

@@ -1,6 +1,6 @@
 TARGET=report
 
-${TARGET}.pdf: ${TARGET}.Rnw sections/*.Rnw
+${TARGET}.pdf: ${TARGET}.Rnw sections/*.Rnw R/*R
 	Rscript -e "library(knitr); knit('${TARGET}.Rnw')"
 	latexmk -pdf ${TARGET}.tex
 

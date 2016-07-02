@@ -210,13 +210,13 @@ determineLabels <- function(query, results, config){
 
 #' Given a species tree and a set of labels, determine orphan origin
 determineOrigins <- function(labels, config){
+
   require(ape)
   require(data.tree)
 
   root <- read.tree(config$f_tree) %>% as.Node(replaceUnderscores=FALSE)
   #
   classify <- function(node){
-print(node$name)
       if(node$isLeaf){
         if(node$name == config$focal_species){
           node$cls <- NULL
@@ -248,7 +248,6 @@ print(node$name)
       node$gen <- sum(node$cls == 'gen')
       node$non <- sum(node$cls == 'non')
       node$unk <- sum(node$cls == 'unk')
-print(sprintf(" - %s", paste0(head(node$cls, 20), collapse=' ')))
       invisible(node$cls)
   }
 
@@ -270,7 +269,6 @@ print(sprintf(" - %s", paste0(head(node$cls, 20), collapse=' ')))
   setAncestor <- function(node){
     # You should be at an leaf node only at the first level, and the leaf must
     # be the focal species
-print(sprintf(":: %s", node$name))
     if(node$isLeaf){
       if(node$name != config$focal_species){
         warning('You should start setAncestor from the focal species')
@@ -287,7 +285,6 @@ print(sprintf(":: %s", node$name))
       }
     }
     node$visited <- node$visited + 1
-print(sprintf(":: %s", paste0(head(node$cls, 20), collapse=' ')))
     if(!node$isRoot){
       setAncestor(node$parent)
     }
@@ -298,13 +295,12 @@ print(sprintf(":: %s", paste0(head(node$cls, 20), collapse=' ')))
 
   d <- fs$Get('cls', traversal='ancestor')
   d[[1]] <- NULL
-  d <- do.call(cbind, d) %>%
+  backbone <- do.call(cbind, d) %>%
     as.data.frame %>%
-    set_names(paste0('ps', 1:(root$height-1))) %>%
-    apply(1, paste0, collapse='-')
+    set_names(paste0('ps', 1:(root$height-1)))
 
   list(
     root=root,
-    final_class=d
+    backbone=backbone
   )
 }

@@ -12,4 +12,4 @@ clean:
 .PHONY: deepclean
 deepclean:
 	latexmk -f -c ${TARGET}.tex
-	rm -rf cache figure ${TARGET}.tex ${TARGET}.pdf
+	rm -rf cache figure ${TARGET}.tex ${TARGET}.pdf *log

@@ -7,6 +7,7 @@ require(scales)
 require(dplyr)
 require(tidyr)
 require(xtable)
+require(robustreg)
 require(fitdistrplus)
 require(ape)
 require(data.tree)
@@ -70,6 +71,16 @@ origin <- determineOrigins(labels, config)
 
 \subsection{Data input}
 
+<<echo=TRUE>>=
+# number of loci in query
+query$gff %>% mcols %>% subset(type == 'mRNA') %$% parent %>% unique %>% length
+
+# number of orphans in query
+model2locus[query$orphans, 'parent'] %>% unique %>% length
+
+@
+
+
 \begin{figure}[!ht]
     \centering
 <<cache=TRUE, message=FALSE>>=
@@ -122,25 +133,22 @@ m.syn <- lapply(results, function(x) {
     dplyr::group_by(seqid) %>%
     dplyr::summarize(
       A=as.logical(f0), 
-      B=as.logical(f1 + f2),
-      C=as.logical(f3),
-      D=as.logical(f4 + f5)
+      B=as.logical(f1 + f2 + f3),
+      C=as.logical(f4 + f5)
     ) %>%
     with(
       data.frame(
         orphan = ifelse(seqid %in% query$orphans, 'orphan', 'non-orphan'),
         A =  A,
         B = !A &  B,
-        C = !A & !B & C,
-        D = !A & !B & !C & D
+        C = !A & !B & C
       )
     ) %>%
     dplyr::group_by(orphan) %>%
     dplyr::summarize(
       A=sum(A),
       B=sum(B),
-      C=sum(C),
-      D=sum(D)
+      C=sum(C)
     )
   }
 ) %>% melt %>% dplyr::rename(species=L1)

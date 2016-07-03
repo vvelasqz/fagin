@@ -2,6 +2,7 @@
 # Statistics
 # ============================================================================
 
+require(robustreg)
 require(fitdistrplus)
 
 dgumbel <- function(x, mu, s){
@@ -19,29 +20,55 @@ qgumbel <- function(p, mu, s){
 }
 
 fit.gumbel <- function(sam){
+
+  stopifnot(c('query', 'score', 'logmn') %in% names(sam))
+  sam <- sam %>%
+    # Filter out maximum score for each query
+    dplyr::group_by(query) %>%
+    dplyr::filter(score==max(score)) %>%
+    dplyr::summarize(score=mean(score), logmn=max(logmn)) # to remove ties
+  adj.fit <- robustreg::robustRegBS(score ~ logmn, sam)
+  b0 <- coef(adj.fit)[1]
+  b1 <- coef(adj.fit)[2]
+
+  get.adj.from.score <- function(x, logmn){
+    x - b0 - b1 * logmn
+  }
+
+  get.score.from.adj <- function(x, logmn){
+    x + b0 + b1 * logmn
+  }
+
+  scores <- get.adj.from.score(sam$score, sam$logmn)
+
   gumbel.fit <- fitdist(
-    data=sam,
+    data=scores,
     distr="gumbel",
-    start=list(mu=mean(sam), s=sd(sam)),
+    start=list(mu=mean(scores), s=sd(scores)),
     method="mle"
   )
+  plot(gumbel.fit, breaks=70)
 
   mu <- gumbel.fit$estimate['mu']
   s  <- gumbel.fit$estimate['s']
 
-  p <- function(q){
+  p <- function(q, logmn){
+    q <- get.adj.from.score(q, logmn)
     z <- (q - mu) / s
     exp(-exp(-z))
   }
 
-  q <- function(p){
-    mu - s*log(-log(p))
+  q <- function(p, logmn){
+    adj.score <- mu - s*log(-log(p))
+    get.score.from.adj(adj.score, logmn)
   }
 
-  d <- function(x){
+  d <- function(x, logmn){
+    x <- get.adj.from.score(x, logmn)
     z <- (mu - x) / s
     exp( z-exp(z) ) / s
   }
+
   list(fit=gumbel.fit, p=p, d=d, q=q)
 }
 
@@ -66,10 +93,9 @@ aln_xy <- function(x, y){
   )
   dplyr::group_by(a, query) %>%
     # Calculate adjusted score
-    dplyr::summarize(adj=log2(qwidth[1]) + log2(sum(twidth))) %>%
+    dplyr::summarize(logmn=log2(qwidth[1]) + log2(sum(twidth))) %>%
     base::merge(a) %>%
-    dplyr::mutate(score.adj = score - adj) %>%
-    dplyr::select(query, score, score.adj)
+    dplyr::select(query, score, logmn)
 }
 
 AA_aln <- function(queseq, tarseq, nsims=10000){
@@ -89,16 +115,12 @@ AA_aln <- function(queseq, tarseq, nsims=10000){
   sam <- aln_xy(
     queseq[simids] %>% set_names(simnames),
     tarseq %>% base::sample(length(simnames), replace=TRUE) %>% reverse
-  ) %>%
-    # Filter out maximum score for each query
-    dplyr::group_by(query) %>%
-    dplyr::filter(score.adj==max(score.adj)) %>%
-    dplyr::summarize(score=mean(score), score.adj=mean(score.adj)) # to remove ties
+  )
 
-  gum <- fit.gumbel(sam$score.adj)
+  gum <- fit.gumbel(sam)
 
-  map$pval <- 1 - gum$p(map$score.adj)
-  sam$pval <- 1 - gum$p(sam$score.adj)
+  map$pval <- 1 - gum$p(map$score, map$logmn)
+  sam$pval <- 1 - gum$p(sam$score, sam$logmn)
 
   sam <- dplyr::sample_n(sam, length(unique(map$query)))
 
@@ -248,14 +270,12 @@ alignToGenome <- function(query.seqs, genome, gr, ...){
 }
 
 
-adjust_DNA_scores <- function(d){
+add_logmn <- function(d){
   dplyr::group_by(d, query) %>%
     # Calculate adjusted score
     dplyr::filter(twidth > 1 & qwidth > 1) %>%
-    dplyr::summarize(adj=log2(qwidth[1]) + log2(sum(twidth))) %>%
-    base::merge(d) %>%
-    dplyr::mutate(score.adj = score - adj) %>%
-    dplyr::select(-adj)
+    dplyr::summarize(logmn=log2(qwidth[1]) + log2(sum(twidth))) %>%
+    base::merge(d)
 }
 
 get_dna2dna <- function(query, target, maxspace=1e8){
@@ -284,7 +304,7 @@ get_dna2dna <- function(query, target, maxspace=1e8){
     genome=genseq,
     gr=orfgff
   ) %>%
-  adjust_DNA_scores
+  add_logmn 
 
   # Align queries against random search intervals
 
@@ -293,18 +313,20 @@ get_dna2dna <- function(query, target, maxspace=1e8){
   small <- log(width(target$si$target)) +
            log(width(query$genes[target$si$query$seqid])) < log(maxspace)
   sample.targets <- target$si$target[small] %>% sample(length(ogen))
+
   ctrl <- alignToGenome(
     query.seqs=ogen,
     genome=genseq,
     gr=sample.targets
   ) %>%
-    adjust_DNA_scores %>%
+    add_logmn %>%
     group_by(query) %>%
-    filter(score.adj == max(score.adj))
+    filter(score == max(score))
 
-  gum <- fit.gumbel(ctrl$score.adj)
-  hits$pval <- 1 - gum$p(hits$score.adj)
-  ctrl$pval <- 1 - gum$p(ctrl$score.adj)
+  gum <- fit.gumbel(ctrl)
+
+  hits$pval <- 1 - gum$p(hits$score, hits$logmn)
+  ctrl$pval <- 1 - gum$p(ctrl$score, ctrl$logmn)
   #
   # subset(hits, pval < 0.001) %$% seqid %>% unique %>% length
   # subset(ctrl, pval < 0.001) %$% seqid %>% unique %>% length

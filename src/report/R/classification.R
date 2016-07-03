@@ -51,7 +51,7 @@ getTargetResults <- function(species, query, config, l_seqinfo, use_cache=TRUE){
     query=query,
     target=target,
     features=features,
-    nsims=1e3)
+    nsims=1e4)
 
   # B7 - Queries matching ORFs on spliced mRNA
   message('--finding orfs in spliced mRNAs overlapping search intervals')
@@ -59,7 +59,7 @@ getTargetResults <- function(species, query, config, l_seqinfo, use_cache=TRUE){
     query=query,
     target=target,
     features=features,
-    nsims=1e3)
+    nsims=1e4)
 
   # B8 - Queries whose protein matches an ORF in an SI
   message('--finding orfs in search intervals')
@@ -69,7 +69,7 @@ getTargetResults <- function(species, query, config, l_seqinfo, use_cache=TRUE){
     query2orf=query2orf,
     query=query,
     target=target,
-    nsims=1e3)
+    nsims=1e4)
 
   # B9 - Queries whose gene matches (DNA-DNA) an SI 
   message('--aligning orphans to the full sequences of their search intervals')

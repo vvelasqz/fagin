@@ -44,14 +44,14 @@ getTargetResults <- function(species, query, config, l_seqinfo, use_cache=TRUE){
   # TODO: I do not currently use features other than CDS and mRNA, so I could
   # save memory by filtering them out
   features <- cache(analyzeTargetFeature, query, target)
-  #
+  
   # B6 - Queries whose protein seq matches a target protein in the SI
   message('--find query matches against known genes')
   prot2prot <- cache(get_prot2prot,
     query=query,
     target=target,
     features=features,
-    nsims=1e4)
+    nsims=1e3)
 
   # B7 - Queries matching ORFs on spliced mRNA
   message('--finding orfs in spliced mRNAs overlapping search intervals')
@@ -59,7 +59,7 @@ getTargetResults <- function(species, query, config, l_seqinfo, use_cache=TRUE){
     query=query,
     target=target,
     features=features,
-    nsims=1e4)
+    nsims=1e3)
 
   # B8 - Queries whose protein matches an ORF in an SI
   message('--finding orfs in search intervals')
@@ -69,7 +69,7 @@ getTargetResults <- function(species, query, config, l_seqinfo, use_cache=TRUE){
     query2orf=query2orf,
     query=query,
     target=target,
-    nsims=1e4)
+    nsims=1e3)
 
   # B9 - Queries whose gene matches (DNA-DNA) an SI 
   message('--aligning orphans to the full sequences of their search intervals')

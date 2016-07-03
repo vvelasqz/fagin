@@ -57,6 +57,12 @@ if(file.exists(results.cache)){
   save(results, file=results.cache)
 }
 
+model2locus <- query$gff %>%
+  subset(type == 'mRNA') %>%
+  mcols
+rownames(model2locus) <- model2locus$seqid
+model2locus <- model2locus['parent']
+
 labels <- determineLabels(query, results, config)
 
 origin <- determineOrigins(labels, config)
@@ -107,6 +113,56 @@ Syntenic flags:
   \item[4] query is to the left of a contig, no overlap
   \item[5] query is to the right of a contig, no overlap
 \end{description}
+
+<<cache=TRUE>>=
+m.syn <- lapply(results, function(x) {
+  x <- x$synteny$flags
+  x$seqid <- rownames(x)
+  x %>%
+    dplyr::group_by(seqid) %>%
+    dplyr::summarize(
+      A=as.logical(f0), 
+      B=as.logical(f1 + f2),
+      C=as.logical(f3),
+      D=as.logical(f4 + f5)
+    ) %>%
+    with(
+      data.frame(
+        orphan = ifelse(seqid %in% query$orphans, 'orphan', 'non-orphan'),
+        A =  A,
+        B = !A &  B,
+        C = !A & !B & C,
+        D = !A & !B & !C & D
+      )
+    ) %>%
+    dplyr::group_by(orphan) %>%
+    dplyr::summarize(
+      A=sum(A),
+      B=sum(B),
+      C=sum(C),
+      D=sum(D)
+    )
+  }
+) %>% melt %>% dplyr::rename(species=L1)
+@
+<<results='asis', cache=TRUE>>=
+m.syn %>%
+  group_by(orphan, species) %>%
+  mutate(proportion=value/sum(value)) %>%
+  dplyr::arrange(orphan, species, variable) %>%
+  xtable(caption='A: numbers of genes with one or more flag==0 regions, B: !A
+  and 1+ flag={1,2}, C: !A and !B and 1+ flag==3, D: else.')
+@
+<<fig.width=4, fig.height=4>>=
+m.syn %>%
+  dplyr::group_by(orphan, species) %>%
+  dplyr::mutate(proportion=value/sum(value)) %>%
+  dplyr::group_by(orphan, variable) %>%
+  dplyr::summarize(proportion=mean(proportion)) %>%
+  ggplot(aes(variable, proportion)) +
+    geom_bar(aes(fill=orphan), stat='identity', position='dodge')
+@
+
 %
 <<message=FALSE, cache=TRUE>>=
 m <- lapply(results, function(x) x$synteny$bittbl) %>%
@@ -383,8 +439,9 @@ labels$summary %>% xtable
   \centering
 <<>>=
 labels$summary %>%
-  dplyr::select(-secondary) %>%
-  ggplot(aes(description, count)) +
+  dplyr::group_by(species) %>%
+  mutate(proportion = count / sum(count)) %>%
+  ggplot(aes(description, proportion)) +
   geom_bar(aes(fill=species), stat='identity', position='dodge') +
   coord_flip()
 @
@@ -490,7 +547,8 @@ print(origin$root, 'gen', 'non', 'unk')
 @
 
 <<results='asis'>>=
-origin$backbone %>% dplyr::count(ps1, ps2, ps3) %>%
+origin$backbone %>%
+  dplyr::count(ps1, ps2, ps3) %>%
   xtable(caption='Counts of primaries labels in youngest to oldest strata')
 @
 

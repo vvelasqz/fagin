@@ -28,7 +28,7 @@
 #' 
 #' @param configfile Absolute path to the config file
 #' @return list of inputs
-LoadConfig <- function(configfile='~/src/git/cadmium/cadmium.cfg'){
+LoadConfig <- function(configfile='~/src/git/fagin/fagin.cfg'){
     if(!file.exists(configfile)){
         warning(sprintf("Cannot open configfile '%s'", configfile))
     }
@@ -552,7 +552,7 @@ LoadSearchIntervals <- function(sifile, extend=FALSE, extend_factor=1, qinfo=NUL
 #' 
 #' @param treefile A newick format tree filename
 #' @return A tree of class 'phylo'
-LoadTree <- function(treefile='~/src/git/cadmium/input/tree'){
+LoadTree <- function(treefile='~/src/git/fagin/input/tree'){
   require(ape)
   read.tree(treefile)
 }

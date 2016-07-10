@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-source cadmium.cfg
+source fagin.cfg
 
 usage (){
 cat << EOF >&2

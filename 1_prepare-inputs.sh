@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -u
 
-source cadmium.cfg
+source fagin.cfg
 
 print-warning(){
     if [[ -t 2 ]]

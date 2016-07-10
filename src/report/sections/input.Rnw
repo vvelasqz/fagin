@@ -8,10 +8,10 @@
 
 <<>>=
 args <- list(
-    scaffile='~/src/git/cadmium/input/stat/scaffold-lengths.tab',
-    nstringfile='~/src/git/cadmium/input/stat/nstrings.tab',
-    kbcompfile='~/src/git/cadmium/input/stat/kb-composition.tab',
-    treefile='~/src/git/cadmium/input/tree'
+    scaffile='~/src/git/fagin/input/stat/scaffold-lengths.tab',
+    nstringfile='~/src/git/fagin/input/stat/nstrings.tab',
+    kbcompfile='~/src/git/fagin/input/stat/kb-composition.tab',
+    treefile='~/src/git/fagin/input/tree'
 )
 @
 

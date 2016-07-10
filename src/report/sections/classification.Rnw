@@ -20,14 +20,14 @@ require(data.tree)
 # $ query$gff[which(query$gff$seqid == target$si$query[1]$seqid)]
 # TODO: in Arabidopsis lyrata, at least, there are out of bound intervals
 
-source('~/src/git/cadmium/src/report/R/classification.R')
-source('~/src/git/cadmium/src/report/R/loadData.R')
-source('~/src/git/cadmium/src/report/R/indels.R')
-source('~/src/git/cadmium/src/report/R/syntenic_stats.R')
-source('~/src/git/cadmium/src/report/R/sequence_alignments.R')
-source('~/src/git/cadmium/src/report/R/feature_overlaps.R')
+source('~/src/git/fagin/src/report/R/classification.R')
+source('~/src/git/fagin/src/report/R/loadData.R')
+source('~/src/git/fagin/src/report/R/indels.R')
+source('~/src/git/fagin/src/report/R/syntenic_stats.R')
+source('~/src/git/fagin/src/report/R/sequence_alignments.R')
+source('~/src/git/fagin/src/report/R/feature_overlaps.R')
 
-config <- LoadConfig(configfile='~/src/git/cadmium/cadmium.cfg')
+config <- LoadConfig(configfile='~/src/git/fagin/fagin.cfg')
 l_seqinfo <- LoadSeqinfoList(config)
 query.cache <- sprintf('%s/query.Rdat', config$d_cache)
 if(file.exists(query.cache)){

@@ -1,4 +1,8 @@
-# Cadmium
+**This program is under heavy development, stability coming soon**
+
+# Fagin
+
+A pipeline for the classification of orphans into origin classes using a syntenic filter.
 
 # Input
 
@@ -16,12 +20,13 @@
 # Pipeline
 
  - Identify target genes that overlap the search space.
- - Search the query protein against the overlapping target gene's coding sequences
+ - Search the query protein against the overlapping target gene's ORFs
+ - Search the query gene DNA against the search interval DNA sequences
+ - Predict ancestor states
 
 # Output
 
- The output of this pipeline is a set of text files and an HTML report
- including the following:
+   A PDF file describing the results of the run.
 
  - The phylogenetic tree of all species in the pipeline
  - Genome summary for each species 
@@ -33,14 +38,15 @@
 
  - [x] Script to retrieve sample data for species of interest
  - [x] Script to check input data
- - [ ] Script to extract relevant fasta files from GFF and genomes 
- - [ ] Script to get search intervals using Synder
- - [ ] Script to prepare summarizing datasets for included genomes
- - [ ] R code for importing and iterating through all data
- - [ ] R code to classify focal species genes against each search interval
- - [ ] R code to merge search interval classifications
- - [ ] R code to get final gene class from species class vector
- - [ ] R code to statistically summarize results
- - [ ] R code to visualize results
+ - [x] Script to extract relevant fasta files from GFF and genomes 
+ - [x] Script to get search intervals using Synder
+ - [x] Script to prepare summarizing datasets for included genomes
+ - [x] R code for importing and iterating through all data
+ - [x] R code to classify focal species genes against each search interval
+ - [x] R code to merge search interval classifications
+ - [x] R code to get final gene class from species class vector
+ - [x] R code to statistically summarize results
+ - [x] R code to visualize results
  - [ ] R code to prepare report for each gene
  - [ ] R code to prepare HTML webpage, merging all results
+ - [ ] Portability, usability, and all that

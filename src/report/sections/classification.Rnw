@@ -77,7 +77,6 @@ query$gff %>% mcols %>% subset(type == 'mRNA') %$% parent %>% unique %>% length
 
 # number of orphans in query
 model2locus[query$orphans, 'parent'] %>% unique %>% length
-
 @
 
 
@@ -101,6 +100,7 @@ ggplot +
   xlab('Ordered position on query genome') +
   ylab('log2 of query to target length ratio') +
   facet_wrap(~species, scale='free_x')
+
 @
     \caption{\textbf{Diagnostic plot of query to target lengths in synteny
         map}. The syntenic intervals on the query and target sides should
@@ -239,12 +239,12 @@ lapply(results, function(x) x$synteny$flags) %>%
 melt_seqaln <- function(field){
   results %>%
     lapply(function(x) x[[field]][which(names(x[[field]]) %in% c('map', 'sam'))]) %>%
-    melt(level=2, id.vars=c('score', 'score.adj', 'pval', 'query')) %>%
+    melt(level=2, id.vars=c('score', 'pval', 'query')) %>%
     dplyr::select(-variable, -value) %>%
     dplyr::rename(group=L3, species=L2) %>%
     dplyr::group_by(query) %>%
-    dplyr::filter(score.adj==max(score.adj)) %>%
-    dplyr::filter(score.adj > 0)
+    dplyr::filter(score == max(score)) %>%
+    dplyr::filter(score > 0)
 }
 
 plot_seqaln <- function(d, cutoff){
@@ -258,7 +258,7 @@ plot_seqaln <- function(d, cutoff){
       mapping=aes(x=species, y=-1*log2(pval)),
       data=subset(m, pval < cutoff) %>%
            dplyr::group_by(query, species) %>%
-           dplyr::filter(score.adj==max(score.adj)) %>%
+           dplyr::filter(score == max(score)) %>%
            as.data.frame,
       position=position_jitter(width=0.3),
       color='red'

@@ -7,14 +7,24 @@ EOF
     exit 0
 }
 
-# print help with no arguments
-[[ $# -eq 0 ]] && usage
+clean (){
+    make deepclean    
+}
+
+cd src/report
 
 while getopts "h" opt; do
     case $opt in
         h)
             usage ;;
+        c)
+            clean
+            exit 
+            ;;
+        r)
+            clean ;;
     esac 
 done
 
-# TODO implement
+make
+cp report.pdf ..

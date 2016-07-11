@@ -47,7 +47,6 @@ fit.gumbel <- function(sam){
     start=list(mu=mean(scores), s=sd(scores)),
     method="mle"
   )
-  plot(gumbel.fit, breaks=70)
 
   mu <- gumbel.fit$estimate['mu']
   s  <- gumbel.fit$estimate['s']

@@ -146,6 +146,7 @@ buildFeatureTable <- function(result, query, config){
 
 buildLabels <- function(feats){
   require(tidyr)
+  # TODO: Reimplement as a tree - bonus, can modify and print
   with(feats,
     data.frame(
       seqid = seqid,

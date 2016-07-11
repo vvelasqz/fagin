@@ -561,6 +561,44 @@ origin$backbone %>%
 @
 
 
+\subsection{Gumbel fitting diagnostics}
+
+<<>>=
+require(fitdistrplus)
+plot_fits <- function(group){
+  for (species in names(results)){
+    fit <- results[[species]][[group]]$dis$fit
+    plot(fit, breaks=70)
+    cat(sprintf('%s\n', species))
+  }
+}
+@
+
+\subsubsection{Query protein to target protein}
+
+<<>>=
+plot_fits('prot2prot')
+@
+
+\subsubsection{Query protein to spliced ORF}
+
+<<>>=
+plot_fits('prot2transorf')
+@
+
+\subsubsection{Query protein to any ORF}
+
+<<>>=
+plot_fits('prot2allorf')
+@
+
+\subsubsection{Query DNA to search interval DNA}
+
+<<>>=
+plot_fits('dna2dna')
+@
+
+
 % <<>>=
 % a <- labels$labels %>% melt %>% dplyr::rename(species=L1, query=seqid)
 % b <- results %>%

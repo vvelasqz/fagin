@@ -36,17 +36,28 @@ A pipeline for the classification of orphans into origin classes using a synteni
 
 # TODO
 
- - [x] Script to retrieve sample data for species of interest
- - [x] Script to check input data
- - [x] Script to extract relevant fasta files from GFF and genomes 
- - [x] Script to get search intervals using Synder
- - [x] Script to prepare summarizing datasets for included genomes
- - [x] R code for importing and iterating through all data
- - [x] R code to classify focal species genes against each search interval
- - [x] R code to merge search interval classifications
- - [x] R code to get final gene class from species class vector
- - [x] R code to statistically summarize results
- - [x] R code to visualize results
- - [ ] R code to prepare report for each gene
- - [ ] R code to prepare HTML webpage, merging all results
- - [ ] Portability, usability, and all that
+## Bash scripts
+
+ - [x] retrieve sample data for species of interest
+ - [x] check input data
+ - [x] extract relevant fasta files from GFF and genomes 
+ - [x] get search intervals using Synder
+ - [x] prepare summarizing datasets for included genomes
+
+## R Code
+
+ - [x] code for importing and iterating through all data
+ - [x] classify focal species genes against each search interval
+ - [x] merge search interval classifications
+ - [x] get final gene class from species class vector
+ - [x] statistically summarize results
+ - [x] visualize results
+ - [ ] generalize from 'orphan' to 'query'
+ - [ ] prepare report for each query
+ - [ ] prepare HTML webpage, merging all results
+ - [ ] add orthology statistics
+ - [ ] print all intermediate data
+ - [ ] modularize analyses, e.g. N-string, indel, CDS overlap, etc.
+ - [ ] build graph for assignment tree
+ - [ ] write statistics for flags
+ - [ ] portability, usability, and all that

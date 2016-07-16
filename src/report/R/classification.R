@@ -144,53 +144,105 @@ buildFeatureTable <- function(result, query, config){
   )
 }
 
-buildLabels <- function(feats){
-  require(tidyr)
-  # TODO: Reimplement as a tree - bonus, can modify and print
-  with(feats,
-    data.frame(
-      seqid = seqid,
-      gen.g         =  gen                                                         ,
-      gen.Gt        = !gen &  trn                                                  ,
-      gen.GTo       = !gen & !trn &  orf                                           ,
-      unk.GTONA     = !gen & !trn & !orf & !nuc &  una                             ,
-      unk.GTONad    = !gen & !trn & !orf & !nuc & !una &  ind                      ,
-      unk.GTONaDu   = !gen & !trn & !orf & !nuc & !una & !ind &  nst               ,
-      unk.GTONaDUr  = !gen & !trn & !orf & !nuc & !una & !ind & !nst &  res        ,
-      unk.GTONaDURs = !gen & !trn & !orf & !nuc & !una & !ind & !nst & !res &  scr ,
-      unk.GTONaDURS = !gen & !trn & !orf & !nuc & !una & !ind & !nst & !res & !scr ,
-      non.GTOnR     = !gen & !trn & !orf &  nuc & !rna                             ,
-      non.GTOnrc    = !gen & !trn & !orf &  nuc &  rna &  cds                      ,
-      non.GTOnrC    = !gen & !trn & !orf &  nuc &  rna & !cds               
-    )
-  ) %>%
-    melt(id.vars='seqid') %>%
-    dplyr::filter(value) %>%
-    dplyr::select(seqid, variable) %>%
-    tidyr::separate(variable, c('primary', 'secondary'), sep='\\.')
+buildLabelsTree <- function(feats, config){
+
+  require(yaml)
+  root <- yaml.load_file(config$f_decision_tree) %>%
+    as.Node(replaceUnderscores=FALSE)
+
+  classify <- function(node, membership=NULL){
+    if(is.null(membership)){
+      membership <- rep(TRUE, nrow(feats))
+    }
+    node$membership <- membership
+    node$N <- sum(membership)
+    if(node$name %in% names(feats)){
+      if(length(node$children) == 2){
+        yes <-  feats[[node$name]] & membership
+        no  <- !feats[[node$name]] & membership
+        classify(node$children[[1]], yes)
+        classify(node$children[[2]], no)
+      }
+    } else if(node$isRoot){
+      classify(node$children[[1]], membership)
+    }
+  }
+
+  classify(root)
+
+  root
+}
+
+labelTreeToTable <- function(root, feats){
+  function(node) {
+    if(node$N > 0){
+      d <- data.frame(seqid = feats$seqid[node$membership])
+      d$primary <- node$primary
+      d$secondary <- node$secondary
+      d
+    } else {
+      NULL
+    }
+  }
+  root$Get(toTable, filterFun = isLeaf) %>%
+    do.call(what=rbind) %>%
+    filter(!is.na(seqid)) %>%
+    set_rownames(NULL)
+}
+
+plotDecisionTree <- function(root){
+  GetNodeLabel <- function(node) { sprintf('%s\n%s', node$name, node$N) }
+
+  GetEdgeLabel <- function(node) {
+    if(!node$isRoot){
+      if(node$name == node$parent$children[[1]]$name){
+        'yes'
+      } else {
+        'no'
+      }
+    } else {
+      NULL
+    }
+  }
+
+  GetNodeShape <- function(node) {
+    if(node$isLeaf){
+      'circle'
+    } else {
+      'square'
+    }
+  }
+
+  SetEdgeStyle(root, label=GetEdgeLabel)
+  SetNodeStyle(root, label=GetNodeLabel, shape=GetNodeShape)
+  SetGraphStyle(root, rankdir="LR")
+
+  plot(root)
 }
 
 #' Merge labels for all species
 determineLabels <- function(query, results, config){
 
   descriptions <- c(
-    g         = 'genic: known gene',
-    Gt        = 'genic: unknown ORF on known mRNA',
-    GTo       = 'genic: unknown ORF off known mRNA',
-    GTONA     = 'unknown: maps off the scaffold',
-    GTONad    = 'unknown: possible indel',
-    GTONaDu   = 'unknown: possible N-string',
-    GTONaDUr  = 'unknown: possible resized',
-    GTONaDURs = 'unknown: syntenically scrambled',
-    GTONaDURS = 'unknown: seriously unknown',
-    GTOnR     = 'non-genic: no gene in SI',
-    GTOnrc    = 'non-genic: CDS in SI',
-    GTOnrC    = 'non-genic: mRNA but not CDS in SI'
+    O1 = 'genic: known gene',
+    O2 = 'genic: unknown ORF on known mRNA',
+    O3 = 'genic: unknown ORF off known mRNA',
+    U1 = 'unknown: maps off the scaffold',
+    U2 = 'unknown: possible indel',
+    U3 = 'unknown: possible N-string',
+    U4 = 'unknown: possible resized',
+    U5 = 'unknown: syntenically scrambled',
+    U6 = 'unknown: seriously unknown',
+    N1 = 'non-genic: no gene in SI',
+    N2 = 'non-genic: CDS in SI',
+    N3 = 'non-genic: mRNA but not CDS in SI'
   )
 
   features <- lapply(results, buildFeatureTable, query, config)
 
-  labels <- lapply(features, buildLabels)
+  labelTrees <- lapply(features, buildLabelsTree, config)
+
+  labels <- lapply(labelTrees, labelTreeToTable)
 
   label.summary <- labels %>%
     lapply(count, primary, secondary) %>%
@@ -204,6 +256,7 @@ determineLabels <- function(query, results, config){
     as.data.frame
 
   list(
+    trees=labelTrees,
     labels=labels,
     summary=label.summary
   )

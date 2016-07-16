@@ -15,6 +15,7 @@
 #' R_SCAFLEN        |
 #' R_NSTRINGS       | individual data files
 #' R_ORPHAN_LIST    |
+#' R_DECISION_TREE  |
 #' R_TREE           /
 #' R_FOCAL_SPECIES          - string
 #' R_EXTEND                 - boolean
@@ -48,6 +49,7 @@ LoadConfig <- function(configfile='~/src/git/fagin/fagin.cfg'){
         'R_SCAFLEN',
         'R_NSTRINGS',
         'R_ORPHAN_LIST',
+        'R_DECISION_TREE',
         'R_TREE',
         'R_FOCAL_SPECIES',
         'R_PROT2PROT_PVAL',
@@ -68,7 +70,7 @@ LoadConfig <- function(configfile='~/src/git/fagin/fagin.cfg'){
         }
     }
     # Check existence of files
-    for(v in expected.vars[11:15]){
+    for(v in expected.vars[11:16]){
         if(!file.exists(eval(parse(text=v)))){
             warning(sprintf("Variable '%s' does not point to a readable file", v))
         }
@@ -93,6 +95,7 @@ LoadConfig <- function(configfile='~/src/git/fagin/fagin.cfg'){
         f_scaflen          = R_SCAFLEN,
         f_nstrings         = R_NSTRINGS,
         f_orphan           = R_ORPHAN_LIST,
+        f_decision_tree    = R_DECISION_TREE,
         f_tree             = R_TREE,
         species            = species,
         focal_species      = R_FOCAL_SPECIES,

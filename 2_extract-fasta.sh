@@ -84,7 +84,7 @@ do
             -fo /dev/stdout       \
             -name > $INPUT/gene/$s.gene.fna
 
-    # Prepare protein fassta files including all predicted coding genes
+    # Prepare protein fasta files including all predicted coding genes
     cat $INPUT/gff/$s.gff |
         awk '
             BEGIN{FS="\t"; OFS="\t"}

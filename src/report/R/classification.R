@@ -174,7 +174,7 @@ buildLabelsTree <- function(feats, config){
 }
 
 labelTreeToTable <- function(root, feats){
-  function(node) {
+  toTable <- function(node) {
     if(node$N > 0){
       d <- data.frame(seqid = feats$seqid[node$membership])
       d$primary <- node$primary
@@ -242,7 +242,8 @@ determineLabels <- function(query, results, config){
 
   labelTrees <- lapply(features, buildLabelsTree, config)
 
-  labels <- lapply(labelTrees, labelTreeToTable)
+  labels <- lapply(names(labelTrees), function(x) labelTreeToTable(labelTrees[[x]], features[[x]])) %>%
+    set_names(names(labelTrees))
 
   label.summary <- labels %>%
     lapply(count, primary, secondary) %>%

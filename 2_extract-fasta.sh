@@ -2,6 +2,8 @@
 
 source fagin.cfg
 
+species=$(cat $INPUT/species)
+
 usage (){
 cat << EOF >&2
 Arguments
@@ -31,17 +33,10 @@ while getopts "h" opt; do
     esac 
 done
 
-species=$(cat $INPUT/species)
-
-mkdir -p $INPUT/faa
-mkdir -p $INPUT/gene
-mkdir -p $INPUT/trans-orf
-
-for s in $species
-do
-
-    # Get transcript ORFs
-    cat $INPUT/gff/$s.gff |
+# Get transcript ORFs
+get_transcript_orfs (){
+    INPUT=$2
+    cat $INPUT/gff/$1.gff |
     awk '
         BEGIN{FS="\t"; OFS="\t"}
         $3 == "exon" {
@@ -57,7 +52,7 @@ do
     ' |
     cut -f1-9 |
     bedtools getfasta         \
-        -fi $INPUT/fna/$s.fna \
+        -fi $INPUT/fna/$1.fna \
         -bed /dev/stdin       \
         -fo /dev/stdout       \
         -name |
@@ -66,10 +61,14 @@ do
         {a[$1]++; print}
     ' |
     getorf -filter -find 1 -minsize 30 |
-    smof clean -s > $INPUT/trans-orf/$s.faa
+    smof clean -s > $INPUT/trans-orf/$1.faa
+}
 
-    # Prepare FASTA file of genes, regions potentially include UTRs and introns
-    cat $INPUT/gff/$s.gff |
+
+# Prepare FASTA file of genes, regions potentially include UTRs and introns
+get_genes (){
+    INPUT=$2
+    cat $INPUT/gff/$1.gff |
         awk '
             BEGIN{OFS="\t"; FS=OFS}
             $3 == "mRNA" {
@@ -79,13 +78,18 @@ do
             }
         ' |
         bedtools getfasta         \
-            -fi $INPUT/fna/$s.fna \
+            -fi $INPUT/fna/$1.fna \
             -bed /dev/stdin       \
             -fo /dev/stdout       \
-            -name > $INPUT/gene/$s.gene.fna
+            -name > $INPUT/gene/$1.gene.fna
+}
 
-    # Prepare protein fasta files including all predicted coding genes
-    cat $INPUT/gff/$s.gff |
+
+# Prepare protein fasta files including all predicted coding genes
+get_proteins (){
+    INPUT=$2
+    x=/tmp/get_proteins_x$3
+    cat $INPUT/gff/$1.gff |
         awk '
             BEGIN{FS="\t"; OFS="\t"}
             $3 == "CDS" {
@@ -99,27 +103,24 @@ do
             {$3 = $9" "$7; print}
         ' |
         bedtools getfasta        \
-            -fi $INPUT/fna/$s.fna \
+            -fi $INPUT/fna/$1.fna \
             -bed /dev/stdin      \
             -fo /dev/stdout      \
             -name |
-        awk '$1 ~ /^>/ && $1 in seqids { next }; {seqids[$1]++; print}' > x
-    cat <(smof grep ' +' x) <(smof grep ' -' x | revseq -filter) | 
+        awk '$1 ~ /^>/ && $1 in seqids { next }; {seqids[$1]++; print}' > $x
+    cat <(smof grep ' +' $x) <(smof grep ' -' $x | revseq -filter) | 
         transeq -filter |
         sed '/>/s/_[0-9]\+//' |
-        smof clean -sux > $INPUT/faa/$s.faa
-    rm x
-done
-
+        smof clean -sux > $INPUT/faa/$1.faa
+    rm $x
+}
 
 # Get open reading frames from each input genome
-mkdir -p $INPUT/orf-faa
-mkdir -p $INPUT/orf-gff
-for s in $species
-do
-    fna=$INPUT/fna/$s.fna
-    faa=$INPUT/orf-faa/$s.faa
-    gff=$INPUT/orf-gff/$s.gff
+get_all_orfs (){
+    INPUT=$2
+    fna=$INPUT/fna/$1.fna
+    faa=$INPUT/orf-faa/$1.faa
+    gff=$INPUT/orf-gff/$1.gff
     smof clean --reduce-header $fna |
        # Find all START STOP bound ORFs with 10+ AA
         getorf -filter -find 1 -minsize 30 |
@@ -151,4 +152,23 @@ do
             }
             { print seq_name, ".", "ORF", start, stop, ".", strand, ".", uid }
         ' > $gff
-done
+}
+
+mkdir -p $INPUT/faa
+mkdir -p $INPUT/gene
+mkdir -p $INPUT/trans-orf
+mkdir -p $INPUT/orf-faa
+mkdir -p $INPUT/orf-gff
+
+# All functions are variables used in them must be exported in order for GNU
+# parallel to find them
+export -f get_transcript_orfs
+export -f get_genes
+export -f get_proteins
+export -f get_all_orfs
+export $INPUT
+
+parallel "get_transcript_orfs {} $INPUT" ::: $species
+parallel "get_genes {} $INPUT" ::: $species
+parallel "get_proteins {} $INPUT {#}" ::: $species
+parallel "get_all_orfs {} $INPUT" ::: $species

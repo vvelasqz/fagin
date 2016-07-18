@@ -11,6 +11,7 @@ require(robustreg)
 require(fitdistrplus)
 require(ape)
 require(data.tree)
+require(yaml)
 @
 
 <<results, message=FALSE, warning=FALSE, cache=TRUE>>=

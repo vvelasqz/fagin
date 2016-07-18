@@ -46,7 +46,10 @@ deps <- c(
     "scales",
     "intervals",
     "data.tree",
-    "xtable"
+    "xtable",
+    "robustreg",
+    "fitdistrplus",
+    "yaml"
 )
 bio.deps <- c('Biostrings', 'GenomicRanges', 'BiocParallel')
 chooseCRANmirror(ind=1)

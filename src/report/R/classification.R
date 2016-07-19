@@ -31,7 +31,7 @@ getTargetResults <- function(species, query, config, l_seqinfo, use_cache){
   # TODO: I do not currently use features other than CDS and mRNA, so I could
   # save memory by filtering them out
   features <- cache(analyzeTargetFeature, query, target)
-  
+
   # B6 - Queries whose protein seq matches a target protein in the SI
   message('--find query matches against known genes')
   prot2prot <- cache(

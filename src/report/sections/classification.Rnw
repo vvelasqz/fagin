@@ -28,6 +28,12 @@ source('~/src/git/fagin/src/report/R/syntenic_stats.R')
 source('~/src/git/fagin/src/report/R/sequence_alignments.R')
 source('~/src/git/fagin/src/report/R/feature_overlaps.R')
 
+use_cache=TRUE
+cache <- cache_factory(config)
+config <- LoadConfig(configfile='~/src/git/fagin/fagin.cfg')
+l_seqinfo <- LoadSeqinfoList(config)
+query <- cache(LoadQuery, config, l_seqinfo)
+
 get_results <- function(){
   results <- list()
   for(s in config$species){
@@ -54,19 +60,7 @@ get_model2locus_map <- function(query){
   model2locus
 }
 
-use_cache=TRUE
-cache <- cache_factory(config)
-config <- LoadConfig(configfile='~/src/git/fagin/fagin.cfg')
-l_seqinfo <- LoadSeqinfoList(config)
-query <- cache(LoadQuery, config, l_seqinfo)
-
-results <- cache(
-  get_results,
-  query=query,
-  config=config,
-  l_seqinfo=l_seqinfo,
-  use_cache=use_cache
-)
+results <- cache(get_results)
 
 model2locus <- get_model2locus_map(query)
 labels <- determineLabels(query, results, config)

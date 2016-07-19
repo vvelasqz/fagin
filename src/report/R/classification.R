@@ -1,23 +1,10 @@
-getTargetResults <- function(species, query, config, l_seqinfo, use_cache=TRUE){
+getTargetResults <- function(species, query, config, l_seqinfo, use_cache){
 
-  cache <- function(x, ...){
-    if(!dir.exists(config$d_cache)){
-      dir.create(config$d_cache)
-    }
-    filename <- sprintf(
-      '%s/%s.vs.%s-%s.Rdat',
-      config$d_cache, config$focal_species, species, deparse(substitute(x))
-    )
-    if(file.exists(filename) && use_cache){
-      load(filename)
-    } else {
-      out <- x(...)
-      if(use_cache){
-        save(out, file=filename)
-      }
-    }
-    out
-  }
+  cache <- cache_factory(
+    config=config,
+    use_cache=use_cache,
+    prefix=sprintf('%s.vs.%s-', config$focal_species, species)
+  )
 
   message(sprintf('Loading data for %s', species))
   #
@@ -31,7 +18,7 @@ getTargetResults <- function(species, query, config, l_seqinfo, use_cache=TRUE){
   #
   message('--processing indel and resize events')
   # B2 - Queries overlap an indel in a target SI
-  ind       <- cache(findIndels, target, indel.threshold=0.05)
+  ind       <- cache(findIndels, target, indel.threshold=config$indel_threshold)
   ind.stats <- cache(indelStats, ind)
   ind.sumar <- cache(indelSummaries, ind)
   #
@@ -47,33 +34,44 @@ getTargetResults <- function(species, query, config, l_seqinfo, use_cache=TRUE){
   
   # B6 - Queries whose protein seq matches a target protein in the SI
   message('--find query matches against known genes')
-  prot2prot <- cache(get_prot2prot,
+  prot2prot <- cache(
+    get_prot2prot,
     query=query,
     target=target,
     features=features,
-    nsims=1e4)
+    nsims=config$prot2prot_nsims
+  )
 
   # B7 - Queries matching ORFs on spliced mRNA
   message('--finding orfs in spliced mRNAs overlapping search intervals')
-  prot2transorf <- cache(get_prot2transorf,
+  prot2transorf <- cache(
+    get_prot2transorf,
     query=query,
     target=target,
     features=features,
-    nsims=1e4)
+    nsims=config$prot2transorf_nsims
+  )
 
   # B8 - Queries whose protein matches an ORF in an SI
   message('--finding orfs in search intervals')
   query2orf <- cache(get_query2orf, target, query) ; gc()
   message('--aligning orphans to orfs that overlap their search intervals')
-  prot2allorf <- cache(get_prot2allorf,
+  prot2allorf <- cache(
+    get_prot2allorf,
     query2orf=query2orf,
     query=query,
     target=target,
-    nsims=1e4)
+    nsims=config$prot2allorf_nsims
+  )
 
   # B9 - Queries whose gene matches (DNA-DNA) an SI 
   message('--aligning orphans to the full sequences of their search intervals')
-  dna2dna <- cache(get_dna2dna, query, target, maxspace=5e7)
+  dna2dna <- cache(
+    get_dna2dna,
+    query=query,
+    target=target,
+    maxspace=config$dna2dna_maxspace
+  )
 
   list(
     species=species,

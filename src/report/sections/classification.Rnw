@@ -1,4 +1,11 @@
-<<message=FALSE>>=
+<<message=FALSE, warning=FALSE>>=
+
+# TODO: check all inputs, and handle missing files appropriately
+# TODO: the ranges for GFFs and SI are off by 1, e.g.
+# $ target$si$query[1]
+# $ query$gff[which(query$gff$seqid == target$si$query[1]$seqid)]
+# TODO: in Arabidopsis lyrata, at least, there are out of bound intervals
+
 require(GenomicRanges)
 require(Biostrings)
 require(ggplot2)
@@ -12,15 +19,8 @@ require(fitdistrplus)
 require(ape)
 require(data.tree)
 require(yaml)
-@
 
-<<results, message=FALSE, warning=FALSE, cache=TRUE>>=
-# TODO: check all inputs, and handle missing files appropriately
-# TODO: the ranges for GFFs and SI are off by 1, e.g.
-# $ target$si$query[1]
-# $ query$gff[which(query$gff$seqid == target$si$query[1]$seqid)]
-# TODO: in Arabidopsis lyrata, at least, there are out of bound intervals
-
+source('~/src/git/fagin/src/report/R/util.R')
 source('~/src/git/fagin/src/report/R/classification.R')
 source('~/src/git/fagin/src/report/R/loadData.R')
 source('~/src/git/fagin/src/report/R/indels.R')
@@ -28,21 +28,7 @@ source('~/src/git/fagin/src/report/R/syntenic_stats.R')
 source('~/src/git/fagin/src/report/R/sequence_alignments.R')
 source('~/src/git/fagin/src/report/R/feature_overlaps.R')
 
-config <- LoadConfig(configfile='~/src/git/fagin/fagin.cfg')
-l_seqinfo <- LoadSeqinfoList(config)
-query.cache <- sprintf('%s/query.Rdat', config$d_cache)
-if(file.exists(query.cache)){
-  load(query.cache)
-} else {
-  query <- LoadQuery(config, l_seqinfo)
-  save(query, file=query.cache)
-}
-
-use_cache=TRUE
-results.cache <- sprintf('%s/results.Rdat', config$d_cache)
-if(file.exists(results.cache)){
-  load(results.cache)
-} else {
+get_results <- function(){
   results <- list()
   for(s in config$species){
     if(s %in% c(config$focal_species)){
@@ -56,18 +42,36 @@ if(file.exists(results.cache)){
       use_cache = use_cache
     )
   }
-  save(results, file=results.cache)
+  results
 }
 
-model2locus <- query$gff %>%
-  subset(type == 'mRNA') %>%
-  mcols
-rownames(model2locus) <- model2locus$seqid
-model2locus <- model2locus['parent']
+get_model2locus_map <- function(query){
+  model2locus <- query$gff %>%
+    subset(type == 'mRNA') %>%
+    mcols
+  rownames(model2locus) <- model2locus$seqid
+  model2locus <- model2locus['parent']
+  model2locus
+}
 
+use_cache=TRUE
+cache <- cache_factory(config)
+config <- LoadConfig(configfile='~/src/git/fagin/fagin.cfg')
+l_seqinfo <- LoadSeqinfoList(config)
+query <- cache(LoadQuery, config, l_seqinfo)
+
+results <- cache(
+  get_results,
+  query=query,
+  config=config,
+  l_seqinfo=l_seqinfo,
+  use_cache=use_cache
+)
+
+model2locus <- get_model2locus_map(query)
 labels <- determineLabels(query, results, config)
-
 origin <- determineOrigins(labels, config)
+
 @
 
 \subsection{Data input}

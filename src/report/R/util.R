@@ -4,7 +4,7 @@ cache_factory <- function(config, use_cache=TRUE, prefix=''){
       dir.create(config$d_cache)
     }
     filename <- sprintf(
-      '%s/%s%s.rdat',
+      '%s/%s%s.Rdat',
       config$d_cache, prefix, deparse(substitute(x))
     )
     if(file.exists(filename) && use_cache){

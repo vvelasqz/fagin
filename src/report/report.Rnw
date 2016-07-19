@@ -73,10 +73,10 @@ for (x in c(deps, bio.deps)) {
 <<introduction, child='sections/introduction.Rnw'>>=
 @
 
-% \section{Input data}
-%
-% <<input, child='sections/input.Rnw'>>=
-% @
+\section{Input data}
+
+<<input, child='sections/input.Rnw'>>=
+@
 
 \section{Classification results}
 

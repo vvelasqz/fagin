@@ -238,7 +238,7 @@ lapply(results, function(x) x$synteny$flags) %>%
 
 <<>>=
 melt_seqaln <- function(field){
-  results %>%
+  m <- results %>%
     lapply(function(x) x[[field]][which(names(x[[field]]) %in% c('map', 'sam'))]) %>%
     melt(level=2, id.vars=c('score', 'pval', 'query')) %>%
     dplyr::select(-variable, -value) %>%

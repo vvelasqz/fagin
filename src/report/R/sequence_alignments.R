@@ -104,13 +104,20 @@ AA_aln <- function(queseq, tarseq, nsims=10000){
   map$target <- names(tarseq)
 
   # Simulate best hit for each query against randomized and reversed target sequences
+  # 1. sample number of target sequences per query
   times <- names(queseq) %>%
       factor %>%
       summary(maxsum=Inf) %>%
       as.numeric %>%
       sample(nsims, replace=TRUE) 
-  simids <- sample(1:length(queseq), nsims, replace=TRUE) %>% rep(times=times)
+  # 2. randomly select query ids
+  simids <- sample(1:length(queseq), nsims, replace=TRUE) %>%
+    # 3. use each a number of times drawn from the empirical targets per query
+    # distribution
+    rep(times=times)
+  # 4. give each simulated query a unique id
   simnames <- paste0('t', 1:nsims) %>% rep(times=times)
+  # 5. align these against random targets
   sam <- aln_xy(
     queseq[simids] %>% set_names(simnames),
     tarseq %>% base::sample(length(simnames), replace=TRUE) %>% reverse
@@ -121,7 +128,11 @@ AA_aln <- function(queseq, tarseq, nsims=10000){
   map$pval <- 1 - gum$p(map$score, map$logmn)
   sam$pval <- 1 - gum$p(sam$score, sam$logmn)
 
-  sam <- dplyr::sample_n(sam, length(unique(map$query)))
+  # Adjust returned sample size to size of query
+  if(nlevels(sam$query) > nlevels(map$query)){
+    simnames <- levels(sam$query) %>% sample(nlevels(map$query))
+    sam <- subset(sam, query %in% simnames) %>% droplevels
+  }
 
   list(
     map=map,

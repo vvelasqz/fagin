@@ -283,14 +283,14 @@ plot_seqaln <- function(d, cutoff){
 \begin{figure}[!ht]
   \centering
 <<fig.width=6, fig.height=4, message=FALSE, cache=TRUE>>=
-require(tidyr)
 m <- lapply(results, function(x) x$features) %>%
     melt(id.vars=c('query', 'target'), level=2) %>%
     dplyr::rename(species=L2, type=L3) %>%
-    filter(type %in% c('CDS', 'mRNA', 'gene')) %>%
-    count(query, species, type) %>%
+    dplyr::filter(type %in% c('CDS', 'mRNA', 'gene')) %>%
+    dplyr::count(query, species, type) %>%
     dplyr::rename(n.feature=n) %>%
-    count(species, type, n.feature)
+    dplyr::group_by(species, type, n.feature) %>%
+    dplyr::tally()
 m.zero <- m %>%
   group_by(species, type) %>%
   summarize(n=sum(n)) %>%
@@ -302,7 +302,7 @@ m2 <- rbind(m, m.zero)
 ggplot(m2) +
   geom_point(aes(x=n.feature, y=n), size=0.2) +
   geom_line(aes(x=n.feature, y=n), alpha=0.05) +
-  xlab('Number of overlapped mRNAs') +
+  xlab('Number of overlapped features') +
   ylab('Number of search intervals') +
   scale_y_continuous(
     trans='log2',
@@ -310,7 +310,7 @@ ggplot(m2) +
   ) +
   facet_grid(type~species)
 @
-  \caption{Number of target mRNAs overlapping one search interval}
+  \caption{Number of target features overlapping a search interval}
 \end{figure}
 <<results='asis', cache=TRUE>>=
 merge(

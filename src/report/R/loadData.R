@@ -1,28 +1,35 @@
 #' Read config file
 #'
 #' Loads the following variables from the config file into a list:
-#' R_FAA_DIR        \
-#' R_GFF_DIR        |
-#' R_SYN_DIR        |
-#' R_GENE_DIR       |
-#' R_GENOME_DIR     |
-#' R_SI_DIR         | data directories
-#' R_ORFGFF         |
-#' R_CACHE          |
-#' R_ORFFAA         |
-#' R_TRANS_ORF      /
-#' R_SPECIES_FILE   \
-#' R_SCAFLEN        |
-#' R_NSTRINGS       | individual data files
-#' R_ORPHAN_LIST    |
-#' R_TREE           /
-#' R_FOCAL_SPECIES          - string
-#' R_EXTEND                 - boolean
+#' R_FAA_DIR    \
+#' R_GFF_DIR    |
+#' R_SYN_DIR    |
+#' R_GENE_DIR   |
+#' R_GENOME_DIR |
+#' R_SI_DIR     | data directories
+#' R_ORFGFF     |
+#' R_ORFFAA     |
+#' R_TRANS_ORF  |
+#' R_CACHE      /
+#' R_SPECIES_FILE  \
+#' R_SCAFLEN       |
+#' R_NSTRINGS      | individual data files
+#' R_ORPHAN_LIST   |
+#' R_DECISION_TREE |
+#' R_TREE          /
+#' R_FOCAL_SPECIES  - string
+#' R_EXTEND         - boolean
 #' R_EXTEND_FACTOR          \
 #' R_PROT2PROT_PVAL         |
-#' R_PROT2ALLORF_PVAL       | numeric
+#' R_PROT2ALLORF_PVAL       |
 #' R_PROT2TRANSORF_PVAL     |
-#' R_DNA2DNA_PVAL           /
+#' R_DNA2DNA_PVAL           |
+#' R_PROT2PROT_NSIMS        | numeric
+#' R_PROT2ALLORF_NSIMS      |
+#' R_PROT2TRANSORF_NSIMS    |
+#' R_DNA2DNA_MAXSPACE       |
+#' R_INDEL_THRESHOLD        /
+#'
 #' Where d_* are directories, and f_* are files. `species` is loaded as a
 #' character string where `focal_species` is a required member.
 #' 
@@ -39,21 +46,27 @@ LoadConfig <- function(configfile='~/src/git/fagin/fagin.cfg'){
         'R_SYN_DIR',
         'R_GENE_DIR',
         'R_GENOME_DIR',
-        'R_CACHE',
         'R_SI_DIR',
         'R_ORFGFF',
         'R_ORFFAA',
         'R_TRANS_ORF',
+        'R_CACHE',
         'R_SPECIES_FILE',
         'R_SCAFLEN',
         'R_NSTRINGS',
         'R_ORPHAN_LIST',
+        'R_DECISION_TREE',
         'R_TREE',
         'R_FOCAL_SPECIES',
         'R_PROT2PROT_PVAL',
         'R_PROT2ALLORF_PVAL',
         'R_PROT2TRANSORF_PVAL',
-        'R_DNA2DNA_PVAL'
+        'R_DNA2DNA_PVAL',
+        'R_PROT2PROT_NSIMS',
+        'R_PROT2ALLORF_NSIMS',
+        'R_PROT2TRANSORF_NSIMS',
+        'R_DNA2DNA_MAXSPACE',
+        'R_INDEL_THRESHOLD'
     )
     # Check for existence of all required variables
     for(v in expected.vars){
@@ -62,13 +75,13 @@ LoadConfig <- function(configfile='~/src/git/fagin/fagin.cfg'){
         }
     }
     # Check existence of directories
-    for(v in expected.vars[1:10]){
+    for(v in expected.vars[1:9]){
         if(!dir.exists(eval(parse(text=v)))){
             warning(sprintf("Variable '%s' does not point to a valid directory", v))
         }
     }
     # Check existence of files
-    for(v in expected.vars[11:15]){
+    for(v in expected.vars[11:16]){
         if(!file.exists(eval(parse(text=v)))){
             warning(sprintf("Variable '%s' does not point to a readable file", v))
         }
@@ -80,28 +93,34 @@ LoadConfig <- function(configfile='~/src/git/fagin/fagin.cfg'){
                   R_FOCAL_SPECIES, paste(species, collapse=", ")))
     }
     list(
-        d_faa              = R_FAA_DIR,
-        d_gff              = R_GFF_DIR,
-        d_syn              = R_SYN_DIR,
-        d_gene             = R_GENE_DIR,
-        d_genome           = R_GENOME_DIR,
-        d_si               = R_SI_DIR,
-        d_orfgff           = R_ORFGFF,
-        d_orffaa           = R_ORFFAA,
-        d_trans_orf        = R_TRANS_ORF,
-        d_cache            = R_CACHE,
-        f_scaflen          = R_SCAFLEN,
-        f_nstrings         = R_NSTRINGS,
-        f_orphan           = R_ORPHAN_LIST,
-        f_tree             = R_TREE,
-        species            = species,
-        focal_species      = R_FOCAL_SPECIES,
-        extend             = as.logical(R_EXTEND),
-        extend_factor      = as.numeric(R_EXTEND_FACTOR),
-        prot2prot_pval     = as.numeric(R_PROT2PROT_PVAL),
-        prot2allorf_pval   = as.numeric(R_PROT2ALLORF_PVAL),
-        prot2transorf_pval = as.numeric(R_PROT2TRANSORF_PVAL),
-        dna2dna_pval       = as.numeric(R_DNA2DNA_PVAL)       
+        d_faa               = R_FAA_DIR,
+        d_gff               = R_GFF_DIR,
+        d_syn               = R_SYN_DIR,
+        d_gene              = R_GENE_DIR,
+        d_genome            = R_GENOME_DIR,
+        d_si                = R_SI_DIR,
+        d_orfgff            = R_ORFGFF,
+        d_orffaa            = R_ORFFAA,
+        d_trans_orf         = R_TRANS_ORF,
+        d_cache             = R_CACHE,
+        f_scaflen           = R_SCAFLEN,
+        f_nstrings          = R_NSTRINGS,
+        f_orphan            = R_ORPHAN_LIST,
+        f_decision_tree     = R_DECISION_TREE,
+        f_tree              = R_TREE,
+        species             = species,
+        focal_species       = R_FOCAL_SPECIES,
+        extend              = as.logical(R_EXTEND),
+        extend_factor       = as.numeric(R_EXTEND_FACTOR),
+        prot2prot_pval      = as.numeric(R_PROT2PROT_PVAL),
+        prot2allorf_pval    = as.numeric(R_PROT2ALLORF_PVAL),
+        prot2transorf_pval  = as.numeric(R_PROT2TRANSORF_PVAL),
+        dna2dna_pval        = as.numeric(R_DNA2DNA_PVAL),
+        prot2prot_nsims     = as.integer(R_PROT2PROT_NSIMS),
+        prot2allorf_nsims   = as.integer(R_PROT2ALLORF_NSIMS),
+        prot2transorf_nsims = as.integer(R_PROT2TRANSORF_NSIMS),
+        dna2dna_maxspace    = as.integer(R_DNA2DNA_MAXSPACE),
+        indel_threshold     = as.numeric(R_INDEL_THRESHOLD)
     )
 }
 

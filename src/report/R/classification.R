@@ -1,23 +1,10 @@
-getTargetResults <- function(species, query, config, l_seqinfo, use_cache=TRUE){
+getTargetResults <- function(species, query, config, l_seqinfo, use_cache){
 
-  cache <- function(x, ...){
-    if(!dir.exists(config$d_cache)){
-      dir.create(config$d_cache)
-    }
-    filename <- sprintf(
-      '%s/%s.vs.%s-%s.Rdat',
-      config$d_cache, config$focal_species, species, deparse(substitute(x))
-    )
-    if(file.exists(filename) && use_cache){
-      load(filename)
-    } else {
-      out <- x(...)
-      if(use_cache){
-        save(out, file=filename)
-      }
-    }
-    out
-  }
+  cache <- cache_factory(
+    config=config,
+    use_cache=use_cache,
+    prefix=sprintf('%s.vs.%s-', config$focal_species, species)
+  )
 
   message(sprintf('Loading data for %s', species))
   #
@@ -31,7 +18,7 @@ getTargetResults <- function(species, query, config, l_seqinfo, use_cache=TRUE){
   #
   message('--processing indel and resize events')
   # B2 - Queries overlap an indel in a target SI
-  ind       <- cache(findIndels, target, indel.threshold=0.05)
+  ind       <- cache(findIndels, target, indel.threshold=config$indel_threshold)
   ind.stats <- cache(indelStats, ind)
   ind.sumar <- cache(indelSummaries, ind)
   #
@@ -44,36 +31,47 @@ getTargetResults <- function(species, query, config, l_seqinfo, use_cache=TRUE){
   # TODO: I do not currently use features other than CDS and mRNA, so I could
   # save memory by filtering them out
   features <- cache(analyzeTargetFeature, query, target)
-  
+
   # B6 - Queries whose protein seq matches a target protein in the SI
   message('--find query matches against known genes')
-  prot2prot <- cache(get_prot2prot,
+  prot2prot <- cache(
+    get_prot2prot,
     query=query,
     target=target,
     features=features,
-    nsims=1e4)
+    nsims=config$prot2prot_nsims
+  )
 
   # B7 - Queries matching ORFs on spliced mRNA
   message('--finding orfs in spliced mRNAs overlapping search intervals')
-  prot2transorf <- cache(get_prot2transorf,
+  prot2transorf <- cache(
+    get_prot2transorf,
     query=query,
     target=target,
     features=features,
-    nsims=1e4)
+    nsims=config$prot2transorf_nsims
+  )
 
   # B8 - Queries whose protein matches an ORF in an SI
   message('--finding orfs in search intervals')
   query2orf <- cache(get_query2orf, target, query) ; gc()
   message('--aligning orphans to orfs that overlap their search intervals')
-  prot2allorf <- cache(get_prot2allorf,
+  prot2allorf <- cache(
+    get_prot2allorf,
     query2orf=query2orf,
     query=query,
     target=target,
-    nsims=1e4)
+    nsims=config$prot2allorf_nsims
+  )
 
   # B9 - Queries whose gene matches (DNA-DNA) an SI 
   message('--aligning orphans to the full sequences of their search intervals')
-  dna2dna <- cache(get_dna2dna, query, target, maxspace=5e7)
+  dna2dna <- cache(
+    get_dna2dna,
+    query=query,
+    target=target,
+    maxspace=config$dna2dna_maxspace
+  )
 
   list(
     species=species,
@@ -144,53 +142,106 @@ buildFeatureTable <- function(result, query, config){
   )
 }
 
-buildLabels <- function(feats){
-  require(tidyr)
-  # TODO: Reimplement as a tree - bonus, can modify and print
-  with(feats,
-    data.frame(
-      seqid = seqid,
-      gen.g         =  gen                                                         ,
-      gen.Gt        = !gen &  trn                                                  ,
-      gen.GTo       = !gen & !trn &  orf                                           ,
-      unk.GTONA     = !gen & !trn & !orf & !nuc &  una                             ,
-      unk.GTONad    = !gen & !trn & !orf & !nuc & !una &  ind                      ,
-      unk.GTONaDu   = !gen & !trn & !orf & !nuc & !una & !ind &  nst               ,
-      unk.GTONaDUr  = !gen & !trn & !orf & !nuc & !una & !ind & !nst &  res        ,
-      unk.GTONaDURs = !gen & !trn & !orf & !nuc & !una & !ind & !nst & !res &  scr ,
-      unk.GTONaDURS = !gen & !trn & !orf & !nuc & !una & !ind & !nst & !res & !scr ,
-      non.GTOnR     = !gen & !trn & !orf &  nuc & !rna                             ,
-      non.GTOnrc    = !gen & !trn & !orf &  nuc &  rna &  cds                      ,
-      non.GTOnrC    = !gen & !trn & !orf &  nuc &  rna & !cds               
-    )
-  ) %>%
-    melt(id.vars='seqid') %>%
-    dplyr::filter(value) %>%
-    dplyr::select(seqid, variable) %>%
-    tidyr::separate(variable, c('primary', 'secondary'), sep='\\.')
+buildLabelsTree <- function(feats, config){
+
+  require(yaml)
+  root <- yaml.load_file(config$f_decision_tree) %>%
+    as.Node(replaceUnderscores=FALSE)
+
+  classify <- function(node, membership=NULL){
+    if(is.null(membership)){
+      membership <- rep(TRUE, nrow(feats))
+    }
+    node$membership <- membership
+    node$N <- sum(membership)
+    if(node$name %in% names(feats)){
+      if(length(node$children) == 2){
+        yes <-  feats[[node$name]] & membership
+        no  <- !feats[[node$name]] & membership
+        classify(node$children[[1]], yes)
+        classify(node$children[[2]], no)
+      }
+    } else if(node$isRoot){
+      classify(node$children[[1]], membership)
+    }
+  }
+
+  classify(root)
+
+  root
+}
+
+labelTreeToTable <- function(root, feats){
+  toTable <- function(node) {
+    if(node$N > 0){
+      d <- data.frame(seqid = feats$seqid[node$membership])
+      d$primary <- node$primary
+      d$secondary <- node$secondary
+      d
+    } else {
+      NULL
+    }
+  }
+  root$Get(toTable, filterFun = isLeaf) %>%
+    do.call(what=rbind) %>%
+    filter(!is.na(seqid)) %>%
+    set_rownames(NULL)
+}
+
+plotDecisionTree <- function(root){
+  GetNodeLabel <- function(node) { sprintf('%s\n%s', node$name, node$N) }
+
+  GetEdgeLabel <- function(node) {
+    if(!node$isRoot){
+      if(node$name == node$parent$children[[1]]$name){
+        'yes'
+      } else {
+        'no'
+      }
+    } else {
+      NULL
+    }
+  }
+
+  GetNodeShape <- function(node) {
+    if(node$isLeaf){
+      'circle'
+    } else {
+      'square'
+    }
+  }
+
+  SetEdgeStyle(root, label=GetEdgeLabel)
+  SetNodeStyle(root, label=GetNodeLabel, shape=GetNodeShape)
+  SetGraphStyle(root, rankdir="LR")
+
+  plot(root)
 }
 
 #' Merge labels for all species
 determineLabels <- function(query, results, config){
 
   descriptions <- c(
-    g         = 'genic: known gene',
-    Gt        = 'genic: unknown ORF on known mRNA',
-    GTo       = 'genic: unknown ORF off known mRNA',
-    GTONA     = 'unknown: maps off the scaffold',
-    GTONad    = 'unknown: possible indel',
-    GTONaDu   = 'unknown: possible N-string',
-    GTONaDUr  = 'unknown: possible resized',
-    GTONaDURs = 'unknown: syntenically scrambled',
-    GTONaDURS = 'unknown: seriously unknown',
-    GTOnR     = 'non-genic: no gene in SI',
-    GTOnrc    = 'non-genic: CDS in SI',
-    GTOnrC    = 'non-genic: mRNA but not CDS in SI'
+    O1 = 'genic: known gene',
+    O2 = 'genic: unknown ORF on known mRNA',
+    O3 = 'genic: unknown ORF off known mRNA',
+    U1 = 'unknown: maps off the scaffold',
+    U2 = 'unknown: possible indel',
+    U3 = 'unknown: possible N-string',
+    U4 = 'unknown: possible resized',
+    U5 = 'unknown: syntenically scrambled',
+    U6 = 'unknown: seriously unknown',
+    N1 = 'non-genic: no gene in SI',
+    N2 = 'non-genic: CDS in SI',
+    N3 = 'non-genic: mRNA but not CDS in SI'
   )
 
   features <- lapply(results, buildFeatureTable, query, config)
 
-  labels <- lapply(features, buildLabels)
+  labelTrees <- lapply(features, buildLabelsTree, config)
+
+  labels <- lapply(names(labelTrees), function(x) labelTreeToTable(labelTrees[[x]], features[[x]])) %>%
+    set_names(names(labelTrees))
 
   label.summary <- labels %>%
     lapply(count, primary, secondary) %>%
@@ -204,6 +255,7 @@ determineLabels <- function(query, results, config){
     as.data.frame
 
   list(
+    trees=labelTrees,
     labels=labels,
     summary=label.summary
   )

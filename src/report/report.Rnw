@@ -28,6 +28,7 @@
 \makeatother
 
 \title{Report}
+
 \begin{document}
 
 \maketitle
@@ -45,7 +46,10 @@ deps <- c(
     "scales",
     "intervals",
     "data.tree",
-    "xtable"
+    "xtable",
+    "robustreg",
+    "fitdistrplus",
+    "yaml"
 )
 bio.deps <- c('Biostrings', 'GenomicRanges', 'BiocParallel')
 chooseCRANmirror(ind=1)
@@ -69,10 +73,10 @@ for (x in c(deps, bio.deps)) {
 <<introduction, child='sections/introduction.Rnw'>>=
 @
 
-% \section{Input data}
-%
-% <<input, child='sections/input.Rnw'>>=
-% @
+\section{Input data}
+
+<<input, child='sections/input.Rnw'>>=
+@
 
 \section{Classification results}
 

@@ -459,8 +459,8 @@ testSI <- function(si, tinfo, qinfo){
 LoadSearchIntervals <- function(sifile, extend=FALSE, extend_factor=1, qinfo=NULL, tinfo=NULL){
   require(magrittr)
   si <- read.table(sifile, stringsAsFactors=FALSE)
-  stopifnot(ncol(si) == 8)
-  names(si) <- c('gene', 'qchr', 'qstart', 'qstop', 'tchr', 'tstart', 'tstop', 'flag')
+  stopifnot(ncol(si) == 9)
+  names(si) <- c('gene', 'qchr', 'qstart', 'qstop', 'tchr', 'tstart', 'tstop', 'strand', 'flag')
 
   si$tstart <- as.numeric(si$tstart)
   si$tstop <- as.numeric(si$tstop)

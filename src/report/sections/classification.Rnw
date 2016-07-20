@@ -68,6 +68,86 @@ origin <- determineOrigins(labels, config)
 
 @
 
+\subsection{Gene stories}
+
+<<>>=
+load('../../cache/Arabidopsis_thaliana.vs.Arabidopsis_lyrata-LoadTarget.Rdat')
+target <- out
+
+q <- "AT4G18000.1"
+
+names(query$gff) <- query$gff$seqid
+
+query$gff[q]
+
+qids <- findOverlaps(
+  query$gff[q],
+  target$syn$query,
+  maxgap=1000L,
+  ignore.strand=TRUE
+) %$% subjectHits
+
+range2df <- function(r, side, group){
+  df <- ranges(r) %>% as.data.frame
+  df$chr <- r %>% seqnames %>% as.character
+  df$side <- side
+  df$group <- group
+  df$id <- 1:nrow(df)
+  df
+}
+
+qints <- target$syn$query[qids]
+tints <- target$syn$target[qints$over]
+qsi   <- target$si$query[which(target$si$query$seqid == q)]
+tsi   <- target$si$target[qsi$id]
+
+d <- do.call(
+    rbind,
+    list(
+        range2df(qints, 'query', 'syn'),
+        range2df(tints, 'target', 'syn'),
+        range2df(qsi, 'query', 'si'),
+        range2df(tsi, 'target', 'si')
+    )
+)
+
+d$y <- ifelse(d$side == 'target', 1, -1)
+d$y[d$group == 'syn'] <- d$y[d$group == 'syn'] / 1.1
+d$y <- d$y + runif(nrow(d), -0.01, 0.01)
+d <- group_by(d, side, chr) %>%
+    mutate(start=start - min(start) + 1, end=start + width - 1) %>%
+    ungroup
+
+# lines <- data.frame(
+#     y=subset(d, side=='query', group=='syn') %$% y,
+#     yend=subset(d, side=='query', group=='syn'),
+# )
+
+ggplot() +
+    geom_segment(
+        data=d,
+        aes(
+            x=start,
+            xend=end,
+            y=y,
+            yend=y,
+            color=group
+        ),
+        size=2,
+        alpha=0.4
+    ) #+
+    # geom_segment(
+    #     data=lines,
+    #     aes(
+    #         x=x,
+    #         xend=xend,
+    #         y=y,
+    #         yend=yend
+    #     )
+    # )
+
+@
+
 \subsection{Data input}
 
 <<echo=TRUE>>=

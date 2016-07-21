@@ -236,17 +236,19 @@ plotOne <- function(q="AT4G18000.1", target=NULL, k=10000L){
     do.call(grid.arrange, c(gplots, ncol=1))
 }
 
-# plotOne(q=query$orphans[1])
+# # Non-inversed transposition
+# plotOne(q=query$orphans[100], k=10000)
+#
+# plotOne(q=query$orphans[1], k=1000)
 #
 # plotOne(q=query$orphans[2])
 #
 # plotOne(q=query$orphans[3])
 #
-# plotOne(q=query$orphans[100], k=10000)
 #
 # plotOne(q=query$orphans[200], k=10000)
 #
-# q <- labels$labels$Arabidopsis_lyrata %>% subset(secondary == "O1") %$% seqid
+# # q <- labels$labels$Arabidopsis_lyrata %>% subset(secondary == "O1") %$% seqid
 #     plotOne(q[1], k=10000)
 #     plotOne(q[2], k=10000)
 #     plotOne(q[3], k=10000)
@@ -254,7 +256,7 @@ plotOne <- function(q="AT4G18000.1", target=NULL, k=10000L){
 #     plotOne(q[5], k=10000)
 #     plotOne(q[6], k=10000)
 #     plotOne(q[7], k=10000)
-# q <- labels$labels$Arabidopsis_lyrata %>% subset(secondary == "O2") %$% seqid
+# # q <- labels$labels$Arabidopsis_lyrata %>% subset(secondary == "O2") %$% seqid
 #     plotOne(q[1], k=10000)
 #     plotOne(q[2], k=10000)
 #     plotOne(q[3], k=10000)

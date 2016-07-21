@@ -19,6 +19,7 @@ require(fitdistrplus)
 require(ape)
 require(data.tree)
 require(yaml)
+require(gridExtra)
 
 source('~/src/git/fagin/src/report/R/util.R')
 source('~/src/git/fagin/src/report/R/classification.R')
@@ -65,6 +66,204 @@ results <- cache(get_results)
 model2locus <- get_model2locus_map(query)
 labels <- determineLabels(query, results, config)
 origin <- determineOrigins(labels, config)
+
+@
+
+\subsection{Gene stories}
+
+<<>>=
+
+plotOne <- function(q="AT4G18000.1", target=NULL, k=10000L){
+    if(is.null(target)){
+        load('../../cache/Arabidopsis_thaliana.vs.Arabidopsis_lyrata-LoadTarget.Rdat')
+        target <- out
+    }
+
+    names(query$gff) <- query$gff$seqid
+
+    query$gff[q]
+
+    qids <- findOverlaps(
+      query$gff[q],
+      target$syn$query,
+      maxgap=k,
+      ignore.strand=TRUE
+    ) %$% subjectHits
+
+    range2df <- function(r, side='query', group='syn'){
+      df <- ranges(r) %>% as.data.frame
+      df$chr <- r %>% seqnames %>% as.character
+      df$names <- NULL # needed only draw from query$gff
+      df$group <- group
+      df$side <- side
+      df$strand <- strand(r) %>% as.character
+      df$id <- 1:nrow(df)
+      df
+    }
+
+    bindAndPlot <- function(chrname, d) {
+        td <- d[[chrname]]
+        synids <- subset(td, group == "syn") %$% id
+
+        td <- do.call(
+            rbind,
+            list(
+                td,
+                range2df(query$gff[q], 'query', 'query'),
+                range2df(qints, 'query', 'syn') %>% subset(id %in% synids)
+            )
+        )
+
+        tmin <- subset(td, side=='target' & group=='syn') %$% start %>% min
+        tmax <- subset(td, side=='target' & group=='syn') %$% end %>% max
+        qmin <- subset(td, side=='query' & group=='syn') %$% start %>% min
+        qmax <- subset(td, side=='query' & group=='syn') %$% end %>% max
+
+
+        tout <- target$syn$target %>% split(target$syn$target %>% seqnames)
+        tout <- tout[[chrname]]
+        tout <- tout[start(tout) >= tmin & end(tout) <= tmax]
+
+        qchr <- td[td$side=='query', ]$chr[1]
+        qout <- target$syn$query %>% split(target$syn$query %>% seqnames)
+        qout <- qout[[qchr]]
+        qout <- qout[start(qout) >= qmin & end(qout) <= qmax]
+
+        td <- do.call(
+            rbind,
+            list(
+                td,
+                range2df(tout, 'target', 'out'),
+                range2df(qout, 'query', 'out')
+            )
+        )
+
+        td <- group_by(td, side, chr) %>%
+            mutate(start=start - min(start) + 1, end=start + width - 1) %>%
+            ungroup
+
+        td$y <- 0
+        td$y[td$side == 'query'  & td$group == 'syn']   <- -1
+        td$y[td$side == 'query'  & td$group == 'out']   <- -1
+        td$y[td$side == 'target' & td$group == 'syn']   <-  1 
+        td$y[td$side == 'target' & td$group == 'out']   <-  1 
+        td$y[td$side == 'query'  & td$group == 'query'] <- -1.1
+        td$y[td$side == 'target' & td$group == 'si']    <-  1.1
+        td$y <- td$y + seq(from=-0.025, to=0.025, length.out=nrow(td))
+
+        intlines <- data.frame(
+            qx=subset(td, side=='query' & group=='syn') %>% with((start + end) / 2),
+            qy=subset(td, side=='query' & group=='syn') %$% y,
+            tx=subset(td, side=='target' & group=='syn') %>% with((start + end) / 2),
+            ty=subset(td, side=='target' & group=='syn') %$% y
+        )
+
+
+        ggplot() +
+            geom_segment(
+                data=subset(td, group=='out'),
+                aes(
+                    x=start,
+                    xend=end,
+                    y=y,
+                    yend=y
+                ),
+                size=2,
+                alpha=0.3,
+                color='black'
+            ) +
+            geom_segment(
+                data=subset(td, group=='syn'),
+                aes(
+                    x=start,
+                    xend=end,
+                    y=y,
+                    yend=y,
+                    color=strand
+                ),
+                size=2,
+            ) +
+            geom_segment(
+                data=subset(td, group=='si'),
+                aes(
+                    x=start,
+                    xend=end,
+                    y=y,
+                    yend=y
+                ),
+                size=3,
+                alpha=0.5,
+                color='orange'
+            ) +
+            geom_segment(
+                data=subset(td, group=='query'),
+                aes(
+                    x=start,
+                    xend=end,
+                    y=y,
+                    yend=y
+                ),
+                color='blue',
+                size=3,
+            ) +
+            geom_segment(
+                data=intlines,
+                aes(
+                    x=qx,
+                    xend=tx,
+                    y=qy,
+                    yend=ty
+                ),
+                alpha=0.2
+            )
+    }
+
+    qints <- target$syn$query[qids]
+    tints <- target$syn$target[qints$over]
+    qsi   <- target$si$query[which(target$si$query$seqid == q)]
+    tsi   <- target$si$target[qsi$id]
+
+    d <- do.call(
+        rbind,
+        list(
+            range2df(tints, 'target', 'syn'),
+            range2df(tsi, 'target', 'si')
+        )
+    )
+    d <- split(d, d$chr)
+    gplots <- lapply(names(d), bindAndPlot, d)
+
+    do.call(grid.arrange, c(gplots, ncol=1))
+}
+
+# # Non-inversed transposition
+# plotOne(q=query$orphans[100], k=10000)
+#
+# plotOne(q=query$orphans[1], k=1000)
+#
+# plotOne(q=query$orphans[2])
+#
+# plotOne(q=query$orphans[3])
+#
+#
+# plotOne(q=query$orphans[200], k=10000)
+#
+# # q <- labels$labels$Arabidopsis_lyrata %>% subset(secondary == "O1") %$% seqid
+#     plotOne(q[1], k=10000)
+#     plotOne(q[2], k=10000)
+#     plotOne(q[3], k=10000)
+#     plotOne(q[4], k=10000)
+#     plotOne(q[5], k=10000)
+#     plotOne(q[6], k=10000)
+#     plotOne(q[7], k=10000)
+# # q <- labels$labels$Arabidopsis_lyrata %>% subset(secondary == "O2") %$% seqid
+#     plotOne(q[1], k=10000)
+#     plotOne(q[2], k=10000)
+#     plotOne(q[3], k=10000)
+#     plotOne(q[4], k=10000)
+#     plotOne(q[5], k=10000)
+#     plotOne(q[6], k=10000)
+#     plotOne(q[7], k=10000)
 
 @
 

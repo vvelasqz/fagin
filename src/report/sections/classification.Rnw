@@ -28,6 +28,7 @@ source('~/src/git/fagin/src/report/R/indels.R')
 source('~/src/git/fagin/src/report/R/syntenic_stats.R')
 source('~/src/git/fagin/src/report/R/sequence_alignments.R')
 source('~/src/git/fagin/src/report/R/feature_overlaps.R')
+source('~/src/git/fagin/src/report/R/plot.R')
 
 use_cache=TRUE
 cache <- cache_factory(config)
@@ -66,204 +67,6 @@ results <- cache(get_results)
 model2locus <- get_model2locus_map(query)
 labels <- determineLabels(query, results, config)
 origin <- determineOrigins(labels, config)
-
-@
-
-\subsection{Gene stories}
-
-<<>>=
-
-plotOne <- function(q="AT4G18000.1", target=NULL, k=10000L){
-    if(is.null(target)){
-        load('../../cache/Arabidopsis_thaliana.vs.Arabidopsis_lyrata-LoadTarget.Rdat')
-        target <- out
-    }
-
-    names(query$gff) <- query$gff$seqid
-
-    query$gff[q]
-
-    qids <- findOverlaps(
-      query$gff[q],
-      target$syn$query,
-      maxgap=k,
-      ignore.strand=TRUE
-    ) %$% subjectHits
-
-    range2df <- function(r, side='query', group='syn'){
-      df <- ranges(r) %>% as.data.frame
-      df$chr <- r %>% seqnames %>% as.character
-      df$names <- NULL # needed only draw from query$gff
-      df$group <- group
-      df$side <- side
-      df$strand <- strand(r) %>% as.character
-      df$id <- 1:nrow(df)
-      df
-    }
-
-    bindAndPlot <- function(chrname, d) {
-        td <- d[[chrname]]
-        synids <- subset(td, group == "syn") %$% id
-
-        td <- do.call(
-            rbind,
-            list(
-                td,
-                range2df(query$gff[q], 'query', 'query'),
-                range2df(qints, 'query', 'syn') %>% subset(id %in% synids)
-            )
-        )
-
-        tmin <- subset(td, side=='target' & group=='syn') %$% start %>% min
-        tmax <- subset(td, side=='target' & group=='syn') %$% end %>% max
-        qmin <- subset(td, side=='query' & group=='syn') %$% start %>% min
-        qmax <- subset(td, side=='query' & group=='syn') %$% end %>% max
-
-
-        tout <- target$syn$target %>% split(target$syn$target %>% seqnames)
-        tout <- tout[[chrname]]
-        tout <- tout[start(tout) >= tmin & end(tout) <= tmax]
-
-        qchr <- td[td$side=='query', ]$chr[1]
-        qout <- target$syn$query %>% split(target$syn$query %>% seqnames)
-        qout <- qout[[qchr]]
-        qout <- qout[start(qout) >= qmin & end(qout) <= qmax]
-
-        td <- do.call(
-            rbind,
-            list(
-                td,
-                range2df(tout, 'target', 'out'),
-                range2df(qout, 'query', 'out')
-            )
-        )
-
-        td <- group_by(td, side, chr) %>%
-            mutate(start=start - min(start) + 1, end=start + width - 1) %>%
-            ungroup
-
-        td$y <- 0
-        td$y[td$side == 'query'  & td$group == 'syn']   <- -1
-        td$y[td$side == 'query'  & td$group == 'out']   <- -1
-        td$y[td$side == 'target' & td$group == 'syn']   <-  1 
-        td$y[td$side == 'target' & td$group == 'out']   <-  1 
-        td$y[td$side == 'query'  & td$group == 'query'] <- -1.1
-        td$y[td$side == 'target' & td$group == 'si']    <-  1.1
-        td$y <- td$y + seq(from=-0.025, to=0.025, length.out=nrow(td))
-
-        intlines <- data.frame(
-            qx=subset(td, side=='query' & group=='syn') %>% with((start + end) / 2),
-            qy=subset(td, side=='query' & group=='syn') %$% y,
-            tx=subset(td, side=='target' & group=='syn') %>% with((start + end) / 2),
-            ty=subset(td, side=='target' & group=='syn') %$% y
-        )
-
-
-        ggplot() +
-            geom_segment(
-                data=subset(td, group=='out'),
-                aes(
-                    x=start,
-                    xend=end,
-                    y=y,
-                    yend=y
-                ),
-                size=2,
-                alpha=0.3,
-                color='black'
-            ) +
-            geom_segment(
-                data=subset(td, group=='syn'),
-                aes(
-                    x=start,
-                    xend=end,
-                    y=y,
-                    yend=y,
-                    color=strand
-                ),
-                size=2,
-            ) +
-            geom_segment(
-                data=subset(td, group=='si'),
-                aes(
-                    x=start,
-                    xend=end,
-                    y=y,
-                    yend=y
-                ),
-                size=3,
-                alpha=0.5,
-                color='orange'
-            ) +
-            geom_segment(
-                data=subset(td, group=='query'),
-                aes(
-                    x=start,
-                    xend=end,
-                    y=y,
-                    yend=y
-                ),
-                color='blue',
-                size=3,
-            ) +
-            geom_segment(
-                data=intlines,
-                aes(
-                    x=qx,
-                    xend=tx,
-                    y=qy,
-                    yend=ty
-                ),
-                alpha=0.2
-            )
-    }
-
-    qints <- target$syn$query[qids]
-    tints <- target$syn$target[qints$over]
-    qsi   <- target$si$query[which(target$si$query$seqid == q)]
-    tsi   <- target$si$target[qsi$id]
-
-    d <- do.call(
-        rbind,
-        list(
-            range2df(tints, 'target', 'syn'),
-            range2df(tsi, 'target', 'si')
-        )
-    )
-    d <- split(d, d$chr)
-    gplots <- lapply(names(d), bindAndPlot, d)
-
-    do.call(grid.arrange, c(gplots, ncol=1))
-}
-
-# # Non-inversed transposition
-# plotOne(q=query$orphans[100], k=10000)
-#
-# plotOne(q=query$orphans[1], k=1000)
-#
-# plotOne(q=query$orphans[2])
-#
-# plotOne(q=query$orphans[3])
-#
-#
-# plotOne(q=query$orphans[200], k=10000)
-#
-# # q <- labels$labels$Arabidopsis_lyrata %>% subset(secondary == "O1") %$% seqid
-#     plotOne(q[1], k=10000)
-#     plotOne(q[2], k=10000)
-#     plotOne(q[3], k=10000)
-#     plotOne(q[4], k=10000)
-#     plotOne(q[5], k=10000)
-#     plotOne(q[6], k=10000)
-#     plotOne(q[7], k=10000)
-# # q <- labels$labels$Arabidopsis_lyrata %>% subset(secondary == "O2") %$% seqid
-#     plotOne(q[1], k=10000)
-#     plotOne(q[2], k=10000)
-#     plotOne(q[3], k=10000)
-#     plotOne(q[4], k=10000)
-#     plotOne(q[5], k=10000)
-#     plotOne(q[6], k=10000)
-#     plotOne(q[7], k=10000)
 
 @
 
@@ -870,4 +673,221 @@ plot_fits('dna2dna')
 %
 %   count(class) %>%
 %   xtable(caption='Counts of primaries labels in youngest to oldest strata')
+% @
+
+\subsection{Synteny successes: the good, the bad, and the ugly}
+
+\begin{itemize}
+  \item Fagin v0.2.1
+  \item Synder v0.3.1
+\end{itemize}
+
+<<cache=TRUE>>=
+load('~/src/git/fagin/cache/Arabidopsis_thaliana.vs.Arabidopsis_lyrata-LoadTarget.Rdat')
+target <- out
+@
+
+
+\subsubsection{The Good}
+
+\begin{figure}[!ht]
+  \centering
+<<cache=TRUE>>=
+  plotOne(q='AT1G01471.1', target, k=1000)
+@
+  \caption{We nail these simplest case}
+  \label{fig:good-1}
+\end{figure}
+
+\begin{figure}[!ht]
+  \centering
+<<cache=TRUE>>=
+  plotOne(q='AT2G31981.1', target, k=1000)
+@
+  \caption{Duplications and overlaps with extensions, no problems.}
+  \label{fig:good-2}
+\end{figure}
+
+\begin{figure}[!ht]
+  \centering
+<<cache=TRUE>>=
+  plotOne(q='AT2G38350.1', target, k=3000)
+@
+  \caption{Weird duplication event is handled nicely.}
+  \label{fig:good-2}
+\end{figure}
+
+
+
+\subsubsection{The Bad}
+
+\begin{figure}[!ht]
+  \centering
+<<cache=TRUE>>=
+  plotOne(q='AT1G35320.1', target, k=10000)
+@
+  \caption{Case 1: Lack of strand awareness results in the search interval
+    being placed on the wrong side of a block (\textbf{top}).}
+  \label{fig:case-1}
+\end{figure}
+
+\begin{figure}[!ht]
+  \centering
+<<cache=TRUE>>=
+  plotOne(q='AT2G47844.1', target, k=1000)
+@
+\caption{Case 2: Clean flag==2 case extends further than needed. It would be
+  better to snap to the end of the nearest adjacent block.}
+  \label{fig:case-1}
+\end{figure}
+
+\begin{figure}[!ht]
+  \centering
+<<cache=TRUE>>=
+  plotOne(q='AT3G13403.1', target, k=1000)
+@
+\caption{Case x: Clean flag==3 case extends further than needed. Again,
+  snapping would be cleaner.}
+  \label{fig:case-1}
+\end{figure}
+
+\begin{figure}[!ht]
+  \centering
+<<cache=TRUE>>=
+  plotOne(q='AT3G04854.1', target, k=3000)
+@
+\caption{Case 3: (\textbf{search interval on right}) incorrectly asserts an
+  inversion occurred and places search interval on the wrong side.}
+  \label{fig:case-1}
+\end{figure}
+
+\begin{figure}[!ht]
+  \centering
+<<cache=TRUE>>=
+  plotOne(q='AT4G31960.1', target, k=3000)
+@
+\caption{Case 4: This looks like it should be a clean flag==0. Why the double
+  search interval?}
+  \label{fig:case-4}
+\end{figure}
+
+\subsubsection{The Ugly}
+
+\begin{figure}[!ht]
+  \centering
+<<cache=TRUE>>=
+plotOne(q='AT1G01073.1', target, k=1000)
+@
+  \caption{Case 2a: slightly overlapping regions split badly}
+  \label{fig:case-2a}
+\end{figure}
+
+\begin{figure}[!ht]
+  \centering
+<<cache=TRUE>>=
+plotOne(q='AT2G34800.1', target, k=3000)
+@
+  \caption{Case 2b: slightly overlapping(?) regions split badly}
+  \label{fig:case-2a}
+\end{figure}
+
+\begin{figure}[!ht]
+  \centering
+<<cache=TRUE>>=
+plotOne(q='AT3G08762.1', target, k=1000)
+@
+  \caption{Case 3: Homologous intervals that overlap in both target and query.
+    Perhaps these should be merged, but there is something weird going on at
+    the sequence level that causes this. Maybe they should be merged with a
+    flag.}
+  \label{fig:case-3}
+\end{figure}
+
+\begin{figure}[!ht]
+  \centering
+<<cache=TRUE>>=
+plotOne(q='AT3G18957.1', target, k=3000)
+@
+  \caption{Case 3b: Again homologous intervals overlapping on both sides
+    disrupt an otherwise clean flag==0 case.}
+  \label{fig:case-2a}
+\end{figure}
+
+\begin{figure}[!ht]
+  \centering
+<<cache=TRUE>>=
+plotOne(q='AT3G25719.1', target, k=5000)
+@
+  \caption{Case 4: Large singleton insertion. The search interval should extend past the insertion, clipping to the nearest block. Likewise on the target side, it should clip somewhere ...}
+  \label{fig:case-4}
+\end{figure}
+
+
+\begin{figure}[!ht]
+  \centering
+<<cache=TRUE>>=
+plotOne(q='AT3G25719.1', target, k=5000)
+@
+  \caption{Case 5: I have no idea why there is a second SI}
+  \label{fig:case-4}
+\end{figure}
+
+
+\begin{figure}[!ht]
+  \centering
+<<cache=TRUE>>=
+plotOne(q='AT3G32120.1', target, k=10000)
+@
+  \caption{Case 6a: Extreme distance}
+  \label{fig:case-6a}
+\end{figure}
+
+\begin{figure}[!ht]
+  \centering
+<<cache=TRUE>>=
+plotOne(q='AT3G42148.1', target, k=10000)
+@
+  \caption{Case 6b: A Hardboiled Wonderland. There are a bunch of genes in this
+    class. I think they are centromere genes}
+  \label{fig:case-6b}
+\end{figure}
+
+\begin{figure}[!ht]
+  \centering
+<<cache=TRUE>>=
+plotOne(q='AT4G16915.1', target, k=100000)
+@
+  \caption{Case 6c: THIS IS SPARTA}
+  \label{fig:case-6c}
+\end{figure}
+
+\begin{figure}[!ht]
+  \centering
+<<cache=TRUE>>=
+plotOne(q='AT55G56795.1', target, k=2000)
+@
+  \caption{Case 7: Multiple non-adjacent insertions.}
+  \label{fig:case-6c}
+\end{figure}
+
+% <<>>=
+% # Non-inversed transposition
+% 
+% 
+% # # q <- labels$labels$Arabidopsis_lyrata %>% subset(secondary == "O1") %$% seqid
+%     plotOne(q[1], target, k=10000)
+%     plotOne(q[2], target, k=10000)
+%     plotOne(q[3], target, k=10000)
+%     plotOne(q[4], target, k=10000)
+%     plotOne(q[5], target, k=10000)
+%     plotOne(q[6], target, k=10000)
+%     plotOne(q[7], target, k=10000)
+% # # q <- labels$labels$Arabidopsis_lyrata %>% subset(secondary == "O2") %$% seqid
+%     plotOne(q[1], target, k=10000)
+%     plotOne(q[2], target, k=10000)
+%     plotOne(q[3], target, k=10000)
+%     plotOne(q[4], target, k=10000)
+%     plotOne(q[5], target, k=10000)
+%     plotOne(q[6], target, k=10000)
+%     plotOne(q[7], target, k=10000)
 % @

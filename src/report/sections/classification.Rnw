@@ -112,7 +112,6 @@ ggplot +
 \end{figure}
 
 
-
 \subsection{Search interval overview}
 %
 Syntenic flags:
@@ -562,44 +561,6 @@ origin$backbone %>%
 @
 
 
-\subsection{Gumbel fitting diagnostics}
-
-<<>>=
-require(fitdistrplus)
-plot_fits <- function(group){
-  for (species in names(results)){
-    fit <- results[[species]][[group]]$dis$fit
-    plot(fit, breaks=70)
-    cat(sprintf('%s\n', species))
-  }
-}
-@
-
-\subsubsection{Query protein to target protein}
-
-<<>>=
-plot_fits('prot2prot')
-@
-
-\subsubsection{Query protein to spliced ORF}
-
-<<>>=
-plot_fits('prot2transorf')
-@
-
-\subsubsection{Query protein to any ORF}
-
-<<>>=
-plot_fits('prot2allorf')
-@
-
-\subsubsection{Query DNA to search interval DNA}
-
-<<>>=
-plot_fits('dna2dna')
-@
-
-
 % <<>>=
 % a <- labels$labels %>% melt %>% dplyr::rename(species=L1, query=seqid)
 % b <- results %>%
@@ -675,200 +636,229 @@ plot_fits('dna2dna')
 %   xtable(caption='Counts of primaries labels in youngest to oldest strata')
 % @
 
-\subsection{Synteny successes: the good, the bad, and the ugly}
+\newpage
+\section{Appendix}
 
-\begin{itemize}
-  \item Fagin v0.2.1
-  \item Synder v0.3.1
-\end{itemize}
+\subsection{Synteny cases: the good, the bad, and the ugly}
+
+In this subsection I will cover the cases Synder and Fagin handles goodly,
+badly, and ugly. As my methods improve, cases should migrate from ugly to bad
+to good.
+
+\begin{description}
+
+  \item[The Good] Handled exactly as I they ought to be.
+
+  \item[The Bad] Wrong in obvious, clear-cut ways; these are nice in that they
+      can probably be resolved with obvious (though possibly hard to implement)
+      changes in the Synder algorithm.
+
+  \item[The Ugly] May be 1) messy but not seriously off, 2) seriously off in
+      difficult to fix ways, or 3) seriously off in ways I don't even
+      understand. 
+
+\end{description}
 
 <<cache=TRUE>>=
 load('~/src/git/fagin/cache/Arabidopsis_thaliana.vs.Arabidopsis_lyrata-LoadTarget.Rdat')
 target <- out
 @
 
-
 \subsubsection{The Good}
+\FloatBarrier
 
 \begin{figure}[!ht]
   \centering
 <<cache=TRUE>>=
   plotOne(q='AT1G01471.1', target, k=1000)
 @
-  \caption{We nail these simplest case}
-  \label{fig:good-1}
+\caption{\textbf{Case 1: Query within a homologous region.} We nail the simplest case}
+  \label{fig:good-case-1}
 \end{figure}
-
+%
 \begin{figure}[!ht]
   \centering
 <<cache=TRUE>>=
   plotOne(q='AT2G31981.1', target, k=1000)
 @
-  \caption{Duplications and overlaps with extensions, no problems.}
-  \label{fig:good-2}
+\caption{\textbf{Case 2a: Dulication.} Duplications and overlaps with
+    extensions, no problems.}
+  \label{fig:good-case-2a}
 \end{figure}
-
+%
 \begin{figure}[!ht]
   \centering
 <<cache=TRUE>>=
   plotOne(q='AT2G38350.1', target, k=3000)
 @
-  \caption{Weird duplication event is handled nicely.}
-  \label{fig:good-2}
+  \caption{\textbf{Case 2b: Dulications.} Weird duplication event is handled nicely.}
+  \label{fig:good-case-2b}
 \end{figure}
-
+\FloatBarrier
 
 
 \subsubsection{The Bad}
+\FloatBarrier
 
 \begin{figure}[!ht]
   \centering
 <<cache=TRUE>>=
   plotOne(q='AT1G35320.1', target, k=10000)
 @
-  \caption{Case 1: Lack of strand awareness results in the search interval
-    being placed on the wrong side of a block (\textbf{top}).}
-  \label{fig:case-1}
+\caption{\textbf{Case 1: strand mishandling}. (\textbf{top}) lack of strand awareness results in
+    the search interval being placed on the wrong side of a block.}
+  \label{fig:bad-case-1}
 \end{figure}
-
+%
 \begin{figure}[!ht]
   \centering
 <<cache=TRUE>>=
   plotOne(q='AT2G47844.1', target, k=1000)
 @
-\caption{Case 2: Clean flag==2 case extends further than needed. It would be
-  better to snap to the end of the nearest adjacent block.}
-  \label{fig:case-1}
+\caption{\textbf{Case 2: excessive extension.} Clean flag==2 case extends
+    further than needed. It would be better to snap to the end of the nearest
+    adjacent block.}
+  \label{fig:bad-case-2}
 \end{figure}
-
+%
 \begin{figure}[!ht]
   \centering
 <<cache=TRUE>>=
   plotOne(q='AT3G13403.1', target, k=1000)
 @
-\caption{Case x: Clean flag==3 case extends further than needed. Again,
-  snapping would be cleaner.}
-  \label{fig:case-1}
+\caption{\textbf{Case 3: double excess extension.} Clean flag==3 case extends
+    further than needed. Again, snapping would be cleaner.}
+  \label{fig:bad-case-3}
 \end{figure}
-
+%
 \begin{figure}[!ht]
   \centering
 <<cache=TRUE>>=
   plotOne(q='AT3G04854.1', target, k=3000)
 @
-\caption{Case 3: (\textbf{search interval on right}) incorrectly asserts an
-  inversion occurred and places search interval on the wrong side.}
-  \label{fig:case-1}
+\caption{\textbf{Case 4: falsly imputed inversion.} incorrectly asserts an
+    inversion occurred and places search interval on the wrong side
+    (\textbf{search interval on right}).}
+  \label{fig:bad-case-4}
 \end{figure}
 
-\begin{figure}[!ht]
-  \centering
-<<cache=TRUE>>=
-  plotOne(q='AT4G31960.1', target, k=3000)
-@
-\caption{Case 4: This looks like it should be a clean flag==0. Why the double
-  search interval?}
-  \label{fig:case-4}
-\end{figure}
 
 \subsubsection{The Ugly}
+\FloatBarrier
 
 \begin{figure}[!ht]
   \centering
 <<cache=TRUE>>=
 plotOne(q='AT1G01073.1', target, k=1000)
 @
-  \caption{Case 2a: slightly overlapping regions split badly}
-  \label{fig:case-2a}
+\caption{\textbf{Case 2a: overlapping homologous regions.} Slightly overlapping
+    regions split badly}
+  \label{fig:ugly-case-1a}
 \end{figure}
-
+%
 \begin{figure}[!ht]
   \centering
 <<cache=TRUE>>=
 plotOne(q='AT2G34800.1', target, k=3000)
 @
-  \caption{Case 2b: slightly overlapping(?) regions split badly}
-  \label{fig:case-2a}
+\caption{\textbf{Case 2b: overlapping homologous regions.} Slightly
+    overlapping(?) regions split badly}
+  \label{fig:ugly-case-1b}
 \end{figure}
-
+%
 \begin{figure}[!ht]
   \centering
 <<cache=TRUE>>=
 plotOne(q='AT3G08762.1', target, k=1000)
 @
-  \caption{Case 3: Homologous intervals that overlap in both target and query.
-    Perhaps these should be merged, but there is something weird going on at
-    the sequence level that causes this. Maybe they should be merged with a
-    flag.}
-  \label{fig:case-3}
+\caption{\textbf{Case 2a: adjacently overlapping.} Homologous intervals that
+    overlap in both target and query.  Perhaps these should be merged, but
+    there is something weird going on at the sequence level that causes this.
+    Maybe they should be merged with a flag.}
+  \label{fig:ugly-case-2a}
 \end{figure}
-
+%
 \begin{figure}[!ht]
   \centering
 <<cache=TRUE>>=
 plotOne(q='AT3G18957.1', target, k=3000)
 @
-  \caption{Case 3b: Again homologous intervals overlapping on both sides
-    disrupt an otherwise clean flag==0 case.}
-  \label{fig:case-2a}
+\caption{\textbf{Case 2b: adjacently overlapping.} Again homologous intervals
+    overlapping on both sides disrupt an otherwise clean flag==0 case.}
+  \label{fig:case-2b}
 \end{figure}
-
+%
 \begin{figure}[!ht]
   \centering
 <<cache=TRUE>>=
 plotOne(q='AT3G25719.1', target, k=5000)
 @
-  \caption{Case 4: Large singleton insertion. The search interval should extend past the insertion, clipping to the nearest block. Likewise on the target side, it should clip somewhere ...}
-  \label{fig:case-4}
+\caption{\textbf{Case 3a: insertions}. A single large insertion screws up the
+    otherwise contiguous blocks. The search interval should extend past the
+    insertion, clipping to the nearest block. Likewise on the target side, it
+    should clip somewhere.}
+  \label{fig:ugly-case-3a}
 \end{figure}
-
-
+%
 \begin{figure}[!ht]
   \centering
 <<cache=TRUE>>=
-plotOne(q='AT3G25719.1', target, k=5000)
+plotOne(q='AT3G42148.1', target, k=20000)
 @
-  \caption{Case 5: I have no idea why there is a second SI}
-  \label{fig:case-4}
+\caption{\textbf{Case 3a: insertions}. Double insertions and missing from main
+    context (A Hardboiled Wonderland).}
+  \label{fig:ugly-case-3b}
 \end{figure}
-
-
+%
+\begin{figure}[!ht]
+  \centering
+<<cache=TRUE>>=
+plotOne(q='AT5G56795.1', target, k=2000)
+@
+  \caption{\textbf{Case 3c: insertions} Multiple non-adjacent insertions.}
+  \label{fig:ugly-case-3c}
+\end{figure}
+%
 \begin{figure}[!ht]
   \centering
 <<cache=TRUE>>=
 plotOne(q='AT3G32120.1', target, k=10000)
 @
-  \caption{Case 6a: Extreme distance}
-  \label{fig:case-6a}
+\caption{\textbf{Case 4a: extreme distance.} There are a bunch of genes in this
+    class. I think they are centromere genes.}
+  \label{fig:ugly-case-4a}
 \end{figure}
-
-\begin{figure}[!ht]
-  \centering
-<<cache=TRUE>>=
-plotOne(q='AT3G42148.1', target, k=10000)
-@
-  \caption{Case 6b: A Hardboiled Wonderland. There are a bunch of genes in this
-    class. I think they are centromere genes}
-  \label{fig:case-6b}
-\end{figure}
-
+%
 \begin{figure}[!ht]
   \centering
 <<cache=TRUE>>=
 plotOne(q='AT4G16915.1', target, k=100000)
 @
-  \caption{Case 6c: THIS IS SPARTA}
-  \label{fig:case-6c}
+  \caption{\textbf{Case 4b: extreme distance.} THIS IS SPARTA}
+  \label{fig:ugly-case-4b}
 \end{figure}
-
 \begin{figure}[!ht]
   \centering
 <<cache=TRUE>>=
-plotOne(q='AT55G56795.1', target, k=2000)
+  plotOne(q='AT4G31960.1', target, k=3000)
 @
-  \caption{Case 7: Multiple non-adjacent insertions.}
-  \label{fig:case-6c}
+\caption{\textbf{Case 5a: Borken Oddly} This looks like it should be a clean flag==0.
+    Why the double search interval?}
+  \label{fig:ugly-case-5a}
 \end{figure}
+\FloatBarrier
+\begin{figure}[!ht]
+  \centering
+<<cache=TRUE>>=
+plotOne(q='AT3G25719.1', target, k=5000)
+@
+  \caption{\textbf{Case 5b: Borken Oddly.} I have no idea why there is a second SI}
+  \label{fig:ugly-case-5b}
+\end{figure}
+%
+
+
+\FloatBarrier
 
 % <<>>=
 % # Non-inversed transposition
@@ -891,3 +881,44 @@ plotOne(q='AT55G56795.1', target, k=2000)
 %     plotOne(q[6], target, k=10000)
 %     plotOne(q[7], target, k=10000)
 % @
+
+
+\subsection{Gumbel fitting diagnostics}
+
+<<>>=
+require(fitdistrplus)
+plot_fits <- function(group){
+  for (species in names(results)){
+    fit <- results[[species]][[group]]$dis$fit
+    plot(fit, breaks=70)
+    cat(sprintf('%s\n', species))
+  }
+}
+@
+
+\subsubsection{Query protein to target protein}
+
+<<>>=
+plot_fits('prot2prot')
+@
+
+\newpage
+\subsubsection{Query protein to spliced ORF}
+
+<<>>=
+plot_fits('prot2transorf')
+@
+
+\newpage
+\subsubsection{Query protein to any ORF}
+
+<<>>=
+plot_fits('prot2allorf')
+@
+
+\newpage
+\subsubsection{Query DNA to search interval DNA}
+
+<<>>=
+plot_fits('dna2dna')
+@

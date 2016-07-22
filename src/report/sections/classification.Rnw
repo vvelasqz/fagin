@@ -29,6 +29,7 @@ source('~/src/git/fagin/src/report/R/syntenic_stats.R')
 source('~/src/git/fagin/src/report/R/sequence_alignments.R')
 source('~/src/git/fagin/src/report/R/feature_overlaps.R')
 source('~/src/git/fagin/src/report/R/plot.R')
+source('~/src/git/fagin/src/report/R/versions.R')
 
 use_cache=TRUE
 cache <- cache_factory(config)
@@ -922,3 +923,10 @@ plot_fits('prot2allorf')
 <<>>=
 plot_fits('dna2dna')
 @
+
+\subsection{Versions}
+
+\begin{itemize}
+    \item Fagin \Sexpr{get_fagin_version(config)}
+    \item Synder \Sexpr{get_synder_version()}
+\end{itemize}

@@ -27,4 +27,4 @@ while getopts "h" opt; do
 done
 
 make
-cp report.pdf ..
+cp report.pdf ../..

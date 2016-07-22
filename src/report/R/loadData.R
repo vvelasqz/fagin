@@ -1,7 +1,8 @@
 #' Read config file
 #'
 #' Loads the following variables from the config file into a list:
-#' R_FAA_DIR    \
+#' R_HOME       \
+#' R_FAA_DIR    |
 #' R_GFF_DIR    |
 #' R_SYN_DIR    |
 #' R_GENE_DIR   |
@@ -41,6 +42,7 @@ LoadConfig <- function(configfile='~/src/git/fagin/fagin.cfg'){
     }
     source(configfile, local=TRUE)
     expected.vars <- c(
+        'R_HOME',
         'R_FAA_DIR',
         'R_GFF_DIR',
         'R_SYN_DIR',
@@ -75,13 +77,13 @@ LoadConfig <- function(configfile='~/src/git/fagin/fagin.cfg'){
         }
     }
     # Check existence of directories
-    for(v in expected.vars[1:9]){
+    for(v in expected.vars[1:10]){
         if(!dir.exists(eval(parse(text=v)))){
             warning(sprintf("Variable '%s' does not point to a valid directory", v))
         }
     }
     # Check existence of files
-    for(v in expected.vars[11:16]){
+    for(v in expected.vars[12:17]){
         if(!file.exists(eval(parse(text=v)))){
             warning(sprintf("Variable '%s' does not point to a readable file", v))
         }
@@ -93,6 +95,7 @@ LoadConfig <- function(configfile='~/src/git/fagin/fagin.cfg'){
                   R_FOCAL_SPECIES, paste(species, collapse=", ")))
     }
     list(
+        d_home              = R_HOME,
         d_faa               = R_FAA_DIR,
         d_gff               = R_GFF_DIR,
         d_syn               = R_SYN_DIR,
@@ -459,8 +462,8 @@ testSI <- function(si, tinfo, qinfo){
 LoadSearchIntervals <- function(sifile, extend=FALSE, extend_factor=1, qinfo=NULL, tinfo=NULL){
   require(magrittr)
   si <- read.table(sifile, stringsAsFactors=FALSE)
-  stopifnot(ncol(si) == 8)
-  names(si) <- c('gene', 'qchr', 'qstart', 'qstop', 'tchr', 'tstart', 'tstop', 'flag')
+  stopifnot(ncol(si) == 9)
+  names(si) <- c('gene', 'qchr', 'qstart', 'qstop', 'tchr', 'tstart', 'tstop', 'strand', 'flag')
 
   si$tstart <- as.numeric(si$tstart)
   si$tstop <- as.numeric(si$tstop)

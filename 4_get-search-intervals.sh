@@ -47,6 +47,6 @@ do
         synder -i $INPUT/search.gff -s $db -c search |
             # Remove the '>' and search interval id columns
             # These are columns which will probably be lost in the future
-            cut -f3-10 > $map
+            cut -f3-11 > $map
     fi
 done

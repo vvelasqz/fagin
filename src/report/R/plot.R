@@ -1,10 +1,14 @@
-plotOne <- function(q, target, k=10000L){
-    names(query$gff) <- query$gff$seqid
+plotOne <- function(qname, target, k=10000L){
 
-    query$gff[q]
+    if(!qname %in% query$gff$seqid){
+      warning(sprintf("'%s' is not present in the query GFF, cannot plot.", qname))
+      return(NULL)
+    }
+
+    q <- query$gff[query$gff$seqid == qname]
 
     qids <- findOverlaps(
-      query$gff[q],
+      q,
       target$syn$query,
       maxgap=k,
       ignore.strand=TRUE
@@ -29,7 +33,7 @@ plotOne <- function(q, target, k=10000L){
             rbind,
             list(
                 td,
-                range2df(query$gff[q], 'query', 'query'),
+                range2df(q, 'query', 'query'),
                 range2df(qints, 'query', 'syn') %>% subset(id %in% synids)
             )
         )
@@ -63,16 +67,21 @@ plotOne <- function(q, target, k=10000L){
             ungroup
 
         td$y <- 0
-        td$y[td$side == 'query'  & td$group == 'syn']   <- -1
-        td$y[td$side == 'target' & td$group == 'syn']   <-  1 
-        td$y[td$side == 'target' & td$group == 'si']    <-  1.3
+        td$y[td$side == 'query'  & td$group == 'syn'] <- -1
+        td$y[td$side == 'target' & td$group == 'syn'] <-  1 
+        td$y[td$side == 'target' & td$group == 'si'] <-  1.3
         td$y <- td$y + seq(from=-0.10, to=0.10, length.out=5)[(1:nrow(td)) %% 5 + 1]
         td$y[td$side == 'query'  & td$group == 'query'] <- -1.2
-        if(sum(td$group == 'si') < 3){
+        if(sum(td$group == 'si') < 2){
           td$y[td$side == 'target' & td$group == 'si'] <-  1.2
         }
-        td$y[td$side == 'query'  & td$group == 'out']   <- -1.2
-        td$y[td$side == 'target' & td$group == 'out']   <-  max(td[td$group == 'si', 'y']) + 0.1
+        td$y[td$side == 'query'  & td$group == 'out'] <- -1.2
+
+        if(sum(td$group == 'si') > 0){
+          td$y[td$side == 'target' & td$group == 'out'] <- max(td[td$group == 'si', 'y']) + 0.1
+        } else {
+          td$y[td$side == 'target' & td$group == 'out'] <- 1.2
+        }
 
         intlines <- data.frame(
             qx=subset(td, side=='query' & group=='syn') %>% with((start + end) / 2),
@@ -144,7 +153,7 @@ plotOne <- function(q, target, k=10000L){
 
     qints <- target$syn$query[qids]
     tints <- target$syn$target[qints$over]
-    qsi   <- target$si$query[which(target$si$query$seqid == q)]
+    qsi   <- target$si$query[which(target$si$query$seqid == qname)]
     tsi   <- target$si$target[qsi$id]
 
     d <- do.call(

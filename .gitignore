@@ -10,6 +10,8 @@ db/
 *.fna
 *.fasta
 
+tags
+
 log
 
 *.RDat

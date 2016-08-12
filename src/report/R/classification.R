@@ -13,80 +13,80 @@ getTargetResults <- function(species, query, config, l_seqinfo, use_cache){
   target <- cache(LoadTarget, species=species, config=config, l_seqinfo=l_seqinfo)
   message('--summarizing synteny')
 
-  # # B1 - Queries of scrambled origin
-  # synteny <- cache(summarize.flags, si=target$si, query=query)
-  #
-  # message('--processing indel and resize events')
-  # # B2 - Queries overlap an indel in a target SI
-  # ind       <- cache(findIndels, target, indel.threshold=config$indel_threshold)
-  # ind.stats <- cache(indelStats, ind)
-  # ind.sumar <- cache(indelSummaries, ind)
-  #
-  # # B5 - Queries whose SI overlap an N-string
-  # message('--mapping to gaps in target genome')  
-  # query2gap <- cache(findQueryGaps, nstring=target$nstring, target=target)
-  #
-  # # B3 and B4 (CDS and mRNA overlaps)
-  # message('--processing feature overlaps')
-  # # TODO: I do not currently use features other than CDS and mRNA, so I could
-  # # save memory by filtering them out
-  # features <- cache(analyzeTargetFeature, query, target)
-  #
-  # # B6 - Queries whose protein seq matches a target protein in the SI
-  # message('--find query matches against known genes')
-  # prot2prot <- cache(
-  #   get_prot2prot,
-  #   query=query,
-  #   target=target,
-  #   features=features,
-  #   nsims=config$prot2prot_nsims
-  # )
-  #
-  # # B7 - Queries matching ORFs on spliced mRNA
-  # message('--finding orfs in spliced mRNAs overlapping search intervals')
-  # prot2transorf <- cache(
-  #   get_prot2transorf,
-  #   query=query,
-  #   target=target,
-  #   features=features,
-  #   nsims=config$prot2transorf_nsims
-  # )
-  #
-  # # B8 - Queries whose protein matches an ORF in an SI
-  # message('--finding orfs in search intervals')
-  # query2orf <- cache(get_query2orf, target, query) ; gc()
-  # message('--aligning orphans to orfs that overlap their search intervals')
-  # prot2allorf <- cache(
-  #   get_prot2allorf,
-  #   query2orf=query2orf,
-  #   query=query,
-  #   target=target,
-  #   nsims=config$prot2allorf_nsims
-  # )
-  #
-  # # B9 - Queries whose gene matches (DNA-DNA) an SI 
-  # message('--aligning orphans to the full sequences of their search intervals')
-  # dna2dna <- cache(
-  #   get_dna2dna,
-  #   query=query,
-  #   target=target,
-  #   maxspace=config$dna2dna_maxspace
-  # )
+  # B1 - Queries of scrambled origin
+  synteny <- cache(summarize.flags, si=target$si, query=query)
+
+  message('--processing indel and resize events')
+  # B2 - Queries overlap an indel in a target SI
+  ind       <- cache(findIndels, target, indel.threshold=config$indel_threshold)
+  ind.stats <- cache(indelStats, ind)
+  ind.sumar <- cache(indelSummaries, ind)
+
+  # B5 - Queries whose SI overlap an N-string
+  message('--mapping to gaps in target genome')  
+  query2gap <- cache(findQueryGaps, nstring=target$nstring, target=target)
+
+  # B3 and B4 (CDS and mRNA overlaps)
+  message('--processing feature overlaps')
+  # TODO: I do not currently use features other than CDS and mRNA, so I could
+  # save memory by filtering them out
+  features <- cache(analyzeTargetFeature, query, target)
+
+  # B6 - Queries whose protein seq matches a target protein in the SI
+  message('--find query matches against known genes')
+  prot2prot <- cache(
+    get_prot2prot,
+    query=query,
+    target=target,
+    features=features,
+    nsims=config$prot2prot_nsims
+  )
+
+  # B7 - Queries matching ORFs on spliced mRNA
+  message('--finding orfs in spliced mRNAs overlapping search intervals')
+  prot2transorf <- cache(
+    get_prot2transorf,
+    query=query,
+    target=target,
+    features=features,
+    nsims=config$prot2transorf_nsims
+  )
+
+  # B8 - Queries whose protein matches an ORF in an SI
+  message('--finding orfs in search intervals')
+  query2orf <- cache(get_query2orf, target, query) ; gc()
+  message('--aligning orphans to orfs that overlap their search intervals')
+  prot2allorf <- cache(
+    get_prot2allorf,
+    query2orf=query2orf,
+    query=query,
+    target=target,
+    nsims=config$prot2allorf_nsims
+  )
+
+  # B9 - Queries whose gene matches (DNA-DNA) an SI 
+  message('--aligning orphans to the full sequences of their search intervals')
+  dna2dna <- cache(
+    get_dna2dna,
+    query=query,
+    target=target,
+    maxspace=config$dna2dna_maxspace
+  )
 
   list(
     species=species,
-    # synteny=synteny,
-    # syn=target$syn,
-    # unassembled=target$si$unassembled,
-    # ind=ind,
-    # ind.stats=ind.stats,
-    # ind.sumar=ind.sumar,
-    # features=features,
-    # query2gap=query2gap,
-    # prot2transorf=prot2transorf,
-    # prot2prot=prot2prot,
-    # prot2allorf=prot2allorf,
-    # dna2dna=dna2dna
+    synteny=synteny,
+    syn=target$syn,
+    unassembled=target$si$unassembled,
+    ind=ind,
+    ind.stats=ind.stats,
+    ind.sumar=ind.sumar,
+    features=features,
+    query2gap=query2gap,
+    prot2transorf=prot2transorf,
+    prot2prot=prot2prot,
+    prot2allorf=prot2allorf,
+    dna2dna=dna2dna
   )
 }
 

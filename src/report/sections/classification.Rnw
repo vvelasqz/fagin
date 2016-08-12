@@ -114,9 +114,9 @@ ggplot +
 
 
 \subsection{Search interval overview}
-%
+
 Syntenic flags:
-%
+
 \begin{description}
   \item[0] the search interval is reliable
   \item[1] the start edge is unreliable
@@ -172,7 +172,7 @@ m.syn %>%
     geom_bar(aes(fill=orphan), stat='identity', position='dodge')
 @
 
-%
+
 <<message=FALSE, cache=TRUE>>=
 m <- lapply(results, function(x) x$synteny$bittbl) %>%
   lapply(dplyr::rename, orphan=orp_prop, non_orphan=non_orp_prop) %>%
@@ -856,7 +856,6 @@ plotOne(q='AT3G25719.1', target, k=5000)
   \caption{\textbf{Case 5b: Borken Oddly.} I have no idea why there is a second SI}
   \label{fig:ugly-case-5b}
 \end{figure}
-%
 
 
 \FloatBarrier

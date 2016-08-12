@@ -57,6 +57,6 @@ do
             rm $tmpsyn $tmpque $tmptar
         fi
         # Find target-side search interval for entries in the input query gff
-        synder -i $INPUT/search.gff -s $db -c search > $map
+        synder -a -b -i $INPUT/search.gff -s $db -c search > $map
     fi
 done

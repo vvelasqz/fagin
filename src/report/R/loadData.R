@@ -319,75 +319,29 @@ testSI <- function(si, tinfo, qinfo){
     warning(sprintf('Found %d queries with stop < start. Possible bug in Synder. You should
     NOT proceed.', sum(i)))
   }
-
-  if(is.null(tinfo)){
-    maxend = Inf
-  } else {
-    maxend = seqlengths(tinfo)[si$tchr]
-    hi_start <- si$tstart - maxend > 1
-    hi_stop <- si$tstop > maxend
-    if(any(hi_start)){
-
-      warning(sprintf('%d target intervals begin more than 1 base after
-      expected terminus of the target chromosome. This should NOT happen. May
-      be a bug in synder.', sum(hi_start)))
-
-      # a <- subset(si, hi_start)
-      # a$flag %>% factor %>% summary
-      # with(si, tstart[hi_start] - maxend[hi_start]) %>% summary
-      # with(si, tstart[hi_start] - maxend[hi_start]) %>% names %>% factor %>% summary
-    }
-    if(any(hi_stop)){
-      warning(sprintf('%d target intervals end after expected terminus of the
-      target chromosome. This may happen when Synder estimates search intervals
-      for flag==5 cases.', sum(hi_stop)))
-      # a <- subset(si, hi_stop & !hi_start)
-      # a$flag %>% factor %>% summary
-    }
+  if(! all(subset(si, lo_flag==3)$start == 1) ){
+    warning("If the lo flag is 3, then the search interval should snap to 1.
+    However, this invariant is broken in %d cases. Perhaps you need to set the
+    -b flag in Synder?")
   }
 
+  maxend = seqlengths(tinfo)[si$tchr]
+  hi_start <- si$tstart - maxend > 1
+  hi_stop <- si$tstop > maxend
+  if(any(hi_start)){
+    warning(sprintf('%d target intervals begin more than 1 base after
+    expected terminus of the target chromosome. This should NOT happen. May
+    be a bug in synder.', sum(hi_start)))
+  }
+  if(any(hi_stop)){
+    warning(sprintf('%d target intervals end after expected terminus of the
+    target chromosome. This should not happen with new versions of Synder.',
+    sum(hi_stop)))
+  }
   if(!all(si$tchr %in% seqnames(tinfo))){
     warning("The search interval file contains scaffolds not in the genome
     file. This is a vary bad sign. Soooooo bad.")
   }
-
-  # que_gt_tar <- with(si, (flag == 4 | flag == 5) & ((tstop - tstart) < (qstop - qstart))) 
-  que_gt_tar <- with(si, (flag >= 4) & ((tstop - tstart) < (qstop - qstart))) 
-  if(any(que_gt_tar)){
-    # term0 <- que_gt_tar & si$tstart == 0
-    # termBig <- que_gt_tar & si$tstart > 0
-    #
-    # # get length summaries for terminal cases
-    # subset(si, term0) %$% tstop %>% summary
-    # subset(si, termBig) %>% with(tstop - tstart + 1) %>% summary
-    # subset(si, termBig & !hi_stop)
-      # b <- subset(si, que_gt_tar)
-      # b$flag %>% factor %>% summary
-      # subset(b, tstart == 0)
-      # subset(b, tstart != 0)
-      # subset(b, tstart == 0) %$% flag %>% factor %>% summary
-      # subset(b, tstart != 0) %$% flag %>% factor %>% summary
-      # subset(b, tstart != 0 & flag == 5)
-      # with(b, tstart)
-      # with(subset(b, tstart != 0), tstart)
-      # with(b, (qstop - qstart) - (tstop - tstart)) %>% summary
-      # with(subset(b, tstart != 0), (qstop - qstart) - (tstop - tstart)) %>% summary
-      # with(subset(b, tstart == 0), (qstop - qstart) - (tstop - tstart)) %>% summary
-      # with(si, tstart[que_gt_tar] - maxend[que_gt_tar]) %>% names %>% factor %>% summary
-    warning(sprintf("%d target intervals for flag equals 4 or 5 are shorter
-    than the queries, this should be possible only if they are at the termini
-    of the contigs", sum(que_gt_tar)))
-  }
-
-  data.frame(
-    hi_start = hi_start %>% as.numeric %>% factor,
-    hi_stop  = hi_stop %>% as.numeric %>% factor,
-    que_gt_tar = (que_gt_tar & si$tstart > 0) %>% as.numeric %>% factor,
-    flag = si$flag %>% factor
-  ) %>%
-  count(hi_start, hi_stop, que_gt_tar, flag) %>%
-  arrange(hi_start, hi_stop, que_gt_tar, flag) %>%
-  write.table(file='log', sep="\t", quote=FALSE, row.names=FALSE) 
 }
 
 #' Load search intervals
@@ -459,21 +413,25 @@ testSI <- function(si, tinfo, qinfo){
 #' @param sifile input TAB delimited file
 #' @param extend (bool) if anchored (flag [123]), extend flanks by query length
 #' @param extend_factor a multiplier for extension
-LoadSearchIntervals <- function(sifile, extend=FALSE, extend_factor=1, qinfo=NULL, tinfo=NULL){
+LoadSearchIntervals <- function(sifile, qinfo, tinfo){
   require(magrittr)
   si <- read.table(sifile, stringsAsFactors=FALSE)
-  stopifnot(ncol(si) == 9)
-  names(si) <- c('gene', 'qchr', 'qstart', 'qstop', 'tchr', 'tstart', 'tstop', 'strand', 'flag')
+  stopifnot(ncol(si) == 10)
+  names(si) <- c(
+    'gene',
+    'qchr',
+    'qstart',
+    'qstop',
+    'tchr',
+    'tstart',
+    'tstop',
+    'strand',
+    'lo_flag',
+    'hi_flag'
+  )
 
   si$tstart <- as.numeric(si$tstart)
   si$tstop <- as.numeric(si$tstop)
-
-  #TODO: need a more elegant solution to the initial index problem
-  # But the Synder output is 0-based, Bioconductor is 1-based
-  si$qstart <- si$qstart + 1
-  si$qstop  <- si$qstop  + 1
-  si$tstart <- si$tstart + 1
-  si$tstop  <- si$tstop  + 1
 
   testSI(si, tinfo, qinfo)
 
@@ -483,7 +441,7 @@ LoadSearchIntervals <- function(sifile, extend=FALSE, extend_factor=1, qinfo=NUL
     maxend = seqlengths(tinfo)[si$tchr]
   }
 
-  outside <- ((si$tstart - maxend) == 1) | (si$tstop == 1)
+  outside <- ((maxend - si$tstart) < 3) | (si$tstop <= 5)
   if(any(outside)){
     unassembled <- subset(si, outside)$gene %>% unique
     message(sprintf('%d intervals begin immediately after the end of the scaffold.
@@ -708,11 +666,7 @@ LoadTarget <- function(species, config, l_seqinfo){
   transorf.file <- sprintf('%s/%s.faa', config$d_trans_orf, species)
 
   aa <- LoadFASTA(aafile, isAA=TRUE)
-  si <- LoadSearchIntervals(sifile,
-                            extend=config$extend,
-                            extend_factor=config$extend_factor,
-                            qinfo=qinfo,
-                            tinfo=tinfo) 
+  si <- LoadSearchIntervals(sifile, qinfo=qinfo, tinfo=tinfo) 
   gff <- LoadGFF(gfffile, seqinfo=tinfo)
   syn <- LoadSyntenyMap(synfile, qinfo=qinfo, tinfo=tinfo)
   nstring <- LoadNString(config$f_nstrings, l_seqinfo)[[species]]

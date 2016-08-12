@@ -371,6 +371,8 @@ LoadSearchIntervals <- function(sifile, qinfo, tinfo){
   # All lower extremes should snap to 1
   stopifnot(subset(si, lo_flag == 3)$tstart == 1)
 
+  maxend = seqlengths(tinfo)[si$tchr]
+
   outside <- ((si$tstart - maxend) == 0) | (si$tstop == 1)
   if(any(outside)){
     unassembled <- subset(si, outside)$gene %>% unique

@@ -13,15 +13,15 @@ getTargetResults <- function(species, query, config, l_seqinfo, use_cache){
   target <- cache(LoadTarget, species=species, config=config, l_seqinfo=l_seqinfo)
   message('--summarizing synteny')
 
-  # B1 - Queries of scrambled origin
-  synteny <- cache(summarize.flags, si=target$si, query=query)
-  #
+  # # B1 - Queries of scrambled origin
+  # synteny <- cache(summarize.flags, si=target$si, query=query)
+
   message('--processing indel and resize events')
   # B2 - Queries overlap an indel in a target SI
   ind       <- cache(findIndels, target, indel.threshold=config$indel_threshold)
   ind.stats <- cache(indelStats, ind)
   ind.sumar <- cache(indelSummaries, ind)
-  #
+
   # B5 - Queries whose SI overlap an N-string
   message('--mapping to gaps in target genome')  
   query2gap <- cache(findQueryGaps, nstring=target$nstring, target=target)
@@ -101,9 +101,9 @@ buildFeatureTable <- function(result, query, config){
   p2t_cutoff <- config$prot2transorf_pval / length(orphans)
 
   # Synteny is scrambled
-  scr <- result$synteny$bits[orphans] %in% c('000010', '000001', '000011')
+  scr <- result$si$target[orphans]$hi_flag > 1 & result$si$target[orphans]$lo_flag > 1
   # synteny is reliable
-  rel <- result$synteny$bits[orphans] == '100000'
+  rel <- result$si$target[orphans]$hi_flag <= 1 & result$si$target[orphans]$lo_flag <= 1 
   # at least one search interval overlaps a target CDS
   cds <- orphans %in% (result$features$CDS$query %>% unique)
   # at least one search interval overlaps a target mRNA

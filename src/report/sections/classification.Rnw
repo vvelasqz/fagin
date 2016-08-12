@@ -349,39 +349,38 @@ merge(
 
 \subsection{Mapping to unknown ORFs outside known mRNAs}
 
-\begin{figure}[!ht]
-  \centering
-<<>>=
-  m <- melt_seqaln('prot2allorf')
-  prot2allorf.cutoff <- config$prot2allorf_pval / (m$query %>% unique %>% length)
-  plot_seqaln(m, prot2allorf.cutoff)
-@
-  \caption{
-    \textbf{Orphan genes hits against target ORFs}. All START/STOP bound open
-    reading frames in the target genome were extracted. All orphan proteins
-    were aligned against the ORFs that overlap one of their search intervals.
-    Dots correspond to hits above \Sexpr{prot2allorf.cutoff}.
-  }
-\end{figure}
+% \begin{figure}[!ht] \centering
+% <<>>=
+%   m <- melt_seqaln('prot2allorf')
+%   prot2allorf.cutoff <- config$prot2allorf_pval / (m$query %>% unique %>% length)
+%   plot_seqaln(m, prot2allorf.cutoff)
+% @
+%   \caption{
+%     \textbf{Orphan genes hits against target ORFs}. All START/STOP bound open
+%     reading frames in the target genome were extracted. All orphan proteins
+%     were aligned against the ORFs that overlap one of their search intervals.
+%     Dots correspond to hits above \Sexpr{prot2allorf.cutoff}.
+%   }
+% \end{figure}
 
 
-\subsection{Mapping to any DNA region in the search interval}
-\begin{figure}[!ht]
-  \centering
-<<message=FALSE, warning=FALSE, cache=TRUE>>=
-<<>>=
-  m <- melt_seqaln('dna2dna')
-  dna2dna.cutoff <- config$dna2dna_pval / (m$query %>% unique %>% length)
-  plot_seqaln(m, dna2dna.cutoff)
-@
-\caption{\
-  Scores of orphan genes against their search intervals. In \textbf{ctrl}, the
-  starting positions of the orphan genes were permuted while preserving their
-  gene length. By chance, a few of these permuted indices may start on their
-  original place, so there will be a few highscoring values. Dots correspond to
-  orphans with scores above \Sexpr{dna2dna.cutoff}.
-}
-\end{figure}
+% \subsection{Mapping to any DNA region in the search interval}
+% \begin{figure}[!ht]
+%   \centering
+% <<message=FALSE, warning=FALSE, cache=TRUE>>=
+% <<>>=
+%   m <- melt_seqaln('dna2dna')
+%   dna2dna.cutoff <- config$dna2dna_pval / (m$query %>% unique %>% length)
+%   plot_seqaln(m, dna2dna.cutoff)
+% @
+% \caption{\
+%   Scores of orphan genes against their search intervals. In \textbf{ctrl}, the
+%   starting positions of the orphan genes were permuted while preserving their
+%   gene length. By chance, a few of these permuted indices may start on their
+%   original place, so there will be a few highscoring values. Dots correspond to
+%   orphans with scores above \Sexpr{dna2dna.cutoff}.
+% }
+% \end{figure}
 
 
 \subsection{Find indel events}

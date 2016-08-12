@@ -1,13 +1,14 @@
 summarize.flags <- function(si, query){
   require(reshape2)
   require(dplyr)
+
   flags <- data.frame(
     seqid=c(si$query$seqid, si$scrambled),
     flag=c(si$target$flag, rep(4, length(si$scrambled))) %>% as.factor,
     stringsAsFactors=FALSE
   ) %>%
   dcast(seqid ~ flag)
-  
+
   flags <- flags %>%
     set_rownames(flags$seqid) %>%
     dplyr::select(-seqid)

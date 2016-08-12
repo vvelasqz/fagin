@@ -10,6 +10,12 @@ db/
 *.fna
 *.fasta
 
+*.un~
+
+archives/
+
+tags
+
 log
 
 tags

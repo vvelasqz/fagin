@@ -53,6 +53,12 @@ do
             awk -v minlen=$MINLEN '($6 - $5) > minlen' $synfile > $tmpsyn
             genlen $s > $tmptar
             genlen $FOCAL_SPECIES > $tmpque
+            # Find target-side search interval for entries in the input query gff
+            # The -a means the input is 1-based. This is the convention for GFF
+            # files used by Ensembl
+            # (http://www.ensembl.org/info/website/upload/gff.html)
+            # The -b means the output is 1-based. Output needs to be 1-based
+            # (Bioconductor, and R in general, is 1-based)
             synder -d $tmpsyn $FOCAL_SPECIES $s $mapdir/db $tmptar $tmpque
             rm $tmpsyn $tmpque $tmptar
         fi

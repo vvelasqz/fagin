@@ -19,9 +19,7 @@
 #' R_DECISION_TREE |
 #' R_TREE          /
 #' R_FOCAL_SPECIES  - string
-#' R_EXTEND         - boolean
-#' R_EXTEND_FACTOR          \
-#' R_PROT2PROT_PVAL         |
+#' R_PROT2PROT_PVAL         \
 #' R_PROT2ALLORF_PVAL       |
 #' R_PROT2TRANSORF_PVAL     |
 #' R_DNA2DNA_PVAL           |
@@ -113,8 +111,6 @@ LoadConfig <- function(configfile='~/src/git/fagin/fagin.cfg'){
         f_tree              = R_TREE,
         species             = species,
         focal_species       = R_FOCAL_SPECIES,
-        extend              = as.logical(R_EXTEND),
-        extend_factor       = as.numeric(R_EXTEND_FACTOR),
         prot2prot_pval      = as.numeric(R_PROT2PROT_PVAL),
         prot2allorf_pval    = as.numeric(R_PROT2ALLORF_PVAL),
         prot2transorf_pval  = as.numeric(R_PROT2TRANSORF_PVAL),
@@ -335,8 +331,7 @@ testSI <- function(si, tinfo, qinfo){
   }
   if(any(hi_stop)){
     warning(sprintf('%d target intervals end after expected terminus of the
-    target chromosome. This should not happen with new versions of Synder.',
-    sum(hi_stop)))
+    target chromosome. If this is very bad.', sum(hi_stop)))
   }
   if(!all(si$tchr %in% seqnames(tinfo))){
     warning("The search interval file contains scaffolds not in the genome
@@ -347,64 +342,21 @@ testSI <- function(si, tinfo, qinfo){
 #' Load search intervals
 #'
 #' Input columns in sifile
-#' 1. gene   - query gene name
-#' 2. qchr   - query chromosome name
-#' 3. qstart - query start
-#' 4. qstop  - query stop
-#' 5. tchr   - target chromosome
-#' 6. tstart - target start
-#' 7. tstop  - target stop
-#' 8. flag   - syntenic flag [0-5]
+#' 1. gene    - query gene name
+#' 2. qchr    - query chromosome name
+#' 3. qstart  - query start
+#' 4. qstop   - query stop
+#' 5. tchr    - target chromosome
+#' 6. tstart  - target start
+#' 7. tstop   - target stop
+#' 8. lo flag - syntenic flag for lower bound [0 - 3]
+#' 9. hi flag - syntenic flag for higher bound [0 - 3]
 #'
-#' The flag must be one of the following:
-#'    0 - query is fully within the target interval
-#'        B ------      -------
-#'        S   |   [::::]   |   
-#'        A ------      -------
-#'        Q        ----        
-#'
-#'          B ------      -------    
-#'          S       [:::::::::::]    
-#'          A ------          -------
-#'          Q              -----     
-#' B - target genome, A - query genome, S - search interval, Q - query interval
-#'
-#'    1 - query starts outside the interval but stops inside
-#'        B       -------  -------
-#'        S       [:::::]         
-#'        S*  [:::::::::]         
-#'        A       -------  -------
-#'        Q     ----              
-#' S* I extend the search interval by a length equal to the query length
-#'
-#'    2 - query stops outside the interval but starts inside 
-#'        B       -------  -------
-#'        S                [:::::]
-#'        S*               [:::::::::]
-#'        A       -------  -------
-#'        Q                     ----
-#'    3 - query fully contains the target interval (start and stop unbounded)
-#'        B                 ---  ---
-#'        S                 [::::::]
-#'        S*    [:::::::::::::::::::::::::::::::]
-#'        A                 ---  ---
-#'        Q               ------------
-#' S* I extend this interval by a query length on both sides of the target interval
-#'    4 - query ends before target interval
-#'        B                    --- ---
-#'        S             [:::::]
-#'        S*        [:::::::::]
-#'        A                    --- ---
-#'        Q             ---    
-#'    5 - query begins after target interval
-#'        B    --- ---
-#'        S           [:::::]
-#'        S*          [:::::::::]
-#'        A    --- ---
-#'        Q               ---    
-#'
-#' If the *extend* option is set, then unbounded edges of search intervals are
-#' extended by the length of the query gene times *extend_factor*.
+#' The current flags are:
+#'   0. Bound is overlaps a interval in the contiguous set
+#'   1. Bound is between intervals in the contiguous set
+#'   2. Bound is outside the contiguous set
+#'   3. Bound is beyond any interval in the synteny map
 #'
 #' Output consists of a list of three items:
 #' 1. query - (GRanges) query intervals, gene names, and common link key
@@ -435,52 +387,24 @@ LoadSearchIntervals <- function(sifile, qinfo, tinfo){
 
   testSI(si, tinfo, qinfo)
 
-  if(is.null(tinfo)){
-    maxend = Inf
-  } else {
-    maxend = seqlengths(tinfo)[si$tchr]
-  }
+  maxend = seqlengths(tinfo)[si$tchr]
 
   outside <- ((maxend - si$tstart) < 3) | (si$tstop <= 5)
   if(any(outside)){
     unassembled <- subset(si, outside)$gene %>% unique
-    message(sprintf('%d intervals begin immediately after the end of the scaffold.
-    The one case where this can occur is for flag==5 cases where the end of the
-    contiguous block on the target side is flush with the end of the
-    scaffold.', sum(outside)))
+    message(sprintf('%d intervals begin immediately after the end of the
+    scaffold.  The one case where this can occur is for hi_flag==3 or lo_flag=3
+    cases where the end of the contiguous block on the target side is flush
+    with the end of the scaffold.', sum(outside)))
     si <- subset(si, !outside)
-    maxend <- maxend[!outside]
   } else {
     unassembled <- c()
   }
 
-  if(extend){
-    # Extend right and left flanks as needed for flags 1, 2, and 3
-    e13 <- si$flag == 1 | si$flag == 3 # extend left by k query lengths
-    e23 <- si$flag == 2 | si$flag == 3 # extend right by k query lengths
-    qlen <- with(si, qstop - qstart + 1)
-    extend_length_123 <- qlen * extend_factor
+  testSI(si, tinfo, qinfo)
 
-    # Extend right and left flanks as needed for flags 4 and 5
-    e4 <- si$flag == 4 # extend left by distance to target interval
-    e5 <- si$flag == 5 # extend right by distance to target interval
-    # B                    --- ---
-    # S             [:::::]
-    # S*        [:::::::::]
-    # A                    --- ---
-    #                  ++++
-    # Q             ---    
-    # So here, I am getting the ++++ region
-    extend_length_45 <- with(si, ((tstop - tstart) - (qstop - qstart)) %>% pmax(qstop - qstart)) 
-
-    si$tstart[e13] <- (si$tstart[e13] - extend_length_123[e13]) %>% pmax(1)
-    si$tstart[e4]  <- (si$tstart[e4]  - extend_length_45[e4]  ) %>% pmax(1)
-    
-    si$tstop[e23] <- (si$tstop[e23] + extend_length_123[e23]) %>% pmin(maxend[e23])
-    si$tstop[e5]  <- (si$tstop[e5]  + extend_length_45[e5]  ) %>% pmin(maxend[e5])
-  }
-
-  stopifnot(si$flag %in% 0:5)
+  stopifnot(si$hi_flag %in% 0:3)
+  stopifnot(si$lo_flag %in% 0:3)
 
   i <- si$tstop - si$tstart + 1 > 1e5
   if(any(i)){
@@ -494,13 +418,13 @@ LoadSearchIntervals <- function(sifile, qinfo, tinfo){
     This is certainly a problem.", sum(i)))
   }
 
-  i <- with(si, (qstop - qstart + 1) * (tstop - tstart + 1) > 1e9)
+  i <- with(si, (qstop - qstart + 1) * (tstop - tstart + 1) > config$dna2dna_maxspace)
   if(any(i)){
     warning(sprintf("Found %d cases where query length X search interval length
-    is greater than 1e9. This will cause minor problems in the current
-    implementation of query-vs-search interval DNA search.", sum(i)))
+    is greater than %d. This will cause problems in the current implementation
+    of query-vs-search interval DNA search, so these intervals will not be
+    searched for dna2dna similarity.", sum(i), config$dna2dna_maxspace))
   }
-
 
   query <- MakeGI(
     starts=si$qstart,
@@ -519,7 +443,8 @@ LoadSearchIntervals <- function(sifile, qinfo, tinfo){
     stops=si$tstop,
     scaffolds=si$tchr,
     metadata=data.frame(
-      flag = si$flag,
+      hi_flag = si$hi_flag,
+      lo_flag = si$lo_flag,
       id   = 1:nrow(si)
     ),
     seqinfo=tinfo

@@ -20,6 +20,8 @@ EOF
 species=$(cat $INPUT/species)
 syndir=$INPUT/syn
 gffdir=$INPUT/gff
+glenfil=$INPUT/stat/scaffold-lengths.tab
+
 while getopts "h" opt; do
     case $opt in
         h)
@@ -30,6 +32,11 @@ done
 mapdir=$INPUT/maps
 mkdir -p $INPUT/maps/db
 
+# Get genome lengths file
+genlen () {
+    awk -v s=$1 'BEGIN{OFS="\t"} NR > 1 && $1 == s {print $2, $3}' $glenfil
+}
+
 for s in $species
 do
     if [[ $s != $FOCAL_SPECIES ]]
@@ -39,14 +46,17 @@ do
         if [[ ! -r $db ]]
         then
             # Build synder database
-            awk -v minlen=$MINLEN '($6 - $5) > minlen' $syndir/$FOCAL_SPECIES.vs.$s.syn > z
-            synder -d z $FOCAL_SPECIES $s $mapdir/db
-            rm z
+            synfile="$syndir/$FOCAL_SPECIES.vs.$s.syn"
+            tmpsyn=/tmp/syn$RANDOM
+            tmpque=/tmp/que$RANDOM
+            tmptar=/tmp/tar$RANDOM
+            awk -v minlen=$MINLEN '($6 - $5) > minlen' $synfile > $tmpsyn
+            genlen $s > $tmptar
+            genlen $FOCAL_SPECIES > $tmpque
+            synder -d $tmpsyn $FOCAL_SPECIES $s $mapdir/db $tmptar $tmpque
+            rm $tmpsyn $tmpque $tmptar
         fi
-        # # Find target-side search interval for entries in the input query gff
-        synder -i $INPUT/search.gff -s $db -c search |
-            # Remove the '>' and search interval id columns
-            # These are columns which will probably be lost in the future
-            cut -f3-11 > $map
+        # Find target-side search interval for entries in the input query gff
+        synder -i $INPUT/search.gff -s $db -c search > $map
     fi
 done

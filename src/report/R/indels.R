@@ -1,12 +1,12 @@
 #' Find possible indels or genes of resized size
 #'
 #' An indel is identified based on the following two criteria:
-#' 1. The search interval must be bounded (flag == 0)
+#' 1. The search interval must be bounded (lo_flag == hi_flag == 1)
 #' 2. The target to query ratio must be smaller than the given threshold
 #'    (default=0.05)
 #'
 #' A resized gene is identified based on the following criteria
-#' 1. The search interval must be bounded (flag == 0)
+#' 1. The search interval must be bounded (as defined above)
 #' 2. The search interval must NOT be an indel (as defined above)
 #' 3. The target to query ratio must be smaller than 1
 #'
@@ -21,16 +21,16 @@ findIndels <- function(target, indel.threshold=0.05){
   d <- data.frame(
     t.size = sitar %>% width,
     ida    = sitar$id,
-    flag   = sitar$flag,
+    bound   = sitar$lo_flag == 1 & sitar$lo_flag == 1,
     stringsAsFactors=FALSE
   )
   d$seqid   <- sique$seqid[d$id]
   d$q.size  <- sique[d$id] %>% width
-  d$indel   <- with(d, t.size / q.size < indel.threshold & flag == 0)
-  d$resized <- with(d, t.size < q.size & flag == 0 & !indel)
+  d$indel   <- with(d, t.size / q.size < indel.threshold & bound)
+  d$resized <- with(d, t.size < q.size & bound & !indel)
 
   d <- d[d$seqid %in% d$seqid[d$resized | d$indel], ]
-  d$flag <- NULL
+  d$bound <- NULL
   d.sum <- group_by(d, seqid) %>% 
     summarize(
       n.indel = sum(indel),
@@ -42,29 +42,26 @@ findIndels <- function(target, indel.threshold=0.05){
   is.resized   <- with(d.sum, N == n.resized)
   is.selective <- with(d.sum, N > (n.resized + n.indel))
 
-  d.sum$type                 <- 'mixed'
-  d.sum[is.indel,     ]$type <- 'indel' 
-  d.sum[is.resized,   ]$type <- 'resized' 
-  d.sum[is.selective, ]$type <- 'selective' 
+  d.sum$type                <- 'mixed'
+  d.sum$type[is.indel     ] <- 'indel' 
+  d.sum$type[is.resized   ] <- 'resized' 
+  d.sum$type[is.selective ] <- 'selective' 
   d.sum$type <- factor(d.sum$type, levels=c('mixed', 'indel', 'resized', 'selective'))
 
   list(d=d, d.sum=d.sum)
 }
 
 indelStats <- function(ind){
-  q.res <- ind$d.sum %>% subset(N == n.resized) %$% seqid
-  q.ind <- ind$d.sum %>% subset(N == n.indel)   %$% seqid
-  # In this set of genes, an indel or resize has occurred in one or more search
-  # intervals, but NOT in all of the search intervals.
-  d.irr <- ind$d.sum %>% subset(N > (n.indel + n.resized))
-
-  # All indel/resize event containing sequences must fall into one of the three above categories
-  stopifnot(length(q.res) + length(q.ind) + nrow(d.irr) == nrow(ind$d.sum))
+  q.res <- ind$d.sum %>% subset(type == "resized")   %$% seqid
+  q.ind <- ind$d.sum %>% subset(type == "indel")     %$% seqid
+  q.irr <- ind$d.sum %>% subset(type == "selective") %$% seqid
+  q.mix <- ind$d.sum %>% subset(type == "mixed")     %$% seqid
 
   list(
-    resized.queries  = q.res, 
-    indeled.queries  = q.ind,
-    d.irregular      = d.irr
+    resized.queries   = q.res,
+    indeled.queries   = q.ind,
+    irregular.queries = q.irr,
+    mixed.queries     = q.mix
   )
 }
 
@@ -84,5 +81,3 @@ indelSummaries <- function(ind){
     ind$d.sum %>% subset(type == "selective") %$% n.resized %>% factor %>% summary
   )
 }
-
-

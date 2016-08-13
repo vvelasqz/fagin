@@ -66,8 +66,8 @@ get_model2locus_map <- function(query){
 results <- cache(get_results)
 
 model2locus <- get_model2locus_map(query)
-labels <- determineLabels(query, results, config)
-origin <- determineOrigins(labels, config)
+labels      <- determineLabels(query, results, config)
+origin      <- determineOrigins(labels, config)
 
 @
 

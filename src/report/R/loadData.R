@@ -305,6 +305,12 @@ LoadNString <- function(nstring.file, l_seqinfo){
 }
 
 testSI <- function(si, tinfo, qinfo){
+
+  if(any(si$inbetween & (si$lo_flag == 0 | si$hi_flag == 0))){
+    warning("Contradictory flags. A search interval cannot have flags
+    inbetween==1 and lo or hi_flag==0")
+  }
+
   if(any(si$tstop < si$tstart)){
     i <- si$tstop < si$tstart
     warning(sprintf('Found %d search intervals with stop < start. Possible bug
@@ -342,15 +348,16 @@ testSI <- function(si, tinfo, qinfo){
 #' Load search intervals
 #'
 #' Input columns in sifile
-#' 1. gene    - query gene name
-#' 2. qchr    - query chromosome name
-#' 3. qstart  - query start
-#' 4. qstop   - query stop
-#' 5. tchr    - target chromosome
-#' 6. tstart  - target start
-#' 7. tstop   - target stop
-#' 8. lo flag - syntenic flag for lower bound [0 - 3]
-#' 9. hi flag - syntenic flag for higher bound [0 - 3]
+#' 1.  gene    - query gene name
+#' 2.  qchr    - query chromosome name
+#' 3.  qstart  - query start
+#' 4.  qstop   - query stop
+#' 5.  tchr    - target chromosome
+#' 6.  tstart  - target start
+#' 7.  tstop   - target stop
+#' 8.  lo_flag - syntenic flag for lower bound [0 - 3]
+#' 9.  hi_flag - syntenic flag for higher bound [0 - 3]
+#' 10. inbetween - query overlaps no syntenic intervals
 #'
 #' The current flags are:
 #'   0. Bound is overlaps a interval in the contiguous set
@@ -368,7 +375,7 @@ testSI <- function(si, tinfo, qinfo){
 LoadSearchIntervals <- function(sifile, qinfo, tinfo){
   require(magrittr)
   si <- read.table(sifile, stringsAsFactors=FALSE)
-  stopifnot(ncol(si) == 10)
+  stopifnot(ncol(si) == 11)
   names(si) <- c(
     'gene',
     'qchr',
@@ -379,11 +386,13 @@ LoadSearchIntervals <- function(sifile, qinfo, tinfo){
     'tstop',
     'strand',
     'lo_flag',
-    'hi_flag'
+    'hi_flag',
+    'inbetween'
   )
 
   si$tstart <- as.numeric(si$tstart)
   si$tstop <- as.numeric(si$tstop)
+  si$inbetween <- as.logical(si$inbetween)
 
   testSI(si, tinfo, qinfo)
 
@@ -445,6 +454,7 @@ LoadSearchIntervals <- function(sifile, qinfo, tinfo){
     metadata=data.frame(
       hi_flag = si$hi_flag,
       lo_flag = si$lo_flag,
+      inbetween = si$inbetween,
       id   = 1:nrow(si)
     ),
     seqinfo=tinfo

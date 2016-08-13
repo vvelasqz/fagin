@@ -15,6 +15,7 @@
 #' R_SPECIES_FILE  \
 #' R_SCAFLEN       |
 #' R_NSTRINGS      | individual data files
+#' R_KBCOMP        |
 #' R_ORPHAN_LIST   |
 #' R_DECISION_TREE |
 #' R_TREE          /
@@ -53,6 +54,7 @@ LoadConfig <- function(configfile='~/src/git/fagin/fagin.cfg'){
         'R_CACHE',
         'R_SPECIES_FILE',
         'R_SCAFLEN',
+        'R_KBCOMP',
         'R_NSTRINGS',
         'R_ORPHAN_LIST',
         'R_DECISION_TREE',
@@ -105,6 +107,7 @@ LoadConfig <- function(configfile='~/src/git/fagin/fagin.cfg'){
         d_trans_orf         = R_TRANS_ORF,
         d_cache             = R_CACHE,
         f_scaflen           = R_SCAFLEN,
+        f_kbcomp            = R_KBCOMP,
         f_nstrings          = R_NSTRINGS,
         f_orphan            = R_ORPHAN_LIST,
         f_decision_tree     = R_DECISION_TREE,

@@ -13,26 +13,23 @@ getTargetResults <- function(species, query, config, l_seqinfo, use_cache){
   target <- cache(LoadTarget, species=species, config=config, l_seqinfo=l_seqinfo)
   message('--summarizing synteny')
 
-  # B1 - Queries of scrambled origin
-  synteny <- cache(summarize.flags, si=target$si, query=query)
-
   message('--processing indel and resize events')
-  # B2 - Queries overlap an indel in a target SI
+  # Queries overlap an indel in a target SI
   ind       <- cache(findIndels, target, indel.threshold=config$indel_threshold)
   ind.stats <- cache(indelStats, ind)
   ind.sumar <- cache(indelSummaries, ind)
 
-  # B5 - Queries whose SI overlap an N-string
+  # Queries whose SI overlap an N-string
   message('--mapping to gaps in target genome')  
   query2gap <- cache(findQueryGaps, nstring=target$nstring, target=target)
 
-  # B3 and B4 (CDS and mRNA overlaps)
+  # (CDS and mRNA overlaps)
   message('--processing feature overlaps')
   # TODO: I do not currently use features other than CDS and mRNA, so I could
   # save memory by filtering them out
   features <- cache(analyzeTargetFeature, query, target)
 
-  # B6 - Queries whose protein seq matches a target protein in the SI
+  # Queries whose protein seq matches a target protein in the SI
   message('--find query matches against known genes')
   prot2prot <- cache(
     get_prot2prot,
@@ -42,7 +39,7 @@ getTargetResults <- function(species, query, config, l_seqinfo, use_cache){
     nsims=config$prot2prot_nsims
   )
 
-  # B7 - Queries matching ORFs on spliced mRNA
+  # Queries matching ORFs on spliced mRNA
   message('--finding orfs in spliced mRNAs overlapping search intervals')
   prot2transorf <- cache(
     get_prot2transorf,
@@ -52,7 +49,7 @@ getTargetResults <- function(species, query, config, l_seqinfo, use_cache){
     nsims=config$prot2transorf_nsims
   )
 
-  # B8 - Queries whose protein matches an ORF in an SI
+  # Queries whose protein matches an ORF in an SI
   message('--finding orfs in search intervals')
   query2orf <- cache(get_query2orf, target, query) ; gc()
   message('--aligning orphans to orfs that overlap their search intervals')
@@ -64,7 +61,7 @@ getTargetResults <- function(species, query, config, l_seqinfo, use_cache){
     nsims=config$prot2allorf_nsims
   )
 
-  # B9 - Queries whose gene matches (DNA-DNA) an SI 
+  # Queries whose gene matches (DNA-DNA) an SI 
   message('--aligning orphans to the full sequences of their search intervals')
   dna2dna <- cache(
     get_dna2dna,
@@ -73,11 +70,14 @@ getTargetResults <- function(species, query, config, l_seqinfo, use_cache){
     maxspace=config$dna2dna_maxspace
   )
 
+  reliable <- target$si$query$seqid[ ! target$si$target$inbetween ] %>% unique
+  scrambled <- setdiff(target$si$query$seqid, reliable)
+
   list(
     species=species,
-    synteny=synteny,
     syn=target$syn,
     unassembled=target$si$unassembled,
+    scrambled=scrambled,
     ind=ind,
     ind.stats=ind.stats,
     ind.sumar=ind.sumar,
@@ -101,9 +101,7 @@ buildFeatureTable <- function(result, query, config){
   p2t_cutoff <- config$prot2transorf_pval / length(orphans)
 
   # Synteny is scrambled
-  scr <- result$si$target[orphans]$hi_flag > 1 & result$si$target[orphans]$lo_flag > 1
-  # synteny is reliable
-  rel <- result$si$target[orphans]$hi_flag <= 1 & result$si$target[orphans]$lo_flag <= 1 
+  scr <- orphans %in% result$scrambled
   # at least one search interval overlaps a target CDS
   cds <- orphans %in% (result$features$CDS$query %>% unique)
   # at least one search interval overlaps a target mRNA
@@ -128,7 +126,6 @@ buildFeatureTable <- function(result, query, config){
   data.frame(
     seqid=orphans,
     scr=scr,
-    rel=rel,
     cds=cds,
     rna=rna,
     gen=gen,
@@ -243,6 +240,10 @@ determineLabels <- function(query, results, config){
   labels <- lapply(names(labelTrees), function(x) labelTreeToTable(labelTrees[[x]], features[[x]])) %>%
     set_names(names(labelTrees))
 
+
+  lapply(names(labelTrees), function(x) lapply(features[[x]][2:11], sum) %>% unlist) %>%
+    set_names(names(labelTrees))
+
   label.summary <- labels %>%
     lapply(count, primary, secondary) %>%
     melt(id.vars=c('primary', 'secondary')) %>%
@@ -268,7 +269,6 @@ determineOrigins <- function(labels, config){
   require(data.tree)
 
   root <- read.tree(config$f_tree) %>% as.Node(replaceUnderscores=FALSE)
-  #
   classify <- function(node){
       if(node$isLeaf){
         if(node$name == config$focal_species){

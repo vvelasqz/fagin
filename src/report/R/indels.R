@@ -21,16 +21,17 @@ findIndels <- function(target, indel.threshold=0.05){
   d <- data.frame(
     t.size = sitar %>% width,
     ida    = sitar$id,
-    bound   = sitar$lo_flag == 1 & sitar$lo_flag == 1,
+    lo_flag = sitar$lo_flag,
+    lo_flag = sitar$lo_flag,
     stringsAsFactors=FALSE
   )
   d$seqid   <- sique$seqid[d$id]
   d$q.size  <- sique[d$id] %>% width
-  d$indel   <- with(d, t.size / q.size < indel.threshold & bound)
-  d$resized <- with(d, t.size < q.size & bound & !indel)
+  # TODO: this is all subtly wrong, I fear, need to consider bounds
+  d$indel   <- with(d, ((t.size - 1) / q.size) < indel.threshold)
+  d$resized <- with(d, t.size < q.size & !indel)
 
   d <- d[d$seqid %in% d$seqid[d$resized | d$indel], ]
-  d$bound <- NULL
   d.sum <- group_by(d, seqid) %>% 
     summarize(
       n.indel = sum(indel),

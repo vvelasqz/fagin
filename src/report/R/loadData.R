@@ -405,7 +405,7 @@ LoadSearchIntervals <- function(sifile, qinfo, tinfo){
   if(any(outside)){
     unassembled <- subset(si, outside)$gene %>% unique
     message(sprintf('%d intervals begin immediately after the end of the
-    scaffold.  The one case where this can occur is for hi_flag==3 or lo_flag=3
+    scaffold.  The one case where this can occur is for hi_flag==4 or lo_flag=4
     cases where the end of the contiguous block on the target side is flush
     with the end of the scaffold.', sum(outside)))
     si <- subset(si, !outside)
@@ -415,8 +415,8 @@ LoadSearchIntervals <- function(sifile, qinfo, tinfo){
 
   testSI(si, tinfo, qinfo)
 
-  stopifnot(si$hi_flag %in% 0:3)
-  stopifnot(si$lo_flag %in% 0:3)
+  stopifnot(si$hi_flag %in% 0:4)
+  stopifnot(si$lo_flag %in% 0:4)
 
   i <- si$tstop - si$tstart + 1 > 1e5
   if(any(i)){

@@ -214,44 +214,7 @@ read.table(config$f_kbcomp, header=TRUE) %>%
 
 \section{Synteny}
 
-\begin{figure}[!ht]
-    \centering
-<<synteny-diagnostic-scatter, cache=TRUE, message=FALSE>>=
-lapply(
-  results,
-  function(x){
-    syn <- x$syn
-    lograt <- log2(width(syn$query) / width(syn$target)[syn$query$over])
-    lograt <- lograt[abs(lograt) > 0.25] 
-    data.frame(
-      lograt=lograt,
-      index=1:length(lograt)
-    )
-  }
-) %>% melt(id.vars=c('lograt', 'index')) %>% dplyr::rename(species=L1) %>%
-ggplot +
-  geom_point(aes(x=index, y=lograt), size=0.2) +
-  xlab('Ordered position on query genome') +
-  ylab('log2 of query to target length ratio') +
-  facet_wrap(~species, scale='free_x')
-
-@
-    \caption{\textbf{Diagnostic plot of query to target lengths in synteny
-        map}. The syntenic intervals on the query and target sides should
-        be of similar length.  They will not be exactly the same size if gaps
-        are allowed in the alignment, but wild deviation from 0 (more than,
-        say, 2) indicates errors in the input. To avoid overplotting, values
-        between -0.25 and 0.25 are not plotted.} 
-\end{figure}
-
-
 <<main-chunk, message=FALSE, warning=FALSE>>=
-
-# number of loci in query
-nloci <- query$gff %>% mcols %>% subset(type == 'mRNA') %$% parent %>% unique %>% length
-
-# number of orphans in query
-norphan_loci <- model2locus[query$orphans, 'parent'] %>% unique %>% length
 
 get_results <- function(){
   results <- list()
@@ -286,6 +249,50 @@ labels <- determineLabels(query, results, config)
 origin <- determineOrigins(labels, config)
 
 @
+
+<<query-loci-counts>>=
+# number of loci in query
+nloci <- query$gff %>%
+  mcols %>%
+  subset(type == 'mRNA') %$% parent %>%
+  unique %>% length
+
+# number of orphans in query
+norphan_loci <- model2locus[query$orphans, 'parent'] %>%
+  unique %>% length
+@
+
+\begin{figure}[!ht]
+    \centering
+<<synteny-diagnostic-scatter, cache=TRUE, message=FALSE>>=
+lapply(
+  results,
+  function(x){
+    syn <- x$syn
+    lograt <- log2(width(syn$query) / width(syn$target)[syn$query$over])
+    lograt <- lograt[abs(lograt) > 0.25] 
+    data.frame(
+      lograt=lograt,
+      index=1:length(lograt)
+    )
+  }
+) %>% melt(id.vars=c('lograt', 'index')) %>% dplyr::rename(species=L1) %>%
+ggplot +
+  geom_point(aes(x=index, y=lograt), size=0.2) +
+  xlab('Ordered position on query genome') +
+  ylab('log2 of query to target length ratio') +
+  facet_wrap(~species, scale='free_x')
+
+@
+    \caption{\textbf{Diagnostic plot of query to target lengths in synteny
+        map}. The syntenic intervals on the query and target sides should
+        be of similar length.  They will not be exactly the same size if gaps
+        are allowed in the alignment, but wild deviation from 0 (more than,
+        say, 2) indicates errors in the input. To avoid overplotting, values
+        between -0.25 and 0.25 are not plotted.} 
+\end{figure}
+
+
 
 \subsection{Search interval overview}
 
@@ -1028,11 +1035,15 @@ plot_fits('prot2allorf')
 plot_fits('dna2dna')
 @
 
-\subsection{Versions}
+\subsection{Versions and parameters}
 
 \begin{itemize}
     \item Fagin \Sexpr{get_fagin_version(config)}
     \item Synder \Sexpr{get_synder_version()}
 \end{itemize}
+
+<<dump-parameters, echo=TRUE>>=
+print(config)
+@
 
 \end{document}

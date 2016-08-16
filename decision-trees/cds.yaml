@@ -34,37 +34,42 @@ gen:
               primary: Non-ORFic
               secondary: N3
               label: SI overlaps no known gene
-        una:
-          divisor: Query maps off target scaffold
-          U1:
+        tec:
+          U7:
             primary: Unknown
-            secondary: U1
-            label: unassembled
-          ind:
-            divisor: Query maps to zero-length target interval
-            U2:
+            secondary: U7
+            label: skipped
+          una:
+            divisor: Query maps off target scaffold
+            U1:
               primary: Unknown
-              secondary: U2
-              label: possible indel
-            nst:
-              divisor: Query maps to N-string
-              U3:
+              secondary: U1
+              label: unassembled
+            ind:
+              divisor: Query maps to zero-length target interval
+              U2:
                 primary: Unknown
-                secondary: U3
-                label: possibly in unknown region
-              res:
-                divisor: Query maps to target interval smaller than self
-                U4:
+                secondary: U2
+                label: possible indel
+              nst:
+                divisor: Query maps to N-string
+                U3:
                   primary: Unknown
-                  secondary: U4
-                  label: possibly resized
-                scr:
-                  divisor: Query maps inbetween contiguous block
-                  U5:
+                  secondary: U3
+                  label: possibly in unknown region
+                res:
+                  divisor: Query maps to target interval smaller than self
+                  U4:
                     primary: Unknown
-                    secondary: U5
-                    label: scrambled synteny
-                  U6:
-                    primary: Unknown
-                    secondary: U6
-                    label: good syntenic match, no homology
+                    secondary: U4
+                    label: possibly resized
+                  scr:
+                    divisor: Query maps inbetween contiguous block
+                    U5:
+                      primary: Unknown
+                      secondary: U5
+                      label: scrambled synteny
+                    U6:
+                      primary: Unknown
+                      secondary: U6
+                      label: good syntenic match, no homology

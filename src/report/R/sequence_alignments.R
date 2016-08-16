@@ -303,6 +303,7 @@ get_dna2dna <- function(query, target, maxspace=1e8){
     program, such as BLAST, which is not currently implemented.',
     sum(too.big), signif(100*sum(too.big)/length(too.big), 2), maxspace))
     orfgff <- orfgff[!too.big]
+    skipped <- ogen[too.big] %>% unique %>% names
     ogen <- ogen[!too.big]
   }
 
@@ -345,6 +346,7 @@ get_dna2dna <- function(query, target, maxspace=1e8){
     map=hits,
     dis=gum,
     sam=ctrl,
+    skipped=skipped,
     maxspace=maxspace
   )
 }

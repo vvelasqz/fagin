@@ -1,6 +1,6 @@
 TARGET=report
 
-${TARGET}.pdf: ${TARGET}.Rnw sections/*.Rnw R/*R
+${TARGET}.pdf: ${TARGET}.Rnw R/*R
 	Rscript -e "library(knitr); knit('${TARGET}.Rnw')"
 	latexmk -pdf ${TARGET}.tex
 
@@ -15,5 +15,5 @@ clean:
 
 .PHONY: deepclean
 deepclean:
-	latexmk -f -c ${TARGET}.tex
+	latexmk -f -c ${TARGET}.tex 2> /dev/null
 	rm -rf cache figure ${TARGET}.tex ${TARGET}.pdf *log

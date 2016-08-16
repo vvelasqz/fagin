@@ -1,2 +1,0 @@
-The Fagin pipeline receives input from the Synder, which uses a synteny
-framework to map genes in one genome to search intervals in another.

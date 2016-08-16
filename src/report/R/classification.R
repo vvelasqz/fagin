@@ -13,80 +13,81 @@ getTargetResults <- function(species, query, config, l_seqinfo, use_cache){
   target <- cache(LoadTarget, species=species, config=config, l_seqinfo=l_seqinfo)
   message('--summarizing synteny')
 
-  # B1 - Queries of scrambled origin
-  synteny <- cache(summarize.flags, si=target$si, query=query)
-  #
   message('--processing indel and resize events')
-  # B2 - Queries overlap an indel in a target SI
+  # Queries overlap an indel in a target SI
   ind       <- cache(findIndels, target, indel.threshold=config$indel_threshold)
   ind.stats <- cache(indelStats, ind)
   ind.sumar <- cache(indelSummaries, ind)
-  #
-  # B5 - Queries whose SI overlap an N-string
+
+  synflags <- cache(summarize.flags, si=target$si, query=query)
+
+  # Queries whose SI overlap an N-string
   message('--mapping to gaps in target genome')  
   query2gap <- cache(findQueryGaps, nstring=target$nstring, target=target)
 
-  # B3 and B4 (CDS and mRNA overlaps)
+  # (CDS and mRNA overlaps)
   message('--processing feature overlaps')
   # TODO: I do not currently use features other than CDS and mRNA, so I could
   # save memory by filtering them out
   features <- cache(analyzeTargetFeature, query, target)
 
-  # B6 - Queries whose protein seq matches a target protein in the SI
+  # Queries whose protein seq matches a target protein in the SI
   message('--find query matches against known genes')
   prot2prot <- cache(
     get_prot2prot,
-    query=query,
-    target=target,
-    features=features,
-    nsims=config$prot2prot_nsims
+    query    = query,
+    target   = target,
+    features = features,
+    nsims    = config$prot2prot_nsims
   )
 
-  # B7 - Queries matching ORFs on spliced mRNA
+  # Queries matching ORFs on spliced mRNA
   message('--finding orfs in spliced mRNAs overlapping search intervals')
   prot2transorf <- cache(
     get_prot2transorf,
-    query=query,
-    target=target,
-    features=features,
-    nsims=config$prot2transorf_nsims
+    query    = query,
+    target   = target,
+    features = features,
+    nsims    = config$prot2transorf_nsims
   )
 
-  # B8 - Queries whose protein matches an ORF in an SI
+  # Queries whose protein matches an ORF in an SI
   message('--finding orfs in search intervals')
   query2orf <- cache(get_query2orf, target, query) ; gc()
   message('--aligning orphans to orfs that overlap their search intervals')
   prot2allorf <- cache(
     get_prot2allorf,
-    query2orf=query2orf,
-    query=query,
-    target=target,
-    nsims=config$prot2allorf_nsims
+    query2orf = query2orf,
+    query     = query,
+    target    = target,
+    nsims     = config$prot2allorf_nsims
   )
 
-  # B9 - Queries whose gene matches (DNA-DNA) an SI 
+  # Queries whose gene matches (DNA-DNA) an SI 
   message('--aligning orphans to the full sequences of their search intervals')
   dna2dna <- cache(
     get_dna2dna,
-    query=query,
-    target=target,
-    maxspace=config$dna2dna_maxspace
+    query    = query,
+    target   = target,
+    maxspace = config$dna2dna_maxspace
   )
 
   list(
-    species=species,
-    synteny=synteny,
-    syn=target$syn,
-    unassembled=target$si$unassembled,
-    ind=ind,
-    ind.stats=ind.stats,
-    ind.sumar=ind.sumar,
-    features=features,
-    query2gap=query2gap,
-    prot2transorf=prot2transorf,
-    prot2prot=prot2prot,
-    prot2allorf=prot2allorf,
-    dna2dna=dna2dna
+    species       = species,
+    syn           = target$syn,
+    unassembled   = target$si$unassembled,
+    scrambled     = synflags$scrambled,
+    skipped       = dna2dna$skipped,
+    flagsum       = synflags$sum,
+    ind           = ind,
+    ind.stats     = ind.stats,
+    ind.sumar     = ind.sumar,
+    features      = features,
+    query2gap     = query2gap,
+    prot2transorf = prot2transorf,
+    prot2prot     = prot2prot,
+    prot2allorf   = prot2allorf,
+    dna2dna       = dna2dna
   )
 }
 
@@ -101,9 +102,7 @@ buildFeatureTable <- function(result, query, config){
   p2t_cutoff <- config$prot2transorf_pval / length(orphans)
 
   # Synteny is scrambled
-  scr <- result$synteny$bits[orphans] %in% c('000010', '000001', '000011')
-  # synteny is reliable
-  rel <- result$synteny$bits[orphans] == '100000'
+  scr <- orphans %in% result$scrambled
   # at least one search interval overlaps a target CDS
   cds <- orphans %in% (result$features$CDS$query %>% unique)
   # at least one search interval overlaps a target mRNA
@@ -124,11 +123,13 @@ buildFeatureTable <- function(result, query, config){
   trn <- orphans %in% (result$prot2transorf$map %>% subset(pval < p2t_cutoff) %$% query)
   # at least one search interval maps off scaffold (flag==4 or flag==5)
   una <- orphans %in% result$unassembled
+  # search interval was not processed for technical reasons (e.g. too big)
+  tec <- orphans %in% result$skipped
+
   
   data.frame(
     seqid=orphans,
     scr=scr,
-    rel=rel,
     cds=cds,
     rna=rna,
     gen=gen,
@@ -138,7 +139,8 @@ buildFeatureTable <- function(result, query, config){
     orf=orf,
     nuc=nuc,
     trn=trn,
-    una=una
+    una=una,
+    tec=tec
   )
 }
 
@@ -172,19 +174,46 @@ buildLabelsTree <- function(feats, config){
 }
 
 labelTreeToTable <- function(root, feats){
+
   toTable <- function(node) {
+    # Build a dataframe for each node
+    # For example:
+    #         seqid primary secondary
+    # 1 AT1G29418.1   ORFic        O1
+    # 2 AT3G15909.1   ORFic        O1
     if(node$N > 0){
       d <- data.frame(seqid = feats$seqid[node$membership])
       d$primary <- node$primary
       d$secondary <- node$secondary
       d
+    # If there are no members in the class
     } else {
       NULL
     }
   }
-  root$Get(toTable, filterFun = isLeaf) %>%
+
+  # Get a table for each class
+  # --- NOTE: Without simplify=FALSE something truly dreadful happens.
+  # The proper output (where a,b,c ... are dataframe columns):
+  #   <Node_1> a b c
+  #   <Node_2> d e f
+  #   <Node_3> g h i
+  #   <Node_4> j k l
+  # The automagically borken output
+  #   <Node_1> a
+  #   <Node_2> b
+  #   <Node_3> c
+  #   <Node_4> d
+  # The columns are recast as vectors, fed to the wrong children, and the
+  # leftovers are tossed.
+  root$Get(toTable, filterFun = isLeaf, simplify=FALSE) %>%
+    # Remove any NULL elements (so rbind doesn't crash)
+    lapply(function(x) if(!is.null(x)) { x }) %>%
+    # Bind all tables into one
     do.call(what=rbind) %>%
+    # Remove missing elements ... TODO: is this necessary?
     filter(!is.na(seqid)) %>%
+    # Remove rownames
     set_rownames(NULL)
 }
 
@@ -231,6 +260,7 @@ determineLabels <- function(query, results, config){
     U4 = 'unknown: possible resized',
     U5 = 'unknown: syntenically scrambled',
     U6 = 'unknown: seriously unknown',
+    U7 = 'unknown: skipped for technical reasons',
     N1 = 'non-genic: no gene in SI',
     N2 = 'non-genic: CDS in SI',
     N3 = 'non-genic: mRNA but not CDS in SI'
@@ -240,24 +270,30 @@ determineLabels <- function(query, results, config){
 
   labelTrees <- lapply(features, buildLabelsTree, config)
 
-  labels <- lapply(names(labelTrees), function(x) labelTreeToTable(labelTrees[[x]], features[[x]])) %>%
+  labels <- lapply(
+    names(labelTrees),
+    function(x) labelTreeToTable(labelTrees[[x]], features[[x]])
+  ) %>% set_names(names(labelTrees))
+
+
+  lapply(names(labelTrees), function(x) lapply(features[[x]][2:11], sum) %>% unlist) %>%
     set_names(names(labelTrees))
 
-  label.summary <- labels %>%
-    lapply(count, primary, secondary) %>%
-    melt(id.vars=c('primary', 'secondary')) %>%
-    dplyr::rename(species=L1, count=value) %>%
-    dplyr::select(secondary, species, count) %>%
-    tidyr::complete(secondary, species, fill=list(count=0)) %>%
-    dplyr::mutate(count = as.integer(count)) %>%
-    dplyr::mutate(description = descriptions[secondary]) %>%
-    dplyr::arrange(description, secondary, species, count) %>%
+  label.summary <- labels                                   %>% 
+    lapply(count, primary, secondary)                       %>% 
+    melt(id.vars=c('primary', 'secondary'))                 %>% 
+    dplyr::rename(species=L1, count=value)                  %>% 
+    dplyr::select(secondary, species, count)                %>% 
+    tidyr::complete(secondary, species, fill=list(count=0)) %>% 
+    dplyr::mutate(count = as.integer(count))                %>% 
+    dplyr::mutate(description = descriptions[secondary])    %>% 
+    dplyr::arrange(description, secondary, species, count)  %>% 
     as.data.frame
 
   list(
-    trees=labelTrees,
-    labels=labels,
-    summary=label.summary
+    trees   = labelTrees,
+    labels  = labels,
+    summary = label.summary
   )
 }
 
@@ -268,7 +304,6 @@ determineOrigins <- function(labels, config){
   require(data.tree)
 
   root <- read.tree(config$f_tree) %>% as.Node(replaceUnderscores=FALSE)
-  #
   classify <- function(node){
       if(node$isLeaf){
         if(node$name == config$focal_species){
@@ -288,8 +323,8 @@ determineOrigins <- function(labels, config){
         if(!is.null(a) && !is.null(b)){
           stopifnot(names(node$cls) == names(a))
           stopifnot(names(node$cls) == names(b))
-          node$cls <- ifelse(a == "non" & b == "non", "non", "unk")
-          node$cls <- ifelse(a == "gen" | b == "gen", "gen", node$cls)
+          node$cls <- ifelse(a == "Unknown" & b == "Non-ORFic", "Non-ORFic", "Unknown")
+          node$cls <- ifelse(a == "ORFic" | b == "ORFic", "ORFic", node$cls)
         } else if(!is.null(a)){
           stopifnot(names(node$cls) == names(a))
           node$cls <- a
@@ -298,9 +333,9 @@ determineOrigins <- function(labels, config){
           node$cls <- b
         }
       }
-      node$gen <- sum(node$cls == 'gen')
-      node$non <- sum(node$cls == 'non')
-      node$unk <- sum(node$cls == 'unk')
+      node$gen <- sum(node$cls == 'ORFic')
+      node$non <- sum(node$cls == 'Non-ORFic')
+      node$unk <- sum(node$cls == 'Unknown')
       invisible(node$cls)
   }
 

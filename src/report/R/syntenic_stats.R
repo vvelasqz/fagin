@@ -1,38 +1,40 @@
 summarize.flags <- function(si, query){
   require(reshape2)
   require(dplyr)
-  flags <- data.frame(
-    seqid=c(si$query$seqid, si$scrambled),
-    flag=c(si$target$flag, rep(4, length(si$scrambled))) %>% as.factor,
-    stringsAsFactors=FALSE
-  ) %>%
-  dcast(seqid ~ flag)
-  
-  flags <- flags %>%
-    set_rownames(flags$seqid) %>%
-    dplyr::select(-seqid)
-  names(flags) <- paste0('f', names(flags))
 
-  bits <- apply(flags, 1, function(x) paste0(as.numeric(x > 0), collapse=''))
+  reliable <- si$query$seqid[ ! si$target$inbetween ] %>% unique
+  scrambled <- setdiff(si$query$seqid, reliable)
 
-  bittbl <- data.frame(
-    seqid = rownames(flags),
-    bit = bits,
-    group = (rownames(flags) %in% query$orphans) %>%
-      ifelse('orphan', 'non_orphan'),
-    stringsAsFactors=FALSE
+  d <- data.frame(
+    seqid = si$query$seqid,
+    lo_flag = si$target$lo_flag,
+    hi_flag = si$target$hi_flag,
+    inbetween = si$target$inbetween,
+    is_orphan = si$query$seqid %in% query$orphan
   ) %>% 
-  dplyr::count(group, bit) %>%
-  dcast(bit ~ group, fill=0) %>%
-  dplyr::mutate(
-    orp_prop = orphan / sum(orphan, na.rm=TRUE),
-    non_orp_prop = non_orphan / sum(non_orphan, na.rm=TRUE)
-  ) %>%
-  set_names(c('bit', 'orp_count', 'non_orp_count', 'orp_prop', 'non_orp_prop'))
+    dplyr::group_by(seqid) %>%
+    dplyr::summarize(
+      inbetween    = all(inbetween),
+      lo_bound     = any(lo_flag < 2),
+      hi_bound     = any(hi_flag < 2),
+      doubly_bound = any(lo_flag < 2 & hi_flag < 2),
+      unbound      = all(lo_flag > 1 & hi_flag > 1),
+      is_orphan    = all(is_orphan)
+    ) %>%
+    dplyr::group_by(is_orphan) %>%
+    dplyr::summarize(
+      inbetween    = mean(inbetween),
+      lo_bound     = mean(lo_bound),
+      hi_bound     = mean(hi_bound),
+      doubly_bound = mean(doubly_bound),
+      unbound      = mean(unbound)
+    ) %>%
+    dplyr::select(-matches('is_orphan')) %>%
+    t %>%
+    set_colnames(c("not_orphan", "orphan"))
 
   list(
-    flags=flags,
-    bits=bits,
-    bittbl=bittbl
+    scrambled = scrambled,
+    sum = d
   )
 }

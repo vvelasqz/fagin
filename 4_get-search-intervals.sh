@@ -3,6 +3,8 @@ set -u
 
 source fagin.cfg
 
+exit_status=0
+
 usage (){
 cat << EOF >&2
 Run focal species and target synteny maps through Synder to get search intervals
@@ -14,7 +16,7 @@ Files are formated as: [query species].vs.[target species].map.tab
 REQUIRES:
     synder
 EOF
-    exit 0
+    exit $exit_status
 }
 
 species=$(cat $INPUT/species)
@@ -37,13 +39,21 @@ genlen () {
     awk -v s=$1 'BEGIN{OFS="\t"} NR > 1 && $1 == s {print $2, $3}' $glenfil
 }
 
+status-check () {
+    if [[ $1 != 0 ]]; then
+        echo -e "\e[1;31m$2\e[0m"
+        exit_status=1
+    fi
+}
+
 for s in $species
 do
     if [[ $s != $FOCAL_SPECIES ]]
     then
-        echo "Finding $s search intervals"
         db=$mapdir/db/${FOCAL_SPECIES}_$s.txt
         map=$mapdir/$FOCAL_SPECIES.vs.$s.map.tab
+        log=/tmp/fagin.log
+        echo $s
         if [[ ! -r $db ]]
         then
             # Build synder database
@@ -54,23 +64,29 @@ do
             awk -v minlen=$MINLEN '($6 - $5) > minlen' $synfile > $tmpsyn
             genlen $s > $tmptar
             genlen $FOCAL_SPECIES > $tmpque
-
-            # Satsuma seems to be 0-based relative to start positions and
-            # 1-based relative to stops. I have not been able to find details
-            # on their output, but the lowest stop positions equal 0 and the
-            # highest stops equal contig length (n, rather than n-1).
-            synder -b '0100' -d $tmpsyn $FOCAL_SPECIES $s $mapdir/db $tmptar $tmpque
+            echo "  building synder database"
+            synder                   \
+                -b $synder_db_bases  \
+                -d $tmpsyn           \
+                $FOCAL_SPECIES       \
+                $s                   \
+                $mapdir/db           \
+                $tmptar              \
+                $tmpque
+            status-check $? "  build failed"
             rm $tmpsyn $tmpque $tmptar
         fi
 
         # Find target-side search interval for entries in the input query gff
-
-        # The -a means the input is 1-based. All GFF files should be 1-based,
-        # according to the specs:
-        # https://github.com/The-Sequence-Ontology/Specifications/blob/master/gff3.md
-
-        # The -b means the output is 1-based. Output needs to be 1-based
-        # (Bioconductor, and R in general, is 1-based)
-        synder -b '1111' -i $INPUT/search.gff -s $db -c search > $map
+        echo "  finding search intervals"
+        time synder                  \
+            -b $synder_search_bases  \
+            -k $synder_k             \
+            -i $INPUT/search.gff     \
+            -s $db                   \
+            -c search > $map
+        status-check $? "  search failed"
     fi
 done
+
+exit $exit_status

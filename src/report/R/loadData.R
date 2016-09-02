@@ -378,7 +378,7 @@ testSI <- function(si, tinfo, qinfo){
 LoadSearchIntervals <- function(sifile, qinfo, tinfo){
   require(magrittr)
   si <- read.table(sifile, stringsAsFactors=FALSE)
-  stopifnot(ncol(si) == 11)
+  stopifnot(ncol(si) == 13)
   names(si) <- c(
     'gene',
     'qchr',
@@ -388,13 +388,19 @@ LoadSearchIntervals <- function(sifile, qinfo, tinfo){
     'tstart',
     'tstop',
     'strand',
+    'score',
+    'csetid',
     'lo_flag',
     'hi_flag',
     'inbetween'
   )
 
+  si$csetid <- as.factor(si$csetid)
+  si$score <- as.numeric(si$score)
   si$tstart <- as.numeric(si$tstart)
   si$tstop <- as.numeric(si$tstop)
+  si$lo_flag <- as.factor(si$lo_flag)
+  si$hi_flag <- as.factor(si$hi_flag)
   si$inbetween <- as.logical(si$inbetween)
 
   testSI(si, tinfo, qinfo)

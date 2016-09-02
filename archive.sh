@@ -2,19 +2,13 @@
 
 arcdir=archive-$(date +"%Y-%m-%d-%T")
 
-mkdir $arcdir
+mkdir "$arcdir"
 
-cd $arcdir
+cd "$arcdir"
 
-mkdir -p input/fna
-mkdir -p input/gff
-mkdir -p input/syn
-
-cp ../input/fna/*fna input/fna
-cp ../input/gff/*gff input/gff
-cp ../input/syn/*syn input/syn
-
-tar -cjf input.tar.gz input/
+md5sum ../input/fna/*fna >  INPUT_MANIFEST
+md5sum ../input/gff/*gff >> INPUT_MANIFEST
+md5sum ../input/syn/*syn >> INPUT_MANIFEST
 
 cp ../input/orphan-list.txt .
 cp ../input/tree .
@@ -29,6 +23,6 @@ echo "fagin version:  " `cat ../VERSION`  >> README
 
 cd ..
 
-mkdir -f archives
+mkdir -p ARCHIVE
 
-mv $arcdir archives
+mv $arcdir ARCHIVE/$arcdir

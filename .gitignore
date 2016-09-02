@@ -13,13 +13,11 @@ db/
 *.un~
 
 archives/
+ARCHIVE/
 
 tags
 
-log
-
-tags
-
+*log
 *.RDat
 *.Rdat
 *.RData

@@ -13,7 +13,7 @@
 #' @param x target list
 #' @return list(d=data.frame(t.size | id | seqid | q.size | indel | resized),
 #'              d.sum=data.frame(seqid | n.indel | n.resized | N)
-findIndels <- function(target, indel.threshold=0.05){
+findIndels <- function(target, indel.threshold=0.25){
 
   sitar <- target$si$target
   sique <- target$si$query
@@ -21,22 +21,21 @@ findIndels <- function(target, indel.threshold=0.05){
   d <- data.frame(
     t.size = sitar %>% width,
     ida    = sitar$id,
-    lo_flag = sitar$lo_flag,
-    lo_flag = sitar$lo_flag,
+    # query is inbetween intervals on a contiguous set
+    bound  = sitar$inbetween & (sitar$lo_flag == 1) & (sitar$hi_flag == 1),
     stringsAsFactors=FALSE
   )
   d$seqid   <- sique$seqid[d$id]
   d$q.size  <- sique[d$id] %>% width
-  # TODO: this is all subtly wrong, I fear, need to consider bounds
-  d$indel   <- with(d, ((t.size - 1) / q.size) < indel.threshold)
-  d$resized <- with(d, t.size < q.size & !indel)
+  d$indel   <- with(d, (t.size / q.size) < indel.threshold)
+  d$resized <- with(d, (t.size < q.size) & !indel)
 
   d <- d[d$seqid %in% d$seqid[d$resized | d$indel], ]
   d.sum <- group_by(d, seqid) %>% 
     summarize(
       n.indel = sum(indel),
       n.resized = sum(resized),
-      N = length(indel)
+      N = n()
     )
 
   is.indel     <- with(d.sum, N == n.indel)

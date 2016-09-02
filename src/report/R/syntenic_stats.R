@@ -19,6 +19,7 @@ summarize.flags <- function(si, query){
       hi_bound     = any(hi_flag < 2),
       doubly_bound = any(lo_flag < 2 & hi_flag < 2),
       unbound      = all(lo_flag > 1 & hi_flag > 1),
+      beyond       = any(lo_flag == 4 | hi_flag == 4),
       is_orphan    = all(is_orphan)
     ) %>%
     dplyr::group_by(is_orphan) %>%
@@ -27,7 +28,8 @@ summarize.flags <- function(si, query){
       lo_bound     = mean(lo_bound),
       hi_bound     = mean(hi_bound),
       doubly_bound = mean(doubly_bound),
-      unbound      = mean(unbound)
+      unbound      = mean(unbound),
+      beyond       = mean(beyond)
     ) %>%
     dplyr::select(-matches('is_orphan')) %>%
     t %>%

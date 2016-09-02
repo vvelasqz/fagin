@@ -305,6 +305,8 @@ get_dna2dna <- function(query, target, maxspace=1e8){
     orfgff <- orfgff[!too.big]
     skipped <- ogen[too.big] %>% unique %>% names
     ogen <- ogen[!too.big]
+  } else {
+    skipped = c()
   }
 
   message(sprintf('This may require on the order of %.1f minutes',

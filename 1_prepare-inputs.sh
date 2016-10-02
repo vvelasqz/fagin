@@ -87,7 +87,6 @@ mkdir -p $INPUT/gff
 mkdir -p $INPUT/syn
 
 ln -sf $TREE $INPUT/tree
-ln -sf $SEARCH_GFF $INPUT/search.gff
 ln -sf $ORPHAN_LIST $INPUT/orphan-list.txt
 
 src/get-species-from-tree.R $TREE > $INPUT/species
@@ -126,3 +125,16 @@ for s in $species; do
         fi
     fi
 done
+
+
+# ---------------------------------
+# Prepare focal species search file
+# ---------------------------------
+
+awk '
+    BEGIN{FS="\t"; OFS="\t"}
+    $3 == "mRNA" {
+        $9 = gensub(/.*ID=([^;]+).*/, "\\1", "g", $9)
+        print
+    }
+' $INPUT/gff/$FOCAL_SPECIES.gff > $INPUT/search.gff

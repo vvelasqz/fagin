@@ -32,7 +32,6 @@ while getopts "h" opt; do
 done
 
 mapdir=$INPUT/maps
-mkdir -p $INPUT/maps/db
 
 # Get genome lengths file
 genlen () {
@@ -50,42 +49,28 @@ for s in $species
 do
     if [[ $s != $FOCAL_SPECIES ]]
     then
-        db=$mapdir/db/${FOCAL_SPECIES}_$s.txt
         map=$mapdir/$FOCAL_SPECIES.vs.$s.map.tab
-        log=/tmp/fagin.log
         echo $s
-        if [[ ! -r $db ]]
-        then
-            # Build synder database
-            synfile="$syndir/$FOCAL_SPECIES.vs.$s.syn"
-            tmpsyn=/tmp/syn$RANDOM
-            tmpque=/tmp/que$RANDOM
-            tmptar=/tmp/tar$RANDOM
-            awk -v minlen=$MINLEN '($6 - $5) > minlen' $synfile > $tmpsyn
-            genlen $s > $tmptar
-            genlen $FOCAL_SPECIES > $tmpque
-            echo "  building synder database"
-            synder                   \
-                -b $synder_db_bases  \
-                -d $tmpsyn           \
-                $FOCAL_SPECIES       \
-                $s                   \
-                $mapdir/db           \
-                $tmptar              \
-                $tmpque
-            status-check $? "  build failed"
-            rm $tmpsyn $tmpque $tmptar
-        fi
 
-        # Find target-side search interval for entries in the input query gff
-        echo "  finding search intervals"
-        time synder                  \
-            -b $synder_search_bases  \
-            -k $synder_k             \
-            -i $INPUT/search.gff     \
-            -s $db                   \
-            -c search > $map
-        status-check $? "  search failed"
+        # Build synder database
+        synfile="$syndir/$FOCAL_SPECIES.vs.$s.syn"
+        tmpque=/tmp/que$RANDOM
+        tmptar=/tmp/tar$RANDOM
+
+        genlen $s             > $tmptar
+        genlen $FOCAL_SPECIES > $tmpque
+
+        time synder search          \
+            -s $synfile             \
+            -i $INPUT/search.gff    \
+            -t $tmptar              \
+            -q $tmpque              \
+            -b $synder_search_bases \
+            -k $synder_k            \
+            -x d > $map 2> $s.log
+        status-check $? "  synder failed"
+
+        rm $tmpque $tmptar
     fi
 done
 

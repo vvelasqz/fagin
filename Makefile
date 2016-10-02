@@ -23,7 +23,7 @@ archive:
 
 .PHONY: clean
 clean:
-	rm -f log report.pdf
+	rm -f *log log report.pdf
 	rm -rf cache
 	rm -f gmon.out
 

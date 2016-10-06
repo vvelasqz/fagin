@@ -77,7 +77,7 @@ getTargetResults <- function(species, query, config, l_seqinfo, use_cache){
     maxspace = config$dna2dna_maxspace
   )
 
-  final_out = list(
+  list(
     species       = species,
     syn           = target$syn,
     unassembled   = target$si$unassembled,
@@ -94,28 +94,6 @@ getTargetResults <- function(species, query, config, l_seqinfo, use_cache){
     prot2allorf   = prot2allorf,
     dna2dna       = dna2dna
   )
-
-  # validate_getTargetResults(final_out)
-
-  final_out
-}
-
-validate_getTargetResults <- function(final_out){
-    # species       = species,
-    # syn           = target$syn,
-    # unassembled   = target$si$unassembled,
-    # scrambled     = synflags$scrambled,
-    # skipped       = dna2dna$skipped,
-    # flagsum       = synflags$sum,
-    # ind           = ind,
-    # ind.stats     = ind.stats,
-    # ind.sumar     = ind.sumar,
-    # features      = features,
-    # query2gap     = query2gap,
-    # prot2transorf = prot2transorf,
-    # prot2prot     = prot2prot,
-    # prot2allorf   = prot2allorf,
-    # dna2dna       = dna2dna
 }
 
 #' Build table of binary features
@@ -152,7 +130,6 @@ buildFeatureTable <- function(result, query, config){
   una <- orphans %in% result$unassembled
   # search interval was not processed for technical reasons (e.g. too big)
   tec <- orphans %in% result$skipped
-
   
   data.frame(
     seqid = orphans,

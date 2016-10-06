@@ -45,7 +45,7 @@ fit.gumbel <- function(sam){
     data   = scores,
     distr  = "gumbel",
     start  = list(mu=mean(scores), s=sd(scores)),
-    method = "mle"
+    method = "mge",gof="CvM" # mge distance method 
   )
 
   mu <- gumbel.fit$estimate['mu']
@@ -346,7 +346,7 @@ get_dna2dna <- function(query, target, maxspace=1e8){
 
   hits$pval <- 1 - gum$p(hits$score, hits$logmn)
   ctrl$pval <- 1 - gum$p(ctrl$score, ctrl$logmn)
-  #
+
   # subset(hits, pval < 0.001) %$% seqid %>% unique %>% length
   # subset(ctrl, pval < 0.001) %$% seqid %>% unique %>% length
 

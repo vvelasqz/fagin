@@ -1,21 +1,26 @@
 getTargetResults <- function(species, query, config, l_seqinfo, use_cache){
 
   cache <- cache_factory(
-    config=config,
-    use_cache=use_cache,
-    prefix=sprintf('%s.vs.%s-', config$focal_species, species)
+    config    = config,
+    use_cache = use_cache,
+    prefix    = sprintf('%s.vs.%s-', config$focal_species, species)
   )
 
   message(sprintf('Loading data for %s', species))
   #
   message('--loading target')
   # TODO: Fix the out-of-range bugs
-  target <- cache(LoadTarget, species=species, config=config, l_seqinfo=l_seqinfo)
+  target <- cache(
+    LoadTarget,
+    species   = species,
+    config    = config,
+    l_seqinfo = l_seqinfo
+  )
   message('--summarizing synteny')
 
   message('--processing indel and resize events')
   # Queries overlap an indel in a target SI
-  ind       <- cache(findIndels, target, indel.threshold=config$indel_threshold)
+  ind <- cache(findIndels, target, indel.threshold=config$indel_threshold)
   ind.stats <- cache(indelStats, ind)
   ind.sumar <- cache(indelSummaries, ind)
 
@@ -41,8 +46,8 @@ getTargetResults <- function(species, query, config, l_seqinfo, use_cache){
     nsims    = config$prot2prot_nsims
   )
 
-  # Queries matching ORFs on spliced mRNA
-  message('--finding orfs in spliced mRNAs overlapping search intervals')
+  # queries matching orfs on spliced mrna
+  message('--finding orfs in spliced mrnas overlapping search intervals')
   prot2transorf <- cache(
     get_prot2transorf,
     query    = query,
@@ -72,7 +77,7 @@ getTargetResults <- function(species, query, config, l_seqinfo, use_cache){
     maxspace = config$dna2dna_maxspace
   )
 
-  list(
+  final_out = list(
     species       = species,
     syn           = target$syn,
     unassembled   = target$si$unassembled,
@@ -89,6 +94,28 @@ getTargetResults <- function(species, query, config, l_seqinfo, use_cache){
     prot2allorf   = prot2allorf,
     dna2dna       = dna2dna
   )
+
+  # validate_getTargetResults(final_out)
+
+  final_out
+}
+
+validate_getTargetResults <- function(final_out){
+    # species       = species,
+    # syn           = target$syn,
+    # unassembled   = target$si$unassembled,
+    # scrambled     = synflags$scrambled,
+    # skipped       = dna2dna$skipped,
+    # flagsum       = synflags$sum,
+    # ind           = ind,
+    # ind.stats     = ind.stats,
+    # ind.sumar     = ind.sumar,
+    # features      = features,
+    # query2gap     = query2gap,
+    # prot2transorf = prot2transorf,
+    # prot2prot     = prot2prot,
+    # prot2allorf   = prot2allorf,
+    # dna2dna       = dna2dna
 }
 
 #' Build table of binary features
@@ -128,19 +155,19 @@ buildFeatureTable <- function(result, query, config){
 
   
   data.frame(
-    seqid=orphans,
-    scr=scr,
-    cds=cds,
-    rna=rna,
-    gen=gen,
-    nst=nst,
-    ind=ind,
-    res=res,
-    orf=orf,
-    nuc=nuc,
-    trn=trn,
-    una=una,
-    tec=tec
+    seqid = orphans,
+    scr   = scr,
+    cds   = cds,
+    rna   = rna,
+    gen   = gen,
+    nst   = nst,
+    ind   = ind,
+    res   = res,
+    orf   = orf,
+    nuc   = nuc,
+    trn   = trn,
+    una   = una,
+    tec   = tec
   )
 }
 
@@ -208,11 +235,11 @@ labelTreeToTable <- function(root, feats){
   # leftovers are tossed.
   root$Get(toTable, filterFun = isLeaf, simplify=FALSE) %>%
     # Remove any NULL elements (so rbind doesn't crash)
-    lapply(function(x) if(!is.null(x)) { x }) %>%
+    lapply(function(x) if(!is.null(x)) { x })           %>%
     # Bind all tables into one
-    do.call(what=rbind) %>%
+    do.call(what=rbind)                                 %>%
     # Remove missing elements ... TODO: is this necessary?
-    filter(!is.na(seqid)) %>%
+    filter(!is.na(seqid))                               %>%
     # Remove rownames
     set_rownames(NULL)
 }

@@ -24,7 +24,8 @@ EOF
     exit 0
 }
 
-while getopts "h" opt; do
+while getopts "h" opt
+do
     case $opt in
         h)
             usage ;;
@@ -33,51 +34,68 @@ while getopts "h" opt; do
     esac 
 done
 
-if [[ -z $SYN_DIR ]]; then
+if [[ -z $SYN_DIR ]]
+then
     print-warning 'missing argument SYN_DIR in config'
     synteny-map-help
     exit 1
 fi
-if [[ -z $GFF_DIR ]]; then
+
+if [[ -z $GFF_DIR ]]
+then
     print-warning 'missing argument GFF_DIR in config'
     gff-help
     exit 1
 fi
-if [[ -z $FNA_DIR ]]; then
+
+if [[ -z $FNA_DIR ]]
+then
     print-warning 'missing argument FNA_DIR in config'
     fna-help
     exit 1
 fi
-if [[ -z $TREE ]]; then
+
+if [[ -z $TREE ]]
+then
     print-warning 'missing argument TREE in config'
     tree-help
     exit 1
 fi
-if [[ -z $FOCAL_SPECIES ]]; then
+
+if [[ -z $FOCAL_SPECIES ]]
+then
     print-warning 'missing argument FOCAL_SPECIES in config'
     focal-species-help
     exit 1
 fi
 
 
-if [[ ! -d $SYN_DIR ]]; then
+if [[ ! -d $SYN_DIR ]]
+then
     print-warning "cannot open synteny directory '$SYN_DIR'"
     exit 1
 fi
-if [[ ! -d $GFF_DIR ]]; then
+
+if [[ ! -d $GFF_DIR ]]
+then
     print-warning "cannot open gff directory '$GFF_DIR'"
     exit 1
 fi
-if [[ ! -d $FNA_DIR ]]; then
+
+if [[ ! -d $FNA_DIR ]]
+then
     print-warning "cannot open genome directory '$FNA_DIR'"
     exit 1
 fi
-if [[ ! -r $TREE ]]; then
+
+if [[ ! -r $TREE ]]
+then
     print-warning "cannot open tree file '$TREE'"
     exit 1
 fi
 
-if [[ ! -r $TREE ]]; then
+if [[ ! -r $TREE ]]
+then
     print-warning "Missing expected file $TREE"
     exit 1
 fi
@@ -93,30 +111,35 @@ src/get-species-from-tree.R $TREE > $INPUT/species
 species=$(cat $INPUT/species)
 
 grep $FOCAL_SPECIES <(echo $species) > /dev/null
-if [[ $? != 0 ]]; then
+if [[ $? != 0 ]]
+then
     print-warning "Focal species $FOCAL_SPECIES not in tree"
     echo "The focal species must be one of the following:"
     echo $species | tr ' ' '\n'
     exit 1
 fi
 
-for s in $species; do
+for s in $species
+do
     gff=$GFF_DIR/$s.gff
     fna=$FNA_DIR/$s.fna
     syn=$SYN_DIR/$FOCAL_SPECIES.vs.$s.tab
-    if [[ -r $gff ]]; then
+    if [[ -r $gff ]]
+    then
         ln -sf $gff $INPUT/gff/$s.gff
     else
         print-warning "Missing expected file $gff" 
     fi
 
-    if [[ -r $fna   ]]; then
+    if [[ -r $fna   ]]
+    then
         ln -sf $fna $INPUT/fna/$s.fna
     else
         print-warning "Missing expected file $fna" 
     fi
 
-    if [[ $FOCAL_SPECIES != $s ]]; then
+    if [[ $FOCAL_SPECIES != $s ]]
+    then
         if [[ -r $syn   ]]
         then
             ln -sf $syn $INPUT/syn/$FOCAL_SPECIES.vs.$s.syn 
@@ -131,10 +154,9 @@ done
 # Prepare focal species search file
 # ---------------------------------
 
-awk '
-    BEGIN{FS="\t"; OFS="\t"}
-    $3 == "mRNA" {
-        $9 = gensub(/.*ID=([^;]+).*/, "\\1", "g", $9)
-        print
-    }
-' $INPUT/gff/$FOCAL_SPECIES.gff > $INPUT/search.gff
+parse_script=src/util/parse-gff.py
+focal_gff=$INPUT/gff/$FOCAL_SPECIES.gff
+search_gff=$INPUT/search.gff
+
+# select mRNA and reduce 9th column to feature name
+$parse_script -s mRNA -r Name -d -- $focal_gff > $search_gff

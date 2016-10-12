@@ -22,9 +22,9 @@ qgumbel <- function(p, mu, s){
 fit.gumbel <- function(sam){
 
   stopifnot(c('query', 'score', 'logmn') %in% names(sam))
-  sam <- sam %>%
+  sam <- sam                         %>%
     # Filter out maximum score for each query
-    dplyr::group_by(query) %>%
+    dplyr::group_by(query)           %>%
     dplyr::filter(score==max(score)) %>%
     dplyr::summarize(score=mean(score), logmn=max(logmn)) # to remove ties
   adj.fit <- robustreg::robustRegBS(score ~ logmn, sam)
@@ -42,10 +42,10 @@ fit.gumbel <- function(sam){
   scores <- get.adj.from.score(sam$score, sam$logmn)
 
   gumbel.fit <- fitdist(
-    data=scores,
-    distr="gumbel",
-    start=list(mu=mean(scores), s=sd(scores)),
-    method="mle"
+    data   = scores,
+    distr  = "gumbel",
+    start  = list(mu=mean(scores), s=sd(scores)),
+    method = "mge",gof="CvM" # mge distance method 
   )
 
   mu <- gumbel.fit$estimate['mu']
@@ -105,10 +105,10 @@ AA_aln <- function(queseq, tarseq, nsims=10000){
 
   # Simulate best hit for each query against randomized and reversed target sequences
   # 1. sample number of target sequences per query
-  times <- names(queseq) %>%
-      factor %>%
+  times <- names(queseq)  %>%
+      factor              %>%
       summary(maxsum=Inf) %>%
-      as.numeric %>%
+      as.numeric          %>%
       sample(nsims, replace=TRUE) 
   # 2. randomly select query ids
   simids <- sample(1:length(queseq), nsims, replace=TRUE) %>%
@@ -135,10 +135,10 @@ AA_aln <- function(queseq, tarseq, nsims=10000){
   }
 
   list(
-    map=map,
-    dis=gum,
-    sam=sam,
-    nsims=nsims
+    map   = map,
+    dis   = gum,
+    sam   = sam,
+    nsims = nsims
   )
 }
 
@@ -157,8 +157,8 @@ get_prot2prot <- function(query, target, features, ...){
     map,
     mcols(target$gff)[c('seqid', 'parent')],
     by.x='target', by.y='seqid'
-  ) %>%
-  as.data.frame %>%
+  )                            %>%
+  as.data.frame                %>%
   dplyr::select(query, parent) %>%
   dplyr::rename(target=parent) %>%
   unique
@@ -176,7 +176,13 @@ get_prot2transorf <- function(query, target, features, ...){
 
   tarseq <- LoadFASTA(target$transorf.file, isAA=TRUE)
 
+  # Assert the transorf file is not empty, if this fails, you probably need to
+  # run 1_prepare-inputs.sh
+  stopifnot(length(tarseq) > 0)
+
   orfmap <- data.frame(
+    # TODO: dependent on output details of ENSEMBL getorf function
+    # Perhaps should move this alteration upstream
     target=gsub('_[0-9]+$', '', names(tarseq)),
     id=1:length(tarseq)
   )
@@ -270,20 +276,20 @@ alignToGenome <- function(query.seqs, genome, gr, ...){
   )
 
   data.frame(
-    query = query.seqs %>% names %>% rep(2),
-    qwidth = query.seqs %>% width %>% rep(2),
-    twidth = search.intervals %>% width %>% rep(2),
-    score = nuc.scores,
-    strand = rep(c('+', '-'), each=length(query.seqs)),
-    stringsAsFactors=FALSE
+    query            = query.seqs %>% names %>% rep(2),
+    qwidth           = query.seqs %>% width %>% rep(2),
+    twidth           = search.intervals %>% width %>% rep(2),
+    score            = nuc.scores,
+    strand           = rep(c('+', '-'), each=length(query.seqs)),
+    stringsAsFactors = FALSE
   )
 }
 
 
 add_logmn <- function(d){
-  dplyr::group_by(d, query) %>%
+  dplyr::group_by(d, query)                                     %>%
     # Calculate adjusted score
-    dplyr::filter(twidth > 1 & qwidth > 1) %>%
+    dplyr::filter(twidth > 1 & qwidth > 1)                      %>%
     dplyr::summarize(logmn=log2(qwidth[1]) + log2(sum(twidth))) %>%
     base::merge(d)
 }
@@ -313,9 +319,9 @@ get_dna2dna <- function(query, target, maxspace=1e8){
     ((orfgff %>% width) * width(ogen) * (3/9e8)) %>% sum %>% signif(1)))
 
   hits <- alignToGenome(
-    query.seqs=ogen,
-    genome=genseq,
-    gr=orfgff
+    query.seqs = ogen,
+    genome     = genseq,
+    gr         = orfgff
   ) %>%
   add_logmn 
 
@@ -328,11 +334,11 @@ get_dna2dna <- function(query, target, maxspace=1e8){
   sample.targets <- target$si$target[small] %>% sample(length(ogen))
 
   ctrl <- alignToGenome(
-    query.seqs=ogen,
-    genome=genseq,
-    gr=sample.targets
-  ) %>%
-    add_logmn %>%
+    query.seqs = ogen,
+    genome     = genseq,
+    gr         = sample.targets
+  )                 %>%
+    add_logmn       %>%
     group_by(query) %>%
     filter(score == max(score))
 
@@ -340,16 +346,16 @@ get_dna2dna <- function(query, target, maxspace=1e8){
 
   hits$pval <- 1 - gum$p(hits$score, hits$logmn)
   ctrl$pval <- 1 - gum$p(ctrl$score, ctrl$logmn)
-  #
+
   # subset(hits, pval < 0.001) %$% seqid %>% unique %>% length
   # subset(ctrl, pval < 0.001) %$% seqid %>% unique %>% length
 
   list(
-    map=hits,
-    dis=gum,
-    sam=ctrl,
-    skipped=skipped,
-    maxspace=maxspace
+    map      = hits,
+    dis      = gum,
+    sam      = ctrl,
+    skipped  = skipped,
+    maxspace = maxspace
   )
 }
 
@@ -392,40 +398,3 @@ get_prot2allorf <- function(query2orf, query, target, ...){
 
   AA_aln(queseq=queseq, tarseq=tarseq, ...) 
 }
-
-# AA_aln_stats <- function(aln, query){
-#   # TODO: Check how many of the missing genes reside on the scaffolds that are
-#   # not covered by SI
-#   # TODO: Fit two normal distributions: one for the noise, one for the signal.
-#
-#   old.qname <- setdiff(names(query$genes), query$orphans)
-#
-#   # total number of old genes
-#   n.total <- length(old.qname)
-#
-#   # number of old genes that do not overlap a CDS
-#   n.missing <- old.qname %in% aln$alnsum$query %>% not %>% sum
-#   d <- aln$alnsum[aln$alnsum$query %in% old.qname, ]
-#
-#   # Proportion of genes whose search intervals overlap at least 1 CDS
-#   perc.with.over <- signif(nrow(d) / n.total, 3) * 100 
-#
-#   # Proportion of genes that link to given number of orthologs
-#   perc.with.orth <- signif(sum(d$n.orth > 0) / n.total, 3) * 100 
-#
-#   # summary of the number of orthologs found
-#   s.orth <- d$n.orth %>% factor %>% summary
-#
-#   # summary of the number of overlapping genes found
-#   s.over <- d$n.over %>% factor %>% summary
-#
-#   list(
-#     n.old.gene=n.total,
-#     n.old.missing=n.missing,
-#     perc.with.over=perc.with.over,
-#     perc.with.orth=perc.with.orth,
-#     s.orth=s.orth,
-#     s.over=s.over
-#   )
-# }
-

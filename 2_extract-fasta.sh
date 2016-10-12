@@ -3,6 +3,7 @@
 source fagin.cfg
 
 species=$(cat $INPUT/species)
+parse_script=src/util/parse-gff.py
 
 usage (){
 cat << EOF >&2
@@ -36,14 +37,10 @@ done
 # Get transcript ORFs
 get_transcript_orfs (){
     INPUT=$2
+    gffparser=$3
     cat $INPUT/gff/$1.gff |
-    awk '
-        BEGIN{FS="\t"; OFS="\t"}
-        $3 == "exon" {
-            $9 = gensub(/.*ID=([^;]+).*Parent=([^;]+).*/, "\\1\t\\2", 1, $9)
-            print
-        }
-    ' |
+    # select exons AND split 9th column into child and parent name columns
+    $gffparser -s exon -r ID Parent -dmp - |
     sort -k10 -k4n |
     awk '
         BEGIN{FS="\t"; OFS="\t"}
@@ -68,15 +65,10 @@ get_transcript_orfs (){
 # Prepare FASTA file of genes, regions potentially include UTRs and introns
 get_genes (){
     INPUT=$2
+    gffparser=$3
     cat $INPUT/gff/$1.gff |
-        awk '
-            BEGIN{OFS="\t"; FS=OFS}
-            $3 == "mRNA" {
-                # pull out ID tag
-                $3 = gensub(/.*ID=([^;]+).*/, "\\1", 1, $9)
-                print
-            }
-        ' |
+        # select mRNA and reduce 9th column to Name
+        $gffparser -s mRNA -r Name -d - |
         bedtools getfasta         \
             -fi $INPUT/fna/$1.fna \
             -bed /dev/stdin       \
@@ -88,15 +80,11 @@ get_genes (){
 # Prepare protein fasta files including all predicted coding genes
 get_proteins (){
     INPUT=$2
-    x=/tmp/get_proteins_x$3
+    gffparser=$2
+    x=/tmp/get_proteins_x$4
     cat $INPUT/gff/$1.gff |
-        awk '
-            BEGIN{FS="\t"; OFS="\t"}
-            $3 == "CDS" {
-                $9 = gensub(/.*Parent=([^;]+).*/, "\\1", 1, $9)
-                print
-            }
-        ' |
+        # select CDS and reduce 9th column to Parent name
+        $gffparser -s CDS -r Parent -m - |
         sort -k3n -k9 |
         awk '
             BEGIN{FS="\t";OFS="\t"}
@@ -168,7 +156,7 @@ export -f get_proteins
 export -f get_all_orfs
 export $INPUT
 
-parallel "get_transcript_orfs {} $INPUT" ::: $species
-parallel "get_genes {} $INPUT" ::: $species
-parallel "get_proteins {} $INPUT {#}" ::: $species
-parallel "get_all_orfs {} $INPUT" ::: $species
+parallel "get_transcript_orfs {} $INPUT  $parse_script     " ::: $species
+parallel "get_genes           {} $INPUT  $parse_script     " ::: $species
+parallel "get_proteins        {} $INPUT  $parse_script {#} " ::: $species
+parallel "get_all_orfs        {} $INPUT                    " ::: $species

@@ -154,10 +154,9 @@ done
 # Prepare focal species search file
 # ---------------------------------
 
-awk '
-    BEGIN{FS="\t"; OFS="\t"}
-    $3 == "mRNA" {
-        $9 = gensub(/.*ID=([^;]+).*/, "\\1", "g", $9)
-        print
-    }
-' $INPUT/gff/$FOCAL_SPECIES.gff > $INPUT/search.gff
+parse_script=src/util/parse-gff.py
+focal_gff=$INPUT/gff/$FOCAL_SPECIES.gff
+search_gff=$INPUT/search.gff
+
+# select mRNA and reduce 9th column to feature name
+$parse_script -s mRNA -r Name -d -- $focal_gff > $search_gff

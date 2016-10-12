@@ -52,9 +52,9 @@ A pipeline for the classification of orphans into origin classes using a synteni
  - [x] get final gene class from species class vector
  - [x] statistically summarize results
  - [x] visualize results
+ - [ ] **remove hard-coded assumption of depth=3 species trees**
  - [ ] generalize from 'orphan' to 'query'
  - [ ] prepare report for each query
- - [ ] prepare HTML webpage, merging all results
  - [ ] add orthology statistics
  - [ ] print all intermediate data
  - [ ] modularize analyses, e.g. N-string, indel, CDS overlap, etc.

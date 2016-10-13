@@ -4,35 +4,35 @@ import argparse
 import sys
 
 
+def err(msg):
+    sys.exit(msg)
+
+
 class Entry:
     def __init__(self, row):
         self.row = row
-        self.attr = {t:v for t,v in (s.split("=") for s in row[8].split(";"))}
+        self.attr = {t:v for t,v in (s.split(b'=') for s in row[8].split(b';'))}
 
     def print_(self, tags=None, split=False, use_ids=False):
         if(tags):
             try:
                 if split:
-                    nine = "\t".join([self.attr[k] for k in tags])
+                    nine = b'\t'.join([self.attr[k] for k in tags])
                 else:
-                    if use_ids and "Name" in tags and not "Name" in self.attr:
-                        self.attr["Name"] = self.attr["ID"]
+                    if use_ids and b'Name' in tags and not b'Name' in self.attr:
+                        self.attr[b'Name'] = self.attr[b'ID']
                     if len(tags) == 1:
                         nine = self.attr[tags[0]]
                     else:
-                        nine = ";".join(["%s=%s" % (k, self.attr[k]) for k in tags])
+                        nine = b';'.join([b'%s=%s' % (k, self.attr[k]) for k in tags])
             except KeyError:
                 err("Input error: requested tag missing")
         else:
             nine = self.row[8]
 
-        out = "\t".join(self.row[0:8] + [nine])
+        out = b'\t'.join(self.row[0:8] + [nine])
 
-        print(out)
-
-
-def err(msg):
-    sys.exit(msg)
+        print(out.decode())
 
 
 def parser():
@@ -71,16 +71,17 @@ def parser():
         default=False
     )
     args = parser.parse_args()
-
     return(args)
+
 
 def rowgen(gff):
     entries = []
     for line in gff.readlines():
-        if(line[0] == "#"):
+        line = line.encode()
+        if(line[0] == ord('#')):
             continue
 
-        row = line.rstrip().split("\t")
+        row = line.rstrip().split(b'\t')
 
         if(len(row) != 9):
             err("Bad GFF, must be TAB-delimited with 9 columns")
@@ -89,18 +90,19 @@ def rowgen(gff):
 
     return entries
 
+
 def mapids(entries):
     idmap = dict()
     for entry in entries:
         try:
-            ID = entry.attr['ID']
+            ID = entry.attr[b'ID']
         except KeyError:
             err("Bad GFF, 9th column must have ID tag")
 
         try:
-            Name = entry.attr['Name']
+            Name = entry.attr[b'Name']
         except KeyError:
-            Name = entry.attr['ID']
+            Name = entry.attr[b'ID']
 
         idmap[ID] = Name
     return(idmap)
@@ -109,7 +111,7 @@ def mapids(entries):
 def parent_id2name(entries, idmap):
     for entry in entries:
         try:
-            entry.attr['Parent'] = idmap[entry.attr['Parent']]
+            entry.attr[b'Parent'] = idmap[entry.attr[b'Parent']]
         except KeyError:
             pass
         except TypeError:
@@ -125,10 +127,16 @@ if __name__ == '__main__':
         idmap = mapids(entries)
         parent_id2name(entries, idmap)
 
-    attr_join = "\t" if args.split else None
+    attr_join = b'\t' if args.split else None
 
     if(args.select):
-        entries = [e for e in entries if e.row[2] in args.select]
+        selection = [s.encode() for s in args.select]
+        entries = [e for e in entries if e.row[2] in selection]
+
+    # Exit will succeed if there is something to print
+    exit_status = 0 if bool(entries) else 1
 
     for entry in entries:
         entry.print_(args.reduce, attr_join, args.use_id_if_unnamed)
+
+    sys.exit(exit_status)

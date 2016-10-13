@@ -1,0 +1,51 @@
+print-warning(){
+    if [[ -t 2 ]]
+    then
+        echo -e "\e[1;31mERROR: \e[0m$1"
+    else
+        echo $1
+    fi
+}
+
+croak(){
+    print-warning "$1"
+    exit 1
+}
+
+check-read(){
+    file="$1"   # the name of the test file
+    place="$2"  # file context, e.g. foo.sh::doit (for debugging)
+    if [[ ! -r "$file" ]]
+    then
+        croak "Cannot read '$file', used in $place"
+    fi
+}
+
+check-dir(){
+    dir=$1    # the name of the test file
+    place=$2  # dir context, e.g. foo.sh::doit (for debugging)
+    if [[ ! -r "$dir" ]]
+    then
+        croak "Access directory '$dir', used in $place"
+    fi
+}
+
+check-exe(){
+    exe=$1
+    place=$2
+    if [[ -z `type -P $exe` ]]
+    then
+        croak "The command '$exe' cannot be executed, used in $place"
+    fi
+}
+
+safe-mkdir(){
+    dir=$1
+    [[ -d $dir ]] || mkdir -p $dir || croak "Could not make directory '$dir'"
+}
+
+kill-mkdir(){
+    dir=$1
+    [[ -d $dir ]] && rm -rf $dir
+    mkdir $dir
+}

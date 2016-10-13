@@ -9,9 +9,13 @@ def err(msg):
 
 
 class Entry:
-    def __init__(self, row):
-        self.row = row
-        self.attr = {t:v for t,v in (s.split(b'=') for s in row[8].split(b';'))}
+    def __init__(self, row, keepers):
+        self.row = row[0:8]
+        self.attr = dict()
+        for s in row[8].split(b';'):
+            t,v = s.split(b'=')
+            if(not keepers or t in keepers):
+                self.attr[t] = v
 
     def print_(self, tags=None, split=False, use_ids=False):
         if(tags):
@@ -28,7 +32,7 @@ class Entry:
             except KeyError:
                 err("Input error: requested tag missing")
         else:
-            nine = self.row[8]
+            nine = b';'.join([b'%s=%s' % (k,v) for k,v in self.attr.items()])
 
         out = b'\t'.join(self.row[0:8] + [nine])
 
@@ -74,7 +78,7 @@ def parser():
     return(args)
 
 
-def rowgen(gff):
+def rowgen(gff, keepers):
     entries = []
     for line in gff.readlines():
         line = line.encode()
@@ -86,7 +90,7 @@ def rowgen(gff):
         if(len(row) != 9):
             err("Bad GFF, must be TAB-delimited with 9 columns")
 
-        entries.append(Entry(row))
+        entries.append(Entry(row, keepers))
 
     return entries
 
@@ -121,7 +125,14 @@ def parent_id2name(entries, idmap):
 if __name__ == '__main__':
     args = parser()
 
-    entries = rowgen(args.gfffile)
+    keepers = set()
+    if(args.reduce):
+        args.reduce = [s.encode() for s in args.reduce]
+        keepers = set(args.reduce)
+        if(args.mapids):
+            keepers.update([b'ID', b'Name'])
+
+    entries = rowgen(args.gfffile, keepers)
 
     if(args.mapids):
         idmap = mapids(entries)

@@ -1,5 +1,11 @@
 #!/usr/bin/env bash
 
+set -o nounset
+set -o errexit
+set -o pipefail
+
+source src/shell-utils.sh
+
 usage (){
 cat << EOF
 Prepare final report
@@ -11,7 +17,13 @@ clean (){
     make deepclean    
 }
 
-cd src/report
+base_dir=$PWD
+report_dir=$base_dir/src/report
+report_pdf=$report/report.pdf
+
+check-dir   $report_dir $0
+
+cd $report
 
 while getopts "h" opt; do
     case $opt in
@@ -27,4 +39,7 @@ while getopts "h" opt; do
 done
 
 make
-cp report.pdf ../..
+
+check-read $report_pdf $0
+
+cp $report_pdf $base_dir

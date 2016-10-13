@@ -1,7 +1,11 @@
 #!/usr/bin/env bash
-set -u
+
+set -o nounset
+set -o errexit
+set -o pipefail
 
 source fagin.cfg
+source src/shell-utils.sh
 
 usage (){
 cat << EOF
@@ -30,8 +34,15 @@ EOF
     exit 0
 }
 
+check-exe smof     $0
+check-exe parallel $0
+check-exe awk      $0
+check-exe sed      $0
+
+
 idir=$INPUT/fna
 odir=$INPUT/stat
+
 while getopts "hi:o:" opt; do
     case $opt in
         h)
@@ -45,7 +56,8 @@ while getopts "hi:o:" opt; do
     esac 
 done
 
-[[ -d $odir ]] || mkdir -p $odir
+check-dir $idir $0
+safe-mkdir $odir
 
 make-header () {
     echo -e "$(tr ' ' '\t' <<< $@)"
@@ -93,25 +105,27 @@ write-nucleotide-composition () {
     do
         s=${j%.fna}
         s=${s##*/}
-        bedtools random \
-            -l 1000 \
-            -n 10000 \
+        bedtools random  \
+            -l 1000      \
+            -n 10000     \
             -seed 123456 \
             -g <(awk -v s=$s -v OFS="\t" '$1 == s {print $2,$3}' $scaflen) |
-        bedtools getfasta \
-            -s \
-            -fi $j \
+        bedtools getfasta   \
+            -s              \
+            -fi $j          \
             -bed /dev/stdin \
             -fo /dev/stdout |
         sed -r "s/>([^:]+):([0-9]+)-[0-9]+\((.)\)/>$s:\1:\2:\3/"
-    done |
+    done                     |
         smof clean -xru -t n |
-        smof stat -qc |
-        tr ':' "\t" |
+        smof stat -qc        |
+        tr ':' "\t"          |
         # Expand header to accomadate the added columns
         sed "1s/seqid/species\tscaffold\tstart\tstrand/"
 }
 
-write-scaffold-lengths > $scaflen
-write-nstrings > $nstring
+write-scaffold-lengths       > $scaflen
+write-nstrings               > $nstring
 write-nucleotide-composition > $nuccomp
+
+exit 0

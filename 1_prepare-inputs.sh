@@ -1,16 +1,11 @@
 #!/usr/bin/env bash
-set -u
+
+set -o nounset
+set -o errexit
+set -o pipefail
 
 source fagin.cfg
-
-print-warning(){
-    if [[ -t 2 ]]
-    then
-        echo -e '\e[1;31mERROR: '$1'\e[0m'
-    else
-        echo $1
-    fi
-}
+source src/shell-utils.sh
 
 usage (){
 cat << EOF
@@ -34,84 +29,24 @@ do
     esac 
 done
 
-if [[ -z $SYN_DIR ]]
-then
-    print-warning 'missing argument SYN_DIR in config'
-    synteny-map-help
-    exit 1
-fi
-
-if [[ -z $GFF_DIR ]]
-then
-    print-warning 'missing argument GFF_DIR in config'
-    gff-help
-    exit 1
-fi
-
-if [[ -z $FNA_DIR ]]
-then
-    print-warning 'missing argument FNA_DIR in config'
-    fna-help
-    exit 1
-fi
-
-if [[ -z $TREE ]]
-then
-    print-warning 'missing argument TREE in config'
-    tree-help
-    exit 1
-fi
-
-if [[ -z $FOCAL_SPECIES ]]
-then
-    print-warning 'missing argument FOCAL_SPECIES in config'
-    focal-species-help
-    exit 1
-fi
+safe-mkdir $INPUT
 
 
-if [[ ! -d $SYN_DIR ]]
-then
-    print-warning "cannot open synteny directory '$SYN_DIR'"
-    exit 1
-fi
+# =============================
+# Prepare tree and species list
+# =============================
 
-if [[ ! -d $GFF_DIR ]]
-then
-    print-warning "cannot open gff directory '$GFF_DIR'"
-    exit 1
-fi
+check-dir "$TREE" $0
+check-dir "$TREE" $0
 
-if [[ ! -d $FNA_DIR ]]
-then
-    print-warning "cannot open genome directory '$FNA_DIR'"
-    exit 1
-fi
-
-if [[ ! -r $TREE ]]
-then
-    print-warning "cannot open tree file '$TREE'"
-    exit 1
-fi
-
-if [[ ! -r $TREE ]]
-then
-    print-warning "Missing expected file $TREE"
-    exit 1
-fi
-
-mkdir -p $INPUT/fna
-mkdir -p $INPUT/gff
-mkdir -p $INPUT/syn
-
-ln -sf $TREE $INPUT/tree
+ln -sf $TREE        $INPUT/tree
 ln -sf $ORPHAN_LIST $INPUT/orphan-list.txt
 
 src/get-species-from-tree.R $TREE > $INPUT/species
+
 species=$(cat $INPUT/species)
 
-grep $FOCAL_SPECIES <(echo $species) > /dev/null
-if [[ $? != 0 ]]
+if [[ ! `grep $FOCAL_SPECIES <(echo $species)` ]]
 then
     print-warning "Focal species $FOCAL_SPECIES not in tree"
     echo "The focal species must be one of the following:"
@@ -119,35 +54,45 @@ then
     exit 1
 fi
 
+
+
+# -------------------------
+# Load data for all species
+# -------------------------
+
+check-dir "$SYN_DIR" $0
+check-dir "$GFF_DIR" $0
+check-dir "$FNA_DIR" $0
+
+safe-mkdir $INPUT/fna
+safe-mkdir $INPUT/gff
+safe-mkdir $INPUT/syn
+
 for s in $species
 do
-    gff=$GFF_DIR/$s.gff
-    fna=$FNA_DIR/$s.fna
-    syn=$SYN_DIR/$FOCAL_SPECIES.vs.$s.tab
-    if [[ -r $gff ]]
+    input_gff=$GFF_DIR/$s.gff
+    input_fna=$FNA_DIR/$s.fna
+
+    output_gff=$INPUT/gff/$s.gff
+    output_fna=$INPUT/fna/$s.fna
+
+    check-read $input_gff $0
+    check-read $input_fna $0
+
+    ln -sf $input_gff $output_gff
+    ln -sf $input_fna $output_fna
+
+    # No focal versus focal map
+    if [[ ! $FOCAL_SPECIES == $s ]]
     then
-        ln -sf $gff $INPUT/gff/$s.gff
-    else
-        print-warning "Missing expected file $gff" 
+        input_syn=$SYN_DIR/$FOCAL_SPECIES.vs.$s.tab
+        output_syn=$INPUT/syn/$FOCAL_SPECIES.vs.$s.syn
+        check-read $input_syn $0
+        ln -sf $input_syn $output_syn
     fi
 
-    if [[ -r $fna   ]]
-    then
-        ln -sf $fna $INPUT/fna/$s.fna
-    else
-        print-warning "Missing expected file $fna" 
-    fi
-
-    if [[ $FOCAL_SPECIES != $s ]]
-    then
-        if [[ -r $syn   ]]
-        then
-            ln -sf $syn $INPUT/syn/$FOCAL_SPECIES.vs.$s.syn 
-        else
-            print-warning "Missing expected file $syn" 
-        fi
-    fi
 done
+
 
 
 # ---------------------------------
@@ -158,5 +103,10 @@ parse_script=src/util/parse-gff.py
 focal_gff=$INPUT/gff/$FOCAL_SPECIES.gff
 search_gff=$INPUT/search.gff
 
+check-read  $focal_gff  $0
+check-exe $parse_script $0
+
 # select mRNA and reduce 9th column to feature name
 $parse_script -s mRNA -r Name -d -- $focal_gff > $search_gff
+
+exit 0

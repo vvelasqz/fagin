@@ -1,7 +1,11 @@
 #!/usr/bin/env bash
-set -u
+
+set -o nounset
+set -o errexit
+set -o pipefail
 
 source fagin.cfg
+source src/shell-utils.sh
 
 exit_status=0
 
@@ -22,7 +26,14 @@ EOF
 species=$(cat $INPUT/species)
 syndir=$INPUT/syn
 gffdir=$INPUT/gff
-glenfil=$INPUT/stat/scaffold-lengths.tab
+mapdir=$INPUT/maps
+glenfile=$INPUT/stat/scaffold-lengths.tab
+
+safe-mkdir $mapdir
+
+check-dir  $syndir   $0
+check-dir  $gffdir   $0
+check-read $glenfile $0
 
 while getopts "h" opt; do
     case $opt in
@@ -31,11 +42,9 @@ while getopts "h" opt; do
     esac 
 done
 
-mapdir=$INPUT/maps
-
 # Get genome lengths file
 genlen () {
-    awk -v s=$1 'BEGIN{OFS="\t"} NR > 1 && $1 == s {print $2, $3}' $glenfil
+    awk -v s=$1 'BEGIN{OFS="\t"} NR > 1 && $1 == s {print $2, $3}' $glenfile
 }
 
 status-check () {
@@ -50,15 +59,17 @@ do
     if [[ $s != $FOCAL_SPECIES ]]
     then
         map=$mapdir/$FOCAL_SPECIES.vs.$s.map.tab
+        log=$s.log
         echo $s
 
-        # Build synder database
         synfile="$syndir/$FOCAL_SPECIES.vs.$s.syn"
         tmpque=/tmp/que$RANDOM
         tmptar=/tmp/tar$RANDOM
 
-        genlen $s             > $tmptar
-        genlen $FOCAL_SPECIES > $tmpque
+        check-read  $synfile $0
+
+        genlen       $s             > $tmptar
+        genlen       $FOCAL_SPECIES > $tmpque
 
         time synder search          \
             -s $synfile             \
@@ -67,7 +78,7 @@ do
             -q $tmpque              \
             -b $synder_search_bases \
             -k $synder_k            \
-            -x d > $map 2> $s.log
+            -x d > $map 2> $log
         status-check $? "  synder failed"
 
         rm $tmpque $tmptar

@@ -20,11 +20,11 @@ class Entry:
     def print_(self, tags=None, split=False, use_ids=False):
         if(tags):
             try:
+                if use_ids and b'Name' in tags and not b'Name' in self.attr:
+                    self.attr[b'Name'] = self.attr[b'ID']
                 if split:
                     nine = b'\t'.join([self.attr[k] for k in tags])
                 else:
-                    if use_ids and b'Name' in tags and not b'Name' in self.attr:
-                        self.attr[b'Name'] = self.attr[b'ID']
                     if len(tags) == 1:
                         nine = self.attr[tags[0]]
                     else:
@@ -129,7 +129,7 @@ if __name__ == '__main__':
     if(args.reduce):
         args.reduce = [s.encode() for s in args.reduce]
         keepers = set(args.reduce)
-        if(args.mapids):
+        if(args.mapids or args.use_id_if_unnamed):
             keepers.update([b'ID', b'Name'])
 
     entries = rowgen(args.gfffile, keepers)

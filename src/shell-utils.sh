@@ -49,3 +49,13 @@ kill-mkdir(){
     [[ -d $dir ]] && rm -rf $dir
     mkdir $dir
 }
+
+# `bedtools getfasta` reads the sequence name from the third column of the gff.
+# This function moves some other column (ARG1) to the 3rd.
+rename_for_bedtools (){
+    awk -v from=$1 '
+        BEGIN{FS="\t"; OFS="\t"}
+        {$3 = $from}
+        {print}
+    '
+}

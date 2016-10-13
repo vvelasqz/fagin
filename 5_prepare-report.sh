@@ -19,11 +19,11 @@ clean (){
 
 base_dir=$PWD
 report_dir=$base_dir/src/report
-report_pdf=$report/report.pdf
+report_pdf=$report_dir/report.pdf
 
 check-dir   $report_dir $0
 
-cd $report
+cd $report_dir
 
 while getopts "h" opt; do
     case $opt in

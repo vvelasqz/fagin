@@ -1,15 +1,9 @@
-# --- Bash config --- fagin inputs ------------------------------------------
+#!/usr/bin/env bash
+# CONFIGURATION TEMPLATE - DO NOT CHANGE
 
-HOME_DIR="$HOME/src/git/fagin"
-
-
-# -----------------------------------------------------------------------------
-# File to hold links to input data and intermediate files. This directory
-# should be on a filesystem with adequate storage (+10Gb, depending on project
-# size).
-# -----------------------------------------------------------------------------
-INPUT="input"
-
+# ===================================================================
+# REQUIRED INPUT                                                  
+# ===================================================================
 
 # -----------------------------------------------------------------------------
 # GFF_DIR is a directory containing a GFF file for each species used in the
@@ -22,14 +16,14 @@ INPUT="input"
 # 3913   .   +   .   AT1G01010.1 Chr1   .   CDS    3996   4276   .   + .
 # AT1G01010.1
 # -----------------------------------------------------------------------------
-GFF_DIR="$HOME/db/fagin-input/gff"
+GFF_DIR=
 
 
 # -----------------------------------------------------------------------------
 # FNA_DIR is a directory containing a single genome sequence file for each
 # species used in the pipeline. The files must be in FASTA format.
 # -----------------------------------------------------------------------------
-FNA_DIR="$HOME/db/fagin-input/fna"
+FNA_DIR=
 
 
 # -----------------------------------------------------------------------------
@@ -62,7 +56,7 @@ FNA_DIR="$HOME/db/fagin-input/fna"
 # hundreds of cpu hours, so it is best done on a cluster. an example pbs script
 # is provided, see src/satsuma.pbs.
 # -----------------------------------------------------------------------------
-SYN_DIR="$HOME/db/fagin-input/syn"
+SYN_DIR=
 
 
 # -----------------------------------------------------------------------------
@@ -76,7 +70,7 @@ SYN_DIR="$HOME/db/fagin-input/syn"
 #
 # (Brassica_rapa,(Capsella_rubella,(Arabidopsis_lyrata,Arabidopsis_thaliana)));
 # -----------------------------------------------------------------------------
-TREE="$HOME/db/fagin-input/brassicaceae.tree"
+TREE=
 
 
 # -----------------------------------------------------------------------------
@@ -87,10 +81,21 @@ TREE="$HOME/db/fagin-input/brassicaceae.tree"
 # For now, there can be only one focal species. Future releases may contain an
 # all-vs-all option.
 # -----------------------------------------------------------------------------
-FOCAL_SPECIES="Arabidopsis_thaliana"
+FOCAL_SPECIES=
 
-ORPHAN_LIST="$HOME/db/fagin-input/orphan-list.txt"
 
+# -----------------------------------------------------------------------------
+# A list of the genes that will be analyzed. All the genes in the list must be
+# represented by gene models of the same name in the focal species GFF file.
+# -----------------------------------------------------------------------------
+ORPHAN_LIST=
+
+
+
+
+# ===================================================================
+# The defaults below are usable for a first pass
+# ===================================================================
 
 # -----------------------------------------------------------------------------
 # Minimum length of an interval in the synteny map (target side) --- This value
@@ -124,7 +129,7 @@ synder_db_bases=0100
 # specs[1]. Fagin assumes 1-based output (required by Bioconductor and R in
 # general). So the value should usually be the 1111.
 #
-# [1] https://github.com/The-Sequence-Ontology/Specifications/blob/master/gff3.md.
+# https://github.com/The-Sequence-Ontology/Specifications/blob/master/gff3.md
 # -----------------------------------------------------------------------------
 synder_search_bases=1111
 
@@ -136,50 +141,31 @@ synder_search_bases=1111
 # -----------------------------------------------------------------------------
 synder_k=10
 
-# --- R config --- Report inputs ----------------------------------------------
 
-R_HOME="~/src/git/fagin"
 
-R_FAA_DIR="~/src/git/fagin/input/faa"
-R_GFF_DIR="~/src/git/fagin/input/gff"
-R_SYN_DIR="~/src/git/fagin/input/syn"
-R_GENE_DIR="~/src/git/fagin/input/gene"
-R_GENOME_DIR="~/src/git/fagin/input/fna"
-R_SI_DIR="~/src/git/fagin/input/maps"
 
-R_SPECIES_FILE="~/src/git/fagin/input/species"
+# ===================================================================
+# Automatically generated variables, do not change
+# ===================================================================
 
-R_SCAFLEN='~/src/git/fagin/input/stat/scaffold-lengths.tab'
-R_NSTRINGS='~/src/git/fagin/input/stat/nstrings.tab'
-R_ORPHAN_LIST="~/src/git/fagin/input/orphan-list.txt"
-R_KBCOMP='~/src/git/fagin/input/stat/kb-composition.tab'
+# -----------------------------------------------------------------------------
+# Fagin home directory containing
+#  .
+#  ├── bin
+#  ├── dbg
+#  ├── doc
+#  ├── etc
+#  ├── src
+#  ├── configure.sh
+#  ├── Makefile
+#  ├── README.md
+#  └── VERSION
+# -----------------------------------------------------------------------------
+HOME_DIR="FAGIN_HOME"
 
-R_ORFGFF="~/src/git/fagin/input/orf-gff"
-R_ORFFAA="~/src/git/fagin/input/orf-faa"
-
-R_TRANS_ORF="~/src/git/fagin/input/trans-orf"
-
-R_CACHE="~/src/git/fagin/cache"
-
-R_DECISION_TREE="~/src/git/fagin/decision-trees/cds.yaml"
-R_TREE="~/src/git/fagin/input/tree"
-R_FOCAL_SPECIES=FOCAL_SPECIES
-
-# Base p-value cutoffs (these will be adjusted for multiple testing
-# query protein versus target gene alignments
-R_PROT2PROT_PVAL=0.05
-# query protein versus all SI translated ORFs
-R_PROT2ALLORF_PVAL=0.05
-# query protein versus translated ORFs from spliced transcripts
-R_PROT2TRANSORF_PVAL=0.05
-# query genes versus entire SI (nucleotide match)
-R_DNA2DNA_PVAL=0.05
-
-# Number of simulations
-R_PROT2PROT_NSIMS=1e3
-R_PROT2ALLORF_NSIMS=1e3
-R_PROT2TRANSORF_NSIMS=1e3
-
-R_DNA2DNA_MAXSPACE=1e8
-
-R_INDEL_THRESHOLD=0.25
+# -----------------------------------------------------------------------------
+# File to hold links to input data and intermediate files. This directory
+# should be on a filesystem with adequate storage (+10Gb, depending on project
+# size).
+# -----------------------------------------------------------------------------
+INPUT="FAGIN_HOME/input"

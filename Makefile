@@ -17,6 +17,8 @@ clean:
 	rm -f *log log report.pdf
 	rm -rf cache
 	rm -f gmon.out
+	rm -f preconfig.sh
+	rm -f runconfig.R
 
 .PHONY: distclean
 distclean:

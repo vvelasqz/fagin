@@ -20,15 +20,21 @@ deps <- c(
     "yaml"
 )
 bio.deps <- c('Biostrings', 'GenomicRanges')
+current <- installed.packages()
+
 chooseCRANmirror(ind=1)
 for (x in c(deps, bio.deps)) {
-    if(!require(x, character.only=TRUE, quietly=TRUE)){
+    cat(paste("Checking R package", x, "... "))
+    if(! x %in% current){
+        cat("installing\n")
         if(x %in% bio.deps){
-            require(devtools)
+            require(devtools, quietly=TRUE, warn.conflicts=FALSE)
             source("https://bioconductor.org/biocLite.R")
             biocLite(x)
         } else {
             install.packages(x)
         }
+    } else {
+        cat("OK\n")
     }
 }

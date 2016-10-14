@@ -30,6 +30,7 @@ cat $input_gff |
         -bed /dev/stdin \
         -fo /dev/stdout \
         -name |
+    sed 's/::.*//' |
     awk '
         $1 ~ /^>/ && $1 in a { next }
         {a[$1]++; print}

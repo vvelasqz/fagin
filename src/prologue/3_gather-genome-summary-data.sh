@@ -76,7 +76,7 @@ write-scaffold-lengths () {
     do
         s=${j%.fna.tab}
         s=${s##*/}
-        sed "s/^/$s\t/" $j
+        perl -pe "s/^/$s\t" $j
         rm $j
     done
 }
@@ -110,13 +110,15 @@ write-nucleotide-composition () {
             -fi $j          \
             -bed /dev/stdin \
             -fo /dev/stdout |
-        sed -r "s/>([^:]+):([0-9]+)-[0-9]+\((.)\)/>$s:\1:\2:\3/"
-    done                     |
+        # e.g. ">foo:23-46(+) stuff" -> ">species:foo:23:+"
+        perl -pe "s/>([^:]+):(\d+)-\d+\((.)\).*/>$s:$1:$2:$3/" |
+        sed "/>/s/::.*//"
+    done                      |
         $smof clean -xru -t n |
         $smof stat -qc        |
-        tr ':' "\t"          |
-        # Expand header to accomadate the added columns
-        sed "1s/seqid/species\tscaffold\tstart\tstrand/"
+        tr ':' "\t"           |
+        # Expand header to accommodate the added columns
+        perl -pe "s/^seqid\t/species\tscaffold\tstart\tstrand\t/"
 }
 
 write-scaffold-lengths       > $scaflen

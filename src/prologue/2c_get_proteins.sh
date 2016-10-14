@@ -14,7 +14,6 @@ input_gff=$INPUT/gff/$species.gff
 input_fna=$INPUT/fna/$species.fna
 output_faa=$INPUT/faa/$species.faa
 parse_script=$PWD/parse-gff.py
-x=/tmp/get_proteins_$species
 
 safe-mkdir $INPUT/faa
 
@@ -34,9 +33,11 @@ cat $input_gff |
         -bed /dev/stdin \
         -fo /dev/stdout \
         -name |
-    awk '$1 ~ /^>/ && $1 in seqids { next }; {seqids[$1]++; print}' > $x
-cat <($smof grep ' +' $x) <($smof grep ' -' $x | revseq -filter) |
+    sed 's/::.*//' |
+    awk '$1 ~ /^>/ && $1 in seqids { next }; {seqids[$1]++; print}' |
+    cat <($smof grep ' +' /dev/stdin                 ) \
+        <($smof grep ' -' /dev/stdin | revseq -filter) |
     transeq -filter |
     $smof clean -sux |
-    sed '/>/s/_[0-9]\+$//' > $output_faa
+    sed '/>/s/_[0-9][0-9]*$//' > $output_faa
 rm $x

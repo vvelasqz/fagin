@@ -10,8 +10,9 @@ db/
 *.fna
 *.fasta
 
-rconf.R
-bconf.sh
+preconfig.sh
+runconfig.R
+config
 
 *.un~
 

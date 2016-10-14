@@ -2,24 +2,15 @@
 # needs a major overhaul before general application.
 
 all:
-	./1_prepare-inputs.sh
-	[[ -d input/faa ]]  || ./2_extract-fasta.sh
-	[[ -d input/stat ]] || ./3_gather-genome-summary-data.sh
-	./4_get-search-intervals.sh
-	./5_prepare-report.sh
-
-# Builds synder, recalculates search intervals, cleans house, makes tags
-.PHONY: refresh
-refresh:
-	cd ../synder && make && make install PREFIX=${HOME} && make test
-	rm -rf input/maps/db
-	./4_get-search-intervals.sh
-	make clean
-	cd src/report && make deepclean && ctags .
+	src/prologue/1_prepare-inputs.sh
+	[[ -d input/faa ]]  || src/prologue/2_extract-fasta.sh
+	[[ -d input/stat ]] || src/prologue/3_gather-genome-summary-data.sh
+	src/prologue/4_get-search-intervals.sh
+	src/prologue/5_prepare-report.sh
 
 .PHONY: archive
 archive:
-	./archive.sh
+	src/epilogue/archive.sh
 
 .PHONY: clean
 clean:
@@ -27,8 +18,8 @@ clean:
 	rm -rf cache
 	rm -f gmon.out
 
-.PHONY: deepclean
-deepclean:
+.PHONY: distclean
+distclean:
 	rm -rf input
 	rm -f log report.pdf
 	rm -rf cache

@@ -90,19 +90,19 @@ require(tidyr)
 require(xtable)
 require(yaml)
 
-source('~/src/git/fagin/src/report/R/util.R')
-source('~/src/git/fagin/src/report/R/classification.R')
-source('~/src/git/fagin/src/report/R/loadData.R')
-source('~/src/git/fagin/src/report/R/indels.R')
-source('~/src/git/fagin/src/report/R/syntenic_stats.R')
-source('~/src/git/fagin/src/report/R/sequence_alignments.R')
-source('~/src/git/fagin/src/report/R/feature_overlaps.R')
-source('~/src/git/fagin/src/report/R/plot.R')
-source('~/src/git/fagin/src/report/R/versions.R')
+source('R/util.R')
+source('R/classification.R')
+source('R/loadData.R')
+source('R/indels.R')
+source('R/syntenic_stats.R')
+source('R/sequence_alignments.R')
+source('R/feature_overlaps.R')
+source('R/plot.R')
+source('R/versions.R')
 
 use_cache <- TRUE
 cache     <- cache_factory(config)
-config    <- LoadConfig(configfile='~/src/git/fagin/fagin.cfg')
+config    <- LoadConfig(configfile='config')
 l_seqinfo <- LoadSeqinfoList(config)
 query     <- cache(LoadQuery, config, l_seqinfo)
 
@@ -765,7 +765,8 @@ sum(g4$n)
 \subsection{Synteny cases}
 
 <<load-lyrata, cache=TRUE>>=
-load('~/src/git/fagin/cache/Arabidopsis_thaliana.vs.Arabidopsis_lyrata-LoadTarget.Rdat')
+
+load(paste0(config$d_cache, '/Arabidopsis_thaliana.vs.Arabidopsis_lyrata-LoadTarget.Rdat'))
 target <- out
 @
 
@@ -947,7 +948,7 @@ plotOne(q='AT3G25719.1', target, k=5000)
 \subsubsection{Samples from all unknown cases}
 
 <<load-brassica_rapa, cache=TRUE>>=
-load('~/src/git/fagin/cache/Arabidopsis_thaliana.vs.Brassica_rapa-LoadTarget.Rdat')
+load(paste0(config$d_cache, '/Arabidopsis_thaliana.vs.Brassica_rapa-LoadTarget.Rdat'))
 target <- out
 # skipped
 u7 <- labels$labels$Brassica_rapa %>%

@@ -1,5 +1,3 @@
-#!/usr/bin/env bash
-# CONFIGURATION TEMPLATE - DO NOT CHANGE
 
 # ===================================================================
 # REQUIRED INPUT                                                  
@@ -16,14 +14,14 @@
 # 3913   .   +   .   AT1G01010.1 Chr1   .   CDS    3996   4276   .   + .
 # AT1G01010.1
 # -----------------------------------------------------------------------------
-GFF_DIR=
+GFF_DIR=~/db/fagin-input/gff
 
 
 # -----------------------------------------------------------------------------
 # FNA_DIR is a directory containing a single genome sequence file for each
 # species used in the pipeline. The files must be in FASTA format.
 # -----------------------------------------------------------------------------
-FNA_DIR=
+FNA_DIR=~/db/fagin-input/fna
 
 
 # -----------------------------------------------------------------------------
@@ -56,7 +54,7 @@ FNA_DIR=
 # hundreds of cpu hours, so it is best done on a cluster. an example pbs script
 # is provided, see src/satsuma.pbs.
 # -----------------------------------------------------------------------------
-SYN_DIR=
+SYN_DIR=~/db/fagin-input/syn
 
 
 # -----------------------------------------------------------------------------
@@ -70,7 +68,7 @@ SYN_DIR=
 #
 # (Brassica_rapa,(Capsella_rubella,(Arabidopsis_lyrata,Arabidopsis_thaliana)));
 # -----------------------------------------------------------------------------
-TREE=
+TREE=~/db/fagin-input/brassicaceae.tree
 
 
 # -----------------------------------------------------------------------------
@@ -81,14 +79,14 @@ TREE=
 # For now, there can be only one focal species. Future releases may contain an
 # all-vs-all option.
 # -----------------------------------------------------------------------------
-FOCAL_SPECIES=
+FOCAL_SPECIES=Arabidopsis_thaliana
 
 
 # -----------------------------------------------------------------------------
 # A list of the genes that will be analyzed. All the genes in the list must be
 # represented by gene models of the same name in the focal species GFF file.
 # -----------------------------------------------------------------------------
-ORPHAN_LIST=
+ORPHAN_LIST=~/db/fagin-input/orphan-list.txt
 
 
 
@@ -161,14 +159,14 @@ synder_k=10
 #  ├── README.md
 #  └── VERSION
 # -----------------------------------------------------------------------------
-HOME_DIR="FAGIN_HOME"
+HOME_DIR="/home/shoggoth/src/git/fagin"
 
 # -----------------------------------------------------------------------------
 # File to hold links to input data and intermediate files. This directory
 # should be on a filesystem with adequate storage (+10Gb, depending on project
 # size).
 # -----------------------------------------------------------------------------
-INPUT="FAGIN_HOME/input"
+INPUT="/home/shoggoth/src/git/fagin/input"
 
 # -----------------------------------------------------------------------------
 # Default paths for automatically buildable dependencies. If the program
@@ -177,5 +175,5 @@ INPUT="FAGIN_HOME/input"
 # program exists in $PATH already.
 # -----------------------------------------------------------------------------
 
-synder="FAGIN_HOME/bin/synder"
-smof="FAGIN_HOME/bin/smof"
+synder='/home/shoggoth/bin/synder'
+smof='/home/shoggoth/bin/smof'

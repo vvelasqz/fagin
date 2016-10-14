@@ -6,7 +6,25 @@ exit_status=0
 smof_src=https://github.com/arendsee/smof
 synder_src=https://github.com/arendsee/synder
 
+pconf=preconfig.sh
+rconf=runconfig.R
+
 [[ -d bin ]] || mkdir bin
+
+make-config(){
+    base=$1
+    dest=$2
+    echo -n "Checking for $base ... "
+    tconf=etc/template-$base
+    if [[ ! -r $base ]]
+    then
+        echo "initializing"
+        sed -n '/^$/,$ p' $tconf | sed "s;FAGIN_HOME;$PWD;" > $base
+        ln -sf $PWD/$base $dest
+    else
+        echo "already exists"
+    fi
+}
 
 check-exe(){
     echo -n "Looking for $1 ... "
@@ -28,6 +46,8 @@ install-exe(){
         $2 $1 || (echo "Failed to install $1" && exit_status=1)
     else
         echo "OK"
+        sed "s;^$1=.*;$1='`which $1`';" $pconf > $pconf~
+        mv $pconf~ $pconf
     fi
 }
 
@@ -44,20 +64,8 @@ install-synder(){
     cp synder ../../bin
 }
 
-make-config(){
-    base=$1
-    dest=$2
-    echo -n "Checking for $base ... "
-    tconf=etc/template-$base
-    if [[ ! -r $base ]]
-    then
-        echo "initializing"
-        sed -n '/^$/,$ p' $tconf | sed "s;FAGIN_HOME;$PWD;" > $base
-        ln -sf $PWD/$base $dest
-    else
-        echo "already exists"
-    fi
-}
+make-config $pconf $PWD/src/prologue/config
+make-config $rconf $PWD/src/report/config
 
 check-exe R        "R not in path, please install"
 check-exe Rscript  "Rscript not in path, please install R"
@@ -71,5 +79,16 @@ install-exe synder install-synder
 
 ./src/prologue/configure.R
 
-make-config preconfig.sh $PWD/src/prologue/config
-make-config runconfig.R  $PWD/src/report/config
+if [[ $exit_status -eq 0 ]]
+then
+cat << EOF
+ Configuration successful, you may now:
+   1. Set required fields in preconfig.sh
+   2. Set required fields in runconfig.R
+   3. Run make (this may require a few hours)
+EOF
+else
+    echo "!!! Configuration FAIL: do NOT proceed, do NOT run make !!!"
+fi
+
+exit $exit_status

@@ -4,12 +4,10 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-source fagin.cfg
-source src/shell-utils.sh
+source config
+source shell-utils.sh
 
 species=$(cat $INPUT/species)
-
-check-exe parallel $0
 
 usage(){
 cat << EOF >&2

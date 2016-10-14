@@ -5,7 +5,7 @@
 # REQUIRED INPUT
 # ===================================================================
 
-FOCAL_SPECIES <- NULL
+FOCAL_SPECIES = NULL
 
 
 
@@ -16,23 +16,27 @@ FOCAL_SPECIES <- NULL
 
 # Base p-value cutoffs (these will be adjusted for multiple testing
 # query protein versus target gene alignments
-PROT2PROT_PVAL <- 0.05
+PROT2PROT_PVAL = 0.05
 
 # query protein versus all SI translated ORFs
-PROT2ALLORF_PVAL <- 0.05
+PROT2ALLORF_PVAL = 0.05
 
 # query protein versus translated ORFs from spliced transcripts
-PROT2TRANSORF_PVAL <- 0.05
+PROT2TRANSORF_PVAL = 0.05
 
 # query genes versus entire SI (nucleotide match)
-DNA2DNA_PVAL <- 0.05
+DNA2DNA_PVAL = 0.05
 
 # Number of simulations
-PROT2PROT_NSIMS <- 1e3
-PROT2ALLORF_NSIMS <- 1e3
-PROT2TRANSORF_NSIMS <- 1e3
-DNA2DNA_MAXSPACE <- 1e8
-INDEL_THRESHOLD <- 0.25
+PROT2PROT_NSIMS     = 1e3
+PROT2ALLORF_NSIMS   = 1e3
+PROT2TRANSORF_NSIMS = 1e3
+
+# Maximum value of m*n that will be searched
+DNA2DNA_MAXSPACE = 1e8
+
+# Ratio of search interval to query interval below which an indel is called
+INDEL_THRESHOLD = 0.25
 
 
 
@@ -42,21 +46,21 @@ INDEL_THRESHOLD <- 0.25
 # The correct configuration will automatically be produced
 # ===================================================================
 
-HOME          <- "FAGIN_HOME"
-FAA_DIR       <- "FAGIN_HOME/input/faa"
-GFF_DIR       <- "FAGIN_HOME/input/gff"
-SYN_DIR       <- "FAGIN_HOME/input/syn"
-GENE_DIR      <- "FAGIN_HOME/input/gene"
-GENOME_DIR    <- "FAGIN_HOME/input/fna"
-SI_DIR        <- "FAGIN_HOME/input/maps"
-SPECIES_FILE  <- "FAGIN_HOME/input/species"
-SCAFLEN       <- 'FAGIN_HOME/input/stat/scaffold-lengths.tab'
-NSTRINGS      <- 'FAGIN_HOME/input/stat/nstrings.tab'
-ORPHAN_LIST   <- "FAGIN_HOME/input/orphan-list.txt"
-KBCOMP        <- 'FAGIN_HOME/input/stat/kb-composition.tab'
-ORFGFF        <- "FAGIN_HOME/input/orf-gff"
-ORFFAA        <- "FAGIN_HOME/input/orf-faa"
-TRANS_ORF     <- "FAGIN_HOME/input/trans-orf"
-CACHE         <- "FAGIN_HOME/cache"
-DECISION_TREE <- "FAGIN_HOME/decision-trees/cds.yaml"
-TREE          <- "FAGIN_HOME/input/tree"
+HOME          = "FAGIN_HOME"
+FAA_DIR       = "FAGIN_HOME/input/faa"
+GFF_DIR       = "FAGIN_HOME/input/gff"
+SYN_DIR       = "FAGIN_HOME/input/syn"
+GENE_DIR      = "FAGIN_HOME/input/gene"
+GENOME_DIR    = "FAGIN_HOME/input/fna"
+SI_DIR        = "FAGIN_HOME/input/maps"
+SPECIES_FILE  = "FAGIN_HOME/input/species"
+SCAFLEN       = 'FAGIN_HOME/input/stat/scaffold-lengths.tab'
+NSTRINGS      = 'FAGIN_HOME/input/stat/nstrings.tab'
+ORPHAN_LIST   = "FAGIN_HOME/input/orphan-list.txt"
+KBCOMP        = 'FAGIN_HOME/input/stat/kb-composition.tab'
+ORFGFF        = "FAGIN_HOME/input/orf-gff"
+ORFFAA        = "FAGIN_HOME/input/orf-faa"
+TRANS_ORF     = "FAGIN_HOME/input/trans-orf"
+CACHE         = "FAGIN_HOME/cache"
+DECISION_TREE = "FAGIN_HOME/ect/cds.yaml"
+TREE          = "FAGIN_HOME/input/tree"

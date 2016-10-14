@@ -1,28 +1,36 @@
 # NOTE: This is not a very reliable Makefile. It is convenient for me, but
 # needs a major overhaul before general application.
 
+TARGET=report.pdf
+INPUT=input
+
+SPECIES=${INPUT}/species
+
+PROLOGUE=src/prologue
+REPORT=src/report
+EPILOGUE=src/epilogue
+
+${TARGET}: species
+
 all:
-	src/prologue/1_prepare-inputs.sh
-	[[ -d input/faa ]]  || src/prologue/2_extract-fasta.sh
-	[[ -d input/stat ]] || src/prologue/3_gather-genome-summary-data.sh
-	src/prologue/4_get-search-intervals.sh
-	src/prologue/5_prepare-report.sh
+	cd ${PROLOGUE} && ./1_prepare-inputs.sh
+	cd ${PROLOGUE} && ./2_extract-fasta.sh
+	cd ${PROLOGUE} && ./3_gather-genome-summary-data.sh
+	cd ${PROLOGUE} && ./4_get-search-intervals.sh
+	cd ${REPORT} && ${MAKE}
 
 .PHONY: archive
 archive:
-	src/epilogue/archive.sh
+	cd ${EPILOGUE} && ./archive.sh
 
 .PHONY: clean
 clean:
-	rm -f *log log report.pdf
+	rm *~
+	rm -f *log log ${TARGET}
 	rm -rf cache
+	rm -rf ${INPUT}
 	rm -f gmon.out
 	rm -f preconfig.sh
 	rm -f runconfig.R
-
-.PHONY: distclean
-distclean:
-	rm -rf input
-	rm -f log report.pdf
-	rm -rf cache
-	rm -f gmon.out
+	rm -f ${PROLOGUE}/config
+	rm -f ${REPORT}/config

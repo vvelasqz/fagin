@@ -6,8 +6,8 @@ set -o pipefail
 
 species=$1
 
-source fagin.cfg
-source src/shell-utils.sh
+source config
+source shell-utils.sh
 
 # Get open reading frames from each input genome
 input_fna=$INPUT/fna/$1.fna
@@ -18,16 +18,14 @@ safe-mkdir $INPUT/orf-faa
 safe-mkdir $INPUT/orf-gff
 
 check-read $input_fna $0
-check-exe  smof       $0
-check-exe  getorf     $0
 
-smof clean --reduce-header $input_fna |
+$smof clean --reduce-header $input_fna |
    # Find all START STOP bound ORFs with 10+ AA
     getorf -filter -find 1 -minsize 30 |
     # Remove the extra gunk getorf appends to headers
-    smof clean -s |
+    $smof clean -s |
     # Filter out all ORFs with unknown residues
-    smof grep -v -q X |
+    $smof grep -v -q X |
     # Pipe the protein sequence to a protein fasta file
     tee  $output_faa |
     # Parse a header such as:

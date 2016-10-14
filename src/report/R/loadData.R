@@ -1,74 +1,74 @@
 #' Read config file
 #'
 #' Loads the following variables from the config file into a list:
-#' R_HOME       \
-#' R_FAA_DIR    |
-#' R_GFF_DIR    |
-#' R_SYN_DIR    |
-#' R_GENE_DIR   |
-#' R_GENOME_DIR |
-#' R_SI_DIR     | data directories
-#' R_ORFGFF     |
-#' R_ORFFAA     |
-#' R_TRANS_ORF  |
-#' R_CACHE      /
-#' R_SPECIES_FILE  \
-#' R_SCAFLEN       |
-#' R_NSTRINGS      | individual data files
-#' R_KBCOMP        |
-#' R_ORPHAN_LIST   |
-#' R_DECISION_TREE |
-#' R_TREE          /
-#' R_FOCAL_SPECIES  - string
-#' R_PROT2PROT_PVAL         \
-#' R_PROT2ALLORF_PVAL       |
-#' R_PROT2TRANSORF_PVAL     |
-#' R_DNA2DNA_PVAL           |
-#' R_PROT2PROT_NSIMS        | numeric
-#' R_PROT2ALLORF_NSIMS      |
-#' R_PROT2TRANSORF_NSIMS    |
-#' R_DNA2DNA_MAXSPACE       |
-#' R_INDEL_THRESHOLD        /
+#' HOME       \
+#' FAA_DIR    \
+#' GFF_DIR    |
+#' SYN_DIR    |
+#' GENE_DIR   |
+#' GENOME_DIR |
+#' SI_DIR     | data directories
+#' ORFGFF     |
+#' ORFFAA     |
+#' TRANS_ORF  |
+#' CACHE      /
+#' SPECIES_FILE  \
+#' SCAFLEN       |
+#' NSTRINGS      | individual data files
+#' KBCOMP        |
+#' ORPHAN_LIST   |
+#' DECISION_TREE |
+#' TREE          /
+#' FOCAL_SPECIES  - string
+#' PROT2PROT_PVAL         \
+#' PROT2ALLORF_PVAL       |
+#' PROT2TRANSORF_PVAL     |
+#' DNA2DNA_PVAL           |
+#' PROT2PROT_NSIMS        | numeric
+#' PROT2ALLORF_NSIMS      |
+#' PROT2TRANSORF_NSIMS    |
+#' DNA2DNA_MAXSPACE       |
+#' INDEL_THRESHOLD        /
 #'
 #' Where d_* are directories, and f_* are files. `species` is loaded as a
 #' character string where `focal_species` is a required member.
 #' 
 #' @param configfile Absolute path to the config file
 #' @return list of inputs
-LoadConfig <- function(configfile='~/src/git/fagin/fagin.cfg'){
+LoadConfig <- function(configfile='config'){
     if(!file.exists(configfile)){
         warning(sprintf("Cannot open configfile '%s'", configfile))
     }
     source(configfile, local=TRUE)
     expected.vars <- c(
-        'R_HOME',
-        'R_FAA_DIR',
-        'R_GFF_DIR',
-        'R_SYN_DIR',
-        'R_GENE_DIR',
-        'R_GENOME_DIR',
-        'R_SI_DIR',
-        'R_ORFGFF',
-        'R_ORFFAA',
-        'R_TRANS_ORF',
-        'R_CACHE',
-        'R_SPECIES_FILE',
-        'R_SCAFLEN',
-        'R_KBCOMP',
-        'R_NSTRINGS',
-        'R_ORPHAN_LIST',
-        'R_DECISION_TREE',
-        'R_TREE',
-        'R_FOCAL_SPECIES',
-        'R_PROT2PROT_PVAL',
-        'R_PROT2ALLORF_PVAL',
-        'R_PROT2TRANSORF_PVAL',
-        'R_DNA2DNA_PVAL',
-        'R_PROT2PROT_NSIMS',
-        'R_PROT2ALLORF_NSIMS',
-        'R_PROT2TRANSORF_NSIMS',
-        'R_DNA2DNA_MAXSPACE',
-        'R_INDEL_THRESHOLD'
+        'HOME',
+        'FAA_DIR',
+        'GFF_DIR',
+        'SYN_DIR',
+        'GENE_DIR',
+        'GENOME_DIR',
+        'SI_DIR',
+        'ORFGFF',
+        'ORFFAA',
+        'TRANS_ORF',
+        'CACHE',
+        'SPECIES_FILE',
+        'SCAFLEN',
+        'KBCOMP',
+        'NSTRINGS',
+        'ORPHAN_LIST',
+        'DECISION_TREE',
+        'TREE',
+        'FOCAL_SPECIES',
+        'PROT2PROT_PVAL',
+        'PROT2ALLORF_PVAL',
+        'PROT2TRANSORF_PVAL',
+        'DNA2DNA_PVAL',
+        'PROT2PROT_NSIMS',
+        'PROT2ALLORF_NSIMS',
+        'PROT2TRANSORF_NSIMS',
+        'DNA2DNA_MAXSPACE',
+        'INDEL_THRESHOLD'
     )
     # Check for existence of all required variables
     for(v in expected.vars){
@@ -89,40 +89,40 @@ LoadConfig <- function(configfile='~/src/git/fagin/fagin.cfg'){
         }
     }
 
-    species <- read.table(R_SPECIES_FILE, stringsAsFactors=FALSE)[[1]]
-    if(!R_FOCAL_SPECIES %in% species){
+    species <- read.table(SPECIES_FILE, stringsAsFactors=FALSE)[[1]]
+    if(!FOCAL_SPECIES %in% species){
       warning(sprintf("Focal species '%s' not found in the species list: [%s]",
-                  R_FOCAL_SPECIES, paste(species, collapse=", ")))
+                  FOCAL_SPECIES, paste(species, collapse=", ")))
     }
     list(
-        d_home              = R_HOME,
-        d_faa               = R_FAA_DIR,
-        d_gff               = R_GFF_DIR,
-        d_syn               = R_SYN_DIR,
-        d_gene              = R_GENE_DIR,
-        d_genome            = R_GENOME_DIR,
-        d_si                = R_SI_DIR,
-        d_orfgff            = R_ORFGFF,
-        d_orffaa            = R_ORFFAA,
-        d_trans_orf         = R_TRANS_ORF,
-        d_cache             = R_CACHE,
-        f_scaflen           = R_SCAFLEN,
-        f_kbcomp            = R_KBCOMP,
-        f_nstrings          = R_NSTRINGS,
-        f_orphan            = R_ORPHAN_LIST,
-        f_decision_tree     = R_DECISION_TREE,
-        f_tree              = R_TREE,
+        d_home              = HOME,
+        d_faa               = FAA_DIR,
+        d_gff               = GFF_DIR,
+        d_syn               = SYN_DIR,
+        d_gene              = GENE_DIR,
+        d_genome            = GENOME_DIR,
+        d_si                = SI_DIR,
+        d_orfgff            = ORFGFF,
+        d_orffaa            = ORFFAA,
+        d_trans_orf         = TRANS_ORF,
+        d_cache             = CACHE,
+        f_scaflen           = SCAFLEN,
+        f_kbcomp            = KBCOMP,
+        f_nstrings          = NSTRINGS,
+        f_orphan            = ORPHAN_LIST,
+        f_decision_tree     = DECISION_TREE,
+        f_tree              = TREE,
         species             = species,
-        focal_species       = R_FOCAL_SPECIES,
-        prot2prot_pval      = as.numeric(R_PROT2PROT_PVAL),
-        prot2allorf_pval    = as.numeric(R_PROT2ALLORF_PVAL),
-        prot2transorf_pval  = as.numeric(R_PROT2TRANSORF_PVAL),
-        dna2dna_pval        = as.numeric(R_DNA2DNA_PVAL),
-        prot2prot_nsims     = as.integer(R_PROT2PROT_NSIMS),
-        prot2allorf_nsims   = as.integer(R_PROT2ALLORF_NSIMS),
-        prot2transorf_nsims = as.integer(R_PROT2TRANSORF_NSIMS),
-        dna2dna_maxspace    = as.integer(R_DNA2DNA_MAXSPACE),
-        indel_threshold     = as.numeric(R_INDEL_THRESHOLD)
+        focal_species       = FOCAL_SPECIES,
+        prot2prot_pval      = as.numeric(PROT2PROT_PVAL),
+        prot2allorf_pval    = as.numeric(PROT2ALLORF_PVAL),
+        prot2transorf_pval  = as.numeric(PROT2TRANSORF_PVAL),
+        dna2dna_pval        = as.numeric(DNA2DNA_PVAL),
+        prot2prot_nsims     = as.integer(PROT2PROT_NSIMS),
+        prot2allorf_nsims   = as.integer(PROT2ALLORF_NSIMS),
+        prot2transorf_nsims = as.integer(PROT2TRANSORF_NSIMS),
+        dna2dna_maxspace    = as.integer(DNA2DNA_MAXSPACE),
+        indel_threshold     = as.numeric(INDEL_THRESHOLD)
     )
 }
 
@@ -476,7 +476,7 @@ LoadSearchIntervals <- function(sifile, qinfo, tinfo){
 #' 
 #' @param treefile A newick format tree filename
 #' @return A tree of class 'phylo'
-LoadTree <- function(treefile='~/src/git/fagin/input/tree'){
+LoadTree <- function(treefile){
   require(ape)
   read.tree(treefile)
 }

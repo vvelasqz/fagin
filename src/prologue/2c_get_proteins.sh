@@ -6,25 +6,19 @@ set -o pipefail
 
 species=$1
 
-source fagin.cfg
-source src/shell-utils.sh
+source config
+source shell-utils.sh
 
 # Prepare protein fasta files including all predicted coding genes
 input_gff=$INPUT/gff/$species.gff
 input_fna=$INPUT/fna/$species.fna
 output_faa=$INPUT/faa/$species.faa
-parse_script=$PWD/src/util/parse-gff.py
-x=/tmp/get_proteins_$species
+parse_script=$PWD/parse-gff.py
 
 safe-mkdir $INPUT/faa
 
 check-read $input_gff $0
 check-read $input_fna $0
-
-check-exe $parse_script $0
-check-exe bedtools      $0
-check-exe transeq       $0
-check-exe smof          $0
 
 cat $input_gff |
     # select CDS and reduce 9th column to Parent name
@@ -39,9 +33,11 @@ cat $input_gff |
         -bed /dev/stdin \
         -fo /dev/stdout \
         -name |
-    awk '$1 ~ /^>/ && $1 in seqids { next }; {seqids[$1]++; print}' > $x
-cat <(smof grep ' +' $x) <(smof grep ' -' $x | revseq -filter) |
+    sed 's/::.*//' |
+    awk '$1 ~ /^>/ && $1 in seqids { next }; {seqids[$1]++; print}' |
+    cat <($smof grep ' +' /dev/stdin                 ) \
+        <($smof grep ' -' /dev/stdin | revseq -filter) |
     transeq -filter |
-    smof clean -sux |
-    sed '/>/s/_[0-9]\+$//' > $output_faa
+    $smof clean -sux |
+    sed '/>/s/_[0-9][0-9]*$//' > $output_faa
 rm $x

@@ -4,8 +4,8 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-source fagin.cfg
-source src/shell-utils.sh
+source config
+source shell-utils.sh
 
 exit_status=0
 
@@ -59,7 +59,7 @@ do
     if [[ $s != $FOCAL_SPECIES ]]
     then
         map=$mapdir/$FOCAL_SPECIES.vs.$s.map.tab
-        log=$s.log
+        log=tmp/$s.log
         echo $s
 
         synfile="$syndir/$FOCAL_SPECIES.vs.$s.syn"
@@ -71,7 +71,7 @@ do
         genlen       $s             > $tmptar
         genlen       $FOCAL_SPECIES > $tmpque
 
-        time synder search          \
+        time $synder search         \
             -s $synfile             \
             -i $INPUT/search.gff    \
             -t $tmptar              \
@@ -80,6 +80,8 @@ do
             -k $synder_k            \
             -x d > $map 2> $log
         status-check $? "  synder failed"
+
+        echo "Log written to '$s'"
 
         rm $tmpque $tmptar
     fi

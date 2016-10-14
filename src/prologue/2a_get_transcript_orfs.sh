@@ -6,14 +6,10 @@ set -o pipefail
 
 species=$1
 
-source fagin.cfg
-source src/shell-utils.sh
+source config
+source shell-utils.sh
 
-parse_script=$PWD/src/util/parse-gff.py
-check-exe $parse_script $0
-check-exe bedtools      $0
-check-exe smof          $0
-check-exe getorf        emboss::$0
+parse_script=$PWD/parse-gff.py
 
 input_gff=$INPUT/gff/$species.gff
 input_fna=$INPUT/fna/$species.fna
@@ -34,9 +30,10 @@ cat $input_gff |
         -bed /dev/stdin \
         -fo /dev/stdout \
         -name |
+    sed 's/::.*//' |
     awk '
         $1 ~ /^>/ && $1 in a { next }
         {a[$1]++; print}
     ' |
     getorf -filter -find 1 -minsize 30 |
-    smof clean -s > $output_faa
+    $smof clean -s > $output_faa

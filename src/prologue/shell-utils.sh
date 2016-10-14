@@ -30,15 +30,6 @@ check-dir(){
     fi
 }
 
-check-exe(){
-    exe=$1
-    place=$2
-    if [[ -z `type -P $exe` ]]
-    then
-        croak "The command '$exe' cannot be executed, used in $place"
-    fi
-}
-
 safe-mkdir(){
     dir=$1
     [[ -d $dir ]] || mkdir -p $dir || croak "Could not make directory '$dir'"

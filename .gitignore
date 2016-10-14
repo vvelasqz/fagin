@@ -10,10 +10,17 @@ db/
 *.fna
 *.fasta
 
+rconf.R
+bconf.sh
+
 *.un~
 
 archives/
 ARCHIVE/
+
+# downloaded source files
+smof/
+synder/
 
 tags
 

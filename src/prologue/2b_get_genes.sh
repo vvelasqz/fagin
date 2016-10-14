@@ -6,14 +6,10 @@ set -o pipefail
 
 species=$1
 
-source fagin.cfg
-source src/shell-utils.sh
+source config
+source shell-utils.sh
 
-parse_script=$PWD/src/util/parse-gff.py
-
-check-exe $parse_script $0
-check-exe bedtools      $0
-check-exe smof          $0
+parse_script=$PWD/parse-gff.py
 
 # Prepare FASTA file of genes, regions potentially include UTRs and introns
 input_gff=$INPUT/gff/$species.gff
@@ -33,4 +29,5 @@ $parse_script -s mRNA -r Name -d $input_gff |
         -name           \
         -bed /dev/stdin \
         -fo /dev/stdout |
-    smof clean > $output_fna
+    sed '/>/s/::.*//' |
+    $smof clean > $output_fna

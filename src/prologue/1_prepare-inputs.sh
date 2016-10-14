@@ -4,8 +4,8 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-source fagin.cfg
-source src/shell-utils.sh
+source config
+source shell-utils.sh
 
 usage (){
 cat << EOF
@@ -42,7 +42,7 @@ check-dir "$TREE" $0
 ln -sf $TREE        $INPUT/tree
 ln -sf $ORPHAN_LIST $INPUT/orphan-list.txt
 
-src/get-species-from-tree.R $TREE > $INPUT/species
+./get-species-from-tree.R $TREE > $INPUT/species
 
 species=$(cat $INPUT/species)
 
@@ -99,14 +99,13 @@ done
 # Prepare focal species search file
 # ---------------------------------
 
-parse_script=src/util/parse-gff.py
+parse_script=$PWD/parse-gff.py
 focal_gff=$INPUT/gff/$FOCAL_SPECIES.gff
 search_gff=$INPUT/search.gff
 
-check-read  $focal_gff  $0
-check-exe $parse_script $0
+check-read $focal_gff    $0
 
 # select mRNA and reduce 9th column to feature name
 $parse_script -s mRNA -r Name -d -- $focal_gff > $search_gff
 
-exit 0
+exit $?

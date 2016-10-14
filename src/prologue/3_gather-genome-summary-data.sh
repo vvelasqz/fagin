@@ -4,8 +4,8 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-source fagin.cfg
-source src/shell-utils.sh
+source config
+source shell-utils.sh
 
 usage (){
 cat << EOF
@@ -26,18 +26,13 @@ OPTIONAL ARGUMENTS
   -h print this help message
 
 REQUIREMENTS
-  smof
+  $smof
   parallel
   awk
   sed
 EOF
     exit 0
 }
-
-check-exe smof     $0
-check-exe parallel $0
-check-exe awk      $0
-check-exe sed      $0
 
 
 idir=$INPUT/fna
@@ -76,12 +71,12 @@ nuccomp=$odir/kb-composition.tab
 # 3. scaffold length 
 write-scaffold-lengths () {
     make-header 'species scaffold length'
-    ls $idir/*fna | parallel "smof stat -q {} > $odir/{/}.tab "
+    ls $idir/*fna | parallel "$smof stat -q {} > $odir/{/}.tab "
     for j in $odir/*fna.tab
     do
         s=${j%.fna.tab}
         s=${s##*/}
-        sed "s/^/$s\t/" $j
+        perl -pe "s/^/$s\t" $j
         rm $j
     done
 }
@@ -95,7 +90,7 @@ write-scaffold-lengths () {
 # 4. n-string stop
 write-nstrings () {
     make-header 'species scaffold start stop'
-    ls $idir/*fna | parallel "smof grep -Poq --gff --gff-type {/.} 'N+' {}" |
+    ls $idir/*fna | parallel "$smof grep -Poq --gff --gff-type {/.} 'N+' {}" |
         awk 'BEGIN{FS="\t"; OFS="\t"} {print $3, $1, $4, $5}'
 }
 
@@ -115,13 +110,15 @@ write-nucleotide-composition () {
             -fi $j          \
             -bed /dev/stdin \
             -fo /dev/stdout |
-        sed -r "s/>([^:]+):([0-9]+)-[0-9]+\((.)\)/>$s:\1:\2:\3/"
-    done                     |
-        smof clean -xru -t n |
-        smof stat -qc        |
-        tr ':' "\t"          |
-        # Expand header to accomadate the added columns
-        sed "1s/seqid/species\tscaffold\tstart\tstrand/"
+        # e.g. ">foo:23-46(+) stuff" -> ">species:foo:23:+"
+        perl -pe "s/>([^:]+):(\d+)-\d+\((.)\).*/>$s:$1:$2:$3/" |
+        sed "/>/s/::.*//"
+    done                      |
+        $smof clean -xru -t n |
+        $smof stat -qc        |
+        tr ':' "\t"           |
+        # Expand header to accommodate the added columns
+        perl -pe "s/^seqid\t/species\tscaffold\tstart\tstrand\t/"
 }
 
 write-scaffold-lengths       > $scaflen

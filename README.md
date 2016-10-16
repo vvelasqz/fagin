@@ -6,13 +6,11 @@ A pipeline for the classification of orphans into origin classes using a synteni
 
 # Input
 
- For information on inputs, call `1_prepare-inputs.sh -H`
-
- In short, the following is required
+ The following is required
 
  - Phylogeny for all included species
  - Name of the focal species
- - Synteny map for the focal species and each other species
+ - Synteny map for the focal species versus each other species
  - For each species
    - GFF file (must at least include gene models)
    - Full genome (GFF reference)
@@ -34,15 +32,36 @@ A pipeline for the classification of orphans into origin classes using a synteni
  - Visualizations of overall statistics
  - Origin page for each orphan gene
 
+# Running Fagin
+
+ 1. `./configure.sh` 
+ 2. Fill in generated config scripts
+ 3. `make load && make test && make run`
+
+## 1. Run configure script
+
+```
+./configure.sh
+```
+
+This script will
+  - check all dependencies, installing locally necessary
+  - check all required R libraries, and install if possible
+  - build basic config files
+
+## 2. Setup config files
+
+Fill in missing fields in `preconfig.sh` and `runconfig.R`. Details for each
+required field are in the config files.
+
+## 3. Run the analysis
+
+```
+make load && make test && make run
+```
+
+
 # TODO
-
-## Bash scripts
-
- - [x] retrieve sample data for species of interest
- - [x] check input data
- - [x] extract relevant fasta files from GFF and genomes 
- - [x] get search intervals using Synder
- - [x] prepare summarizing datasets for included genomes
 
 ## R Code
 
@@ -59,5 +78,3 @@ A pipeline for the classification of orphans into origin classes using a synteni
  - [ ] print all intermediate data
  - [ ] modularize analyses, e.g. N-string, indel, CDS overlap, etc.
  - [ ] build graph for assignment tree
- - [ ] write statistics for flags
- - [ ] portability, usability, and all that

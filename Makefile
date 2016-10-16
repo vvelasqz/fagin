@@ -12,12 +12,20 @@ EPILOGUE=src/epilogue
 
 ${TARGET}: species
 
-all:
+.PHONY: load
+load:
 	cd ${PROLOGUE} && ./1_prepare-inputs.sh
 	cd ${PROLOGUE} && ./2_extract-fasta.sh
 	cd ${PROLOGUE} && ./3_gather-genome-summary-data.sh
 	cd ${PROLOGUE} && ./4_get-search-intervals.sh
+
+.PHONY: run
+run:
 	cd ${REPORT} && ${MAKE}
+
+.PHONY: test
+test:
+	echo "Not yet implemented"
 
 .PHONY: archive
 archive:

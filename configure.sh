@@ -40,34 +40,53 @@ check-exe(){
 
 install-exe(){
     echo -n "Looking for $1 ... "
-    if [[ -z `type -P $1` ]]
+    inpath=0 inbin=0
+
+    if [[ ! -z `type -P $1` ]]
     then
+        inpath=1
+        path=`which $1`
+    fi
+
+    if [[ -f "bin/$1" ]]
+    then
+        inbin=1
+        path="$PWD/bin/$1"
+    fi
+
+    if [[ $inpath -eq 1 || $inbin -eq 1 ]]
+    then
+        echo "OK"
+        sed "s;^$1=.*;$1='$path';" $pconf > $pconf~
+        mv $pconf~ $pconf
+    else
         echo "MISSING"
         $2 $1 || (echo "Failed to install $1" && exit_status=1)
-    else
-        echo "OK"
-        sed "s;^$1=.*;$1='`which $1`';" $pconf > $pconf~
-        mv $pconf~ $pconf
     fi
 }
 
 install-smof(){
     git clone $smof_src src/smof &&
-    cp src/smof/smof.py bin/smof
+    cp src/smof/smof.py bin/smof &&
+    rm -rf src/smof
 }
 
 install-synder(){
-    git clone $synder_src src/synder &&
-    cd src/synder                    &&
-    make                             &&
-    make test                        &&
-    cp synder ../../bin
+    (
+     git clone $synder_src src/synder &&
+     cd src/synder                    &&
+     make                             &&
+     make test                        &&
+     cp synder ../../bin              &&
+     rm -rf src/synder
+    )
 }
 
 make-config $pconf $PWD/src/prologue/config
 make-config $rconf $PWD/src/report/config
 
 check-exe R        "R not in path, please install"
+check-exe parallel "parallel is not in your path"
 check-exe Rscript  "Rscript not in path, please install R"
 check-exe bedtools "bedtools not in path, please install"
 check-exe transeq  "emboss::transeq not in path, please install emboss"

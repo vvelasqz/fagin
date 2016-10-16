@@ -175,5 +175,5 @@ INPUT="/home/shoggoth/src/git/fagin/input"
 # program exists in $PATH already.
 # -----------------------------------------------------------------------------
 
-synder='/home/shoggoth/bin/synder'
-smof='/home/shoggoth/bin/smof'
+synder='/home/shoggoth/src/git/fagin/bin/synder'
+smof='/home/shoggoth/src/git/fagin/bin/smof'

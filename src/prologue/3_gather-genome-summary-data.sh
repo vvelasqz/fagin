@@ -24,12 +24,6 @@ OPTIONAL ARGUMENTS
   -i Input directory for genome sequences (default: input/fna)
   -o Output directory (default: input/stat)
   -h print this help message
-
-REQUIREMENTS
-  $smof
-  parallel
-  awk
-  sed
 EOF
     exit 0
 }

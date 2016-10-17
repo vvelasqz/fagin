@@ -6,9 +6,9 @@ summarize.flags <- function(si, query){
   scrambled <- setdiff(si$query$seqid, reliable)
 
   d <- data.frame(
-    seqid = si$query$seqid,
-    lo_flag = si$target$lo_flag,
-    hi_flag = si$target$hi_flag,
+    seqid     = si$query$seqid,
+    lo_flag   = si$target$lo_flag %>% as.character %>% as.integer,
+    hi_flag   = si$target$hi_flag %>% as.character %>% as.integer,
     inbetween = si$target$inbetween,
     is_orphan = si$query$seqid %in% query$orphan
   ) %>% 

@@ -26,6 +26,8 @@ $smof clean --reduce-header $input_fna |
     $smof grep -v -q X |
     # Pipe the protein sequence to a protein fasta file
     tee  $output_faa |
+    # Select only header lines
+    grep '>' |
     # Parse a header such as:
     # >scaffold_1_432765 [258 - 70] (REVERSE SENSE)
     perl -pe 's/>(\S+)_(\d+) \[(\d+) - (\d+)\].*/$1 $3 $4 $1_$2/' |

@@ -7,6 +7,8 @@ set -o pipefail
 source config
 source shell-utils.sh
 
+parse_script=$PWD/parse-gff.py
+
 usage (){
 cat << EOF
 Links the input files specified in the config file to the input directory.
@@ -70,17 +72,16 @@ safe-mkdir $INPUT/syn
 
 for s in $species
 do
-    input_gff=$GFF_DIR/$s.gff
     input_fna=$FNA_DIR/$s.fna
-
-    output_gff=$INPUT/gff/$s.gff
     output_fna=$INPUT/fna/$s.fna
-
-    check-read $input_gff $0
     check-read $input_fna $0
-
-    ln -sf $input_gff $output_gff
     ln -sf $input_fna $output_fna
+
+    input_gff=$GFF_DIR/$s.gff
+    output_gff=$INPUT/gff/$s.gff
+    check-read $input_gff $0
+    # Coalesce names and ids into one, keep only ID and Parent tags
+    $parse_script -r Name Parent -dm $input_gff | sed 's/Name=/ID=/' > $output_gff
 
     # No focal versus focal map
     if [[ ! $FOCAL_SPECIES == $s ]]
@@ -99,7 +100,6 @@ done
 # Prepare focal species search file
 # ---------------------------------
 
-parse_script=$PWD/parse-gff.py
 focal_gff=$INPUT/gff/$FOCAL_SPECIES.gff
 search_gff=$INPUT/search.gff
 

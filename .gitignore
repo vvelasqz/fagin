@@ -2,6 +2,7 @@ input/
 output/
 data/
 db/
+bin/
 *.tab
 *.gff
 *.gff3
@@ -13,6 +14,9 @@ db/
 preconfig.sh
 runconfig.R
 config
+
+preconfig.sh
+runconfig.R
 
 *.un~
 

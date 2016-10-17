@@ -20,6 +20,8 @@ safe-mkdir $INPUT/faa
 check-read $input_gff $0
 check-read $input_fna $0
 
+x=/tmp/get_proteins_$species
+
 cat $input_gff |
     # select CDS and reduce 9th column to Parent name
     $parse_script -s CDS -r Parent -md - |
@@ -34,10 +36,10 @@ cat $input_gff |
         -fo /dev/stdout \
         -name |
     sed 's/::.*//' |
-    awk '$1 ~ /^>/ && $1 in seqids { next }; {seqids[$1]++; print}' |
-    cat <($smof grep ' +' /dev/stdin                 ) \
-        <($smof grep ' -' /dev/stdin | revseq -filter) |
+    awk '$1 ~ /^>/ && $1 in seqids { next }; {seqids[$1]++; print}' > $x
+cat <($smof grep ' +' $x) \
+    <($smof grep ' -' $x | revseq -filter) |
     transeq -filter |
     $smof clean -sux |
-    sed '/>/s/_[0-9][0-9]*$//' > $output_faa
+    perl -pe 's/_\d+$//' > $output_faa
 rm $x

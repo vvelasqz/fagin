@@ -1,10 +1,18 @@
 #!/usr/bin/env R
 # CONFIGURATION TEMPLATE - DO NOT CHANGE
 
+# This script will be sourced as an R file. So everything written in it must be
+# legal R code. Strings must be quoted. You may add any R code you like here.
+
+
+
 # ===================================================================
 # REQUIRED INPUT
 # ===================================================================
 
+# The focal species for this analysis. This should be the query sequence used
+# in building the synteny maps. The name MUST be quoted, e.g.
+# "Arabidopsis_thaliana"
 FOCAL_SPECIES = NULL
 
 

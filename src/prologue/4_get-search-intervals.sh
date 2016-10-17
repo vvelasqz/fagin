@@ -59,7 +59,7 @@ do
     if [[ $s != $FOCAL_SPECIES ]]
     then
         map=$mapdir/$FOCAL_SPECIES.vs.$s.map.tab
-        log=tmp/$s.log
+        log=/tmp/$s.log
         echo $s
 
         synfile="$syndir/$FOCAL_SPECIES.vs.$s.syn"

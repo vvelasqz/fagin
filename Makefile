@@ -12,12 +12,22 @@ EPILOGUE=src/epilogue
 
 ${TARGET}: species
 
-all:
+.PHONY: load
+load:
 	cd ${PROLOGUE} && ./1_prepare-inputs.sh
 	cd ${PROLOGUE} && ./2_extract-fasta.sh
 	cd ${PROLOGUE} && ./3_gather-genome-summary-data.sh
 	cd ${PROLOGUE} && ./4_get-search-intervals.sh
+
+.PHONY: run
+run:
+	rm -rf cache
+	cd ${REPORT} && ${MAKE} deepclean
 	cd ${REPORT} && ${MAKE}
+
+.PHONY: test
+test:
+	echo "Not yet implemented"
 
 .PHONY: archive
 archive:
@@ -25,6 +35,7 @@ archive:
 
 .PHONY: clean
 clean:
+	rm -f *~
 	rm -f *log log ${TARGET}
 	rm -rf cache
 	rm -rf ${INPUT}

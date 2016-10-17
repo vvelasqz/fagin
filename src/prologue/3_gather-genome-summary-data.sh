@@ -24,12 +24,6 @@ OPTIONAL ARGUMENTS
   -i Input directory for genome sequences (default: input/fna)
   -o Output directory (default: input/stat)
   -h print this help message
-
-REQUIREMENTS
-  $smof
-  parallel
-  awk
-  sed
 EOF
     exit 0
 }
@@ -54,10 +48,6 @@ done
 check-dir $idir $0
 safe-mkdir $odir
 
-make-header () {
-    echo -e "$(tr ' ' '\t' <<< $@)"
-}
-
 scaflen=$odir/scaffold-lengths.tab
 nstring=$odir/nstrings.tab
 nuccomp=$odir/kb-composition.tab
@@ -70,16 +60,18 @@ nuccomp=$odir/kb-composition.tab
 # 2. scaffold name
 # 3. scaffold length 
 write-scaffold-lengths () {
-    make-header 'species scaffold length'
+    echo species scaffold length | tr ' ' '\t'
     ls $idir/*fna | parallel "$smof stat -q {} > $odir/{/}.tab "
     for j in $odir/*fna.tab
     do
         s=${j%.fna.tab}
         s=${s##*/}
-        perl -pe "s/^/$s\t" $j
+        perl -pe "s/^/$s\t/" $j
         rm $j
     done
 }
+
+
 
 # Find positions of runs of unknown bases
 #
@@ -89,7 +81,7 @@ write-scaffold-lengths () {
 # 3. n-string start
 # 4. n-string stop
 write-nstrings () {
-    make-header 'species scaffold start stop'
+    echo species scaffold start stop | tr ' ' '\t' 
     ls $idir/*fna | parallel "$smof grep -Poq --gff --gff-type {/.} 'N+' {}" |
         awk 'BEGIN{FS="\t"; OFS="\t"} {print $3, $1, $4, $5}'
 }

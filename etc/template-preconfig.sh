@@ -106,32 +106,31 @@ ORPHAN_LIST=
 # -----------------------------------------------------------------------------
 MINLEN=0
 
-# -----------------------------------------------------------------------------
-# --- Input start and stop bases for building the synder database
-# This is a 4 character string of 0s and 1s. For building the database, only
-# the first two matter. Options are ...
-#   1. 0000 - input start and stop are 0-based
-#   2. 1000 - input start is 1-based and stop is 0-based
-#   3. 0100 - input start is 0-based and stop is 1-based
-#   4. 1100 - input start and stop are both 1-based
-# The correct choice dependes on the synteny builder you are using. Satsuma,
-# the tool I use, seems to be 0-based relative to start positions and 1-based
-# relative to stops. I have not been able to find details on their output, but
-# the lowest stop positions equal 0 and the highest stops equal contig length
-# (n, rather than n-1).
-# -----------------------------------------------------------------------------
-synder_db_bases=0100
-
 
 # -----------------------------------------------------------------------------
-# Stop and start base for the input and output to synder (after building the
-# database). A properly formatted GFF files should be 1-based, according to the
-# specs[1]. Fagin assumes 1-based output (required by Bioconductor and R in
-# general). So the value should usually be the 1111.
+# --- 0/1 offsets for the synteny map, GFF input, and search interval output
+# This is a 6 character bit string, with the following fields
+#  1. synteny map start offset   (def=0)
+#  2. synteny map stop offset    (def=1)
+#  3. GFF input start offset     (def=1)
+#  4. GFF input stop offset      (def=1)
+#  5. synder output start offset (def=1)
+#  6. synder output stop offset  (def=1)
 #
-# https://github.com/The-Sequence-Ontology/Specifications/blob/master/gff3.md
+# The correct choice for the first two bits depends on the synteny builder you
+# are using. Satsuma, the tool I use, seems to be 0-based relative to start
+# positions and 1-based relative to stops. I have not been able to find details
+# on their output, but the lowest stop positions equal 0 and the highest stops
+# equal contig length (n, rather than n-1).
+#
+# The final four bits represet start and stop offsets for the input and output
+# to synder. A properly formatted GFF files should be 1-based, according to the
+# specs[1]. Fagin assumes 1-based output (required by Bioconductor and R in
+# general).
+#
+# [1] https://github.com/The-Sequence-Ontology/Specifications/blob/master/gff3.md
 # -----------------------------------------------------------------------------
-synder_search_bases=1111
+synder_search_bases=011111
 
 
 # -----------------------------------------------------------------------------

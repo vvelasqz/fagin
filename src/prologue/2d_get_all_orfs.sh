@@ -22,15 +22,13 @@ check-read $input_fna $0
 $smof clean --reduce-header $input_fna |
    # Find all START STOP bound ORFs with 10+ AA
     getorf -filter -find 1 -minsize 30 |
-    # Remove the extra gunk getorf appends to headers
-    $smof clean -s |
     # Filter out all ORFs with unknown residues
     $smof grep -v -q X |
     # Pipe the protein sequence to a protein fasta file
     tee  $output_faa |
     # Parse a header such as:
     # >scaffold_1_432765 [258 - 70] (REVERSE SENSE)
-    sed -nr '/^>/ s/>([^ ]+)_([0-9])+ \[([0-9]+) - ([0-9]+)\]/\1 \3 \4 \1_\2/p' |
+    perl -pe 's/>(\S+)_(\d+) \[(\d+) - (\d+)\].*/$1 $3 $4 $1_$2/' |
     # Prepare GFF
     awk '
         BEGIN{OFS="\t"}
@@ -52,3 +50,6 @@ $smof clean --reduce-header $input_fna |
         }
         { print seq_name, ".", "ORF", start, stop, ".", strand, ".", uid }
     ' > $output_gff
+
+# Remove the extra gunk getorf appends to headers
+$smof clean -s $output_faa > $output_faa~; mv $output_faa~ $output_faa 

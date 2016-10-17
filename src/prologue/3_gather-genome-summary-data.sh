@@ -54,10 +54,6 @@ done
 check-dir $idir $0
 safe-mkdir $odir
 
-make-header () {
-    echo -e "$(tr ' ' '\t' <<< $@)"
-}
-
 scaflen=$odir/scaffold-lengths.tab
 nstring=$odir/nstrings.tab
 nuccomp=$odir/kb-composition.tab
@@ -70,16 +66,18 @@ nuccomp=$odir/kb-composition.tab
 # 2. scaffold name
 # 3. scaffold length 
 write-scaffold-lengths () {
-    make-header 'species scaffold length'
+    echo species scaffold length | tr ' ' '\t'
     ls $idir/*fna | parallel "$smof stat -q {} > $odir/{/}.tab "
     for j in $odir/*fna.tab
     do
         s=${j%.fna.tab}
         s=${s##*/}
-        sed "s/^/$s\t/" $j
+        perl -pe "s/^/$s\t/" $j
         rm $j
     done
 }
+
+
 
 # Find positions of runs of unknown bases
 #
@@ -89,7 +87,7 @@ write-scaffold-lengths () {
 # 3. n-string start
 # 4. n-string stop
 write-nstrings () {
-    make-header 'species scaffold start stop'
+    echo species scaffold start stop | tr ' ' '\t' 
     ls $idir/*fna | parallel "$smof grep -Poq --gff --gff-type {/.} 'N+' {}" |
         awk 'BEGIN{FS="\t"; OFS="\t"} {print $3, $1, $4, $5}'
 }
@@ -110,13 +108,15 @@ write-nucleotide-composition () {
             -fi $j          \
             -bed /dev/stdin \
             -fo /dev/stdout |
-        sed -r "s/>([^:]+):([0-9]+)-[0-9]+\((.)\)/>$s:\1:\2:\3/"
+        # e.g. ">foo:23-46(+) stuff" -> ">species:foo:23:+"
+        perl -pe "s/>([^:]+):(\d+)-\d+\((.)\).*/>$s:\1:\2:\3/" |
+        sed "/>/s/::.*//"
     done                     |
         $smof clean -xru -t n |
         $smof stat -qc        |
         tr ':' "\t"          |
         # Expand header to accomadate the added columns
-        sed "1s/seqid/species\tscaffold\tstart\tstrand/"
+        perl -pe "s/^seqid\t/species\tscaffold\tstart\tstrand\t/"
 }
 
 write-scaffold-lengths       > $scaflen

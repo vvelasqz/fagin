@@ -14,12 +14,13 @@ input_gff=$INPUT/gff/$species.gff
 input_fna=$INPUT/fna/$species.fna
 output_faa=$INPUT/faa/$species.faa
 parse_script=$PWD/parse-gff.py
-x=/tmp/get_proteins_$species
 
 safe-mkdir $INPUT/faa
 
 check-read $input_gff $0
 check-read $input_fna $0
+
+x=/tmp/get_proteins_$species
 
 cat $input_gff |
     # select CDS and reduce 9th column to Parent name
@@ -34,9 +35,11 @@ cat $input_gff |
         -bed /dev/stdin \
         -fo /dev/stdout \
         -name |
+    sed 's/::.*//' |
     awk '$1 ~ /^>/ && $1 in seqids { next }; {seqids[$1]++; print}' > $x
-cat <($smof grep ' +' $x) <($smof grep ' -' $x | revseq -filter) |
+cat <($smof grep ' +' $x) \
+    <($smof grep ' -' $x | revseq -filter) |
     transeq -filter |
     $smof clean -sux |
-    sed '/>/s/_[0-9]\+$//' > $output_faa
+    perl -pe 's/_\d+$//' > $output_faa
 rm $x

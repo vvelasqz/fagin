@@ -29,4 +29,5 @@ $parse_script -s mRNA -r Name -d $input_gff |
         -name           \
         -bed /dev/stdin \
         -fo /dev/stdout |
+    sed '/>/s/::.*//' |
     $smof clean > $output_fna

@@ -35,7 +35,7 @@ archive:
 
 .PHONY: clean
 clean:
-	rm *~
+	rm -f *~
 	rm -f *log log ${TARGET}
 	rm -rf cache
 	rm -rf ${INPUT}

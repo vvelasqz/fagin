@@ -21,6 +21,8 @@ load:
 
 .PHONY: run
 run:
+	rm -rf cache
+	cd ${REPORT} && ${MAKE} deepclean
 	cd ${REPORT} && ${MAKE}
 
 .PHONY: test

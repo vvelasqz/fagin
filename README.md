@@ -15,6 +15,15 @@ A pipeline for the classification of orphans into origin classes using a synteni
    - GFF file (must at least include gene models)
    - Full genome (GFF reference)
 
+# Assumptions about the input
+
+ - The Parent tag in all GFFs for the CDS type maps uniquely to a protein. It
+   doesn't have to be a protein ID, it may be a model id or transcript id. If
+   multiple proteins have the same parent, the proteins will be merged
+   incorrectly into one protein.
+ - As above, an exon Parent tag must map uniquely to a transcript. This is less
+   likely to be a problem.
+
 # Pipeline
 
  - Identify target genes that overlap the search space.

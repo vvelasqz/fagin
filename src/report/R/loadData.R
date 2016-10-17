@@ -395,17 +395,17 @@ LoadSearchIntervals <- function(sifile, qinfo, tinfo){
     'inbetween'
   )
 
-  si$csetid <- as.factor(si$csetid)
-  si$score <- as.numeric(si$score)
-  si$tstart <- as.numeric(si$tstart)
-  si$tstop <- as.numeric(si$tstop)
-  si$lo_flag <- as.factor(si$lo_flag)
-  si$hi_flag <- as.factor(si$hi_flag)
+  si$csetid    <- as.factor(si$csetid)
+  si$score     <- as.numeric(si$score)
+  si$tstart    <- as.numeric(si$tstart)
+  si$tstop     <- as.numeric(si$tstop)
+  si$lo_flag   <- as.factor(si$lo_flag)
+  si$hi_flag   <- as.factor(si$hi_flag)
   si$inbetween <- as.logical(si$inbetween)
 
   testSI(si, tinfo, qinfo)
 
-  maxend = seqlengths(tinfo)[si$tchr]
+  maxend <- seqlengths(tinfo)[si$tchr]
 
   outside <- ((maxend - si$tstart) < 3) | (si$tstop <= 5)
   if(any(outside)){

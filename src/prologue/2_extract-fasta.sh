@@ -38,7 +38,7 @@ while getopts "h" opt; do
     esac
 done
 
-parallel --bibtex "./2a_get_transcript_orfs.sh {} " ::: $species
-parallel --bibtex "./2b_get_genes.sh           {} " ::: $species
-parallel --bibtex "./2c_get_proteins.sh        {} " ::: $species
-parallel --bibtex "./2d_get_all_orfs.sh        {} " ::: $species
+parallel --will-cite "./2a_get_transcript_orfs.sh {} " ::: $species
+parallel --will-cite "./2b_get_genes.sh           {} " ::: $species
+parallel --will-cite "./2c_get_proteins.sh        {} " ::: $species
+parallel --will-cite "./2d_get_all_orfs.sh        {} " ::: $species

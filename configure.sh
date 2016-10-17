@@ -61,25 +61,33 @@ install-exe(){
         mv $pconf~ $pconf
     else
         echo "MISSING"
-        $2 $1 || (echo "Failed to install $1" && exit_status=1)
+        $2 $1
+        if [[ $? -ne 0  ]]
+        then
+            echo "Failed to install $1"
+            exit_status=1
+        fi
     fi
 }
 
 install-smof(){
-    git clone $smof_src src/smof &&
-    cp src/smof/smof.py bin/smof &&
-    rm -rf src/smof
+    d=src/smof
+    git clone $smof_src $d || return 1
+    cp $d/smof.py bin/smof
+    rm -rf $d
+    return 0
 }
 
 install-synder(){
-    (
-     git clone $synder_src src/synder &&
-     cd src/synder                    &&
-     make                             &&
-     make test                        &&
-     cp synder ../../bin              &&
-     rm -rf src/synder
-    )
+    d=src/synder
+    git clone $synder_src $d || return 1
+    cd $d
+    make      || return 1
+    make test || return 1
+    cd -
+    cp $d/synder bin
+    [[ -d $d ]] && rm -rf $d
+    return 0
 }
 
 make-config $pconf $PWD/src/prologue/config

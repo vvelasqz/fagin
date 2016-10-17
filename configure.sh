@@ -93,6 +93,7 @@ make-config $pconf $PWD/src/prologue/config
 make-config $rconf $PWD/src/report/config
 
 check-exe python3  "python3 not in path, please install"
+check-exe latexmk  "latexmk not in path (needed for report generation), please install"
 check-exe R        "R not in path, please install"
 check-exe parallel "parallel is not in your path"
 check-exe Rscript  "Rscript not in path, please install R"

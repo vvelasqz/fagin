@@ -83,7 +83,6 @@ install-synder(){
     git clone $synder_src $d || return 1
     cd $d
     make      || return 1
-    make test || return 1
     cd -
     cp $d/synder bin
     [[ -d $d ]] && rm -rf $d
@@ -93,6 +92,7 @@ install-synder(){
 make-config $pconf $PWD/src/prologue/config
 make-config $rconf $PWD/src/report/config
 
+check-exe python3  "python3 not in path, please install"
 check-exe R        "R not in path, please install"
 check-exe parallel "parallel is not in your path"
 check-exe Rscript  "Rscript not in path, please install R"

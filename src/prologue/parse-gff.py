@@ -19,24 +19,27 @@ class Entry:
 
     def print_(self, tags=None, split=False, use_ids=False):
         if(tags):
-            try:
-                if use_ids and b'Name' in tags and not b'Name' in self.attr:
-                    self.attr[b'Name'] = self.attr[b'ID']
-                if split:
-                    nine = b'\t'.join([self.attr[k] for k in tags])
+            if use_ids and b'Name' in tags and not b'Name' in self.attr:
+                self.attr[b'Name'] = self.get_attr(b'ID')
+            if split:
+                nine = b'\t'.join([self.get_attr(k) for k in tags])
+            else:
+                if len(tags) == 1:
+                    nine = self.get_attr(tags[0])
                 else:
-                    if len(tags) == 1:
-                        nine = self.attr[tags[0]]
-                    else:
-                        nine = b';'.join([b'%s=%s' % (k, self.attr[k]) for k in tags])
-            except KeyError:
-                err("Input error: requested tag missing")
+                    nine = b';'.join([b'%s=%s' % (k, self.get_attr(k)) for k in tags])
         else:
             nine = b';'.join([b'%s=%s' % (k,v) for k,v in self.attr.items()])
 
         out = b'\t'.join(self.row[0:8] + [nine])
 
         print(out.decode())
+
+    def get_attr(self, tag):
+        try:
+            return self.attr[tag]
+        except KeyError:
+            return b'-'
 
 
 def parser():

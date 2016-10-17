@@ -180,23 +180,23 @@ LoadGFF <- function(gfffile, features=NULL, ...){
 
   g <- read.table(gfffile, comment="#", sep="\t", quote='', stringsAsFactors=FALSE) %>%
     dplyr::rename(
-      scaffold=V1,
-      source=V2,
-      type=V3,
-      start=V4,
-      stop=V5,
-      score=V6,
-      strand=V7,
-      phase=V8,
-      attribute=V9
+      scaffold  = V1,
+      source    = V2,
+      type      = V3,
+      start     = V4,
+      stop      = V5,
+      score     = V6,
+      strand    = V7,
+      phase     = V8,
+      attribute = V9
     ) %>%
     dplyr::mutate(
-      seqid=grepl('ID=[^;]', attribute) %>% ifelse(attribute, NA),
-      parent=grepl('Parent=[^;]', attribute) %>% ifelse(attribute, NA)
+      seqid  = grepl('ID=[^;]', attribute) %>% ifelse(attribute, NA),
+      parent = grepl('Parent=[^;]', attribute) %>% ifelse(attribute, NA)
     ) %>%
     dplyr::mutate(
-      seqid=sub('.*ID=([^;]+).*', '\\1', seqid),
-      parent=sub('.*Parent=([^;]+).*', '\\1', parent)
+      seqid  = sub('.*ID=([^;]+).*', '\\1', seqid),
+      parent = sub('.*Parent=([^;]+).*', '\\1', parent)
     )
 
   if(any(is.na(g$seqid))){

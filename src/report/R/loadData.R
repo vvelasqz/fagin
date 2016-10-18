@@ -90,10 +90,19 @@ LoadConfig <- function(configfile='config'){
     }
 
     species <- read.table(SPECIES_FILE, stringsAsFactors=FALSE)[[1]]
-    if(!FOCAL_SPECIES %in% species){
-      warning(sprintf("Focal species '%s' not found in the species list: [%s]",
-                  FOCAL_SPECIES, paste(species, collapse=", ")))
+
+    if(is.null(FOCAL_SPECIES)){
+      warning("You forgot to set the FOCAL_SPECIES variable in runconfig.R")
     }
+
+    if(!FOCAL_SPECIES %in% species){
+      sprintf(
+        "Focal species '%s' not found in the species list: [%s]",
+        FOCAL_SPECIES,
+        paste(species, collapse=", ")
+      ) %>% warning
+    }
+
     list(
         d_home              = HOME,
         d_faa               = FAA_DIR,

@@ -88,20 +88,29 @@ aln_xy <- function(x, y){
       scoreOnly=TRUE
     ),
     qwidth=width(x),
-    twidth=width(y)
+    twidth=width(y),
+    stringsAsFactors=FALSE
   )
   dplyr::group_by(a, query) %>%
     # Calculate adjusted score
     dplyr::summarize(logmn=log2(qwidth[1]) + log2(sum(twidth))) %>%
     base::merge(a) %>%
-    dplyr::select(query, score, logmn)
+    dplyr::select(query, target, score, logmn)
 }
 
 AA_aln <- function(queseq, tarseq, nsims=10000){
   data(BLOSUM80)
 
+  # Store the original query to target mapping for later testing.
+  # The input and output must have the same mapping.
+  original.pairs = data.frame(
+    query=names(queseq),
+    target=names(tarseq),
+    stringsAsFactors=FALSE
+  )
+  original.length = length(queseq)
+
   map <- aln_xy(queseq, tarseq)
-  map$target <- names(tarseq)
 
   # Simulate best hit for each query against randomized and reversed target sequences
   # 1. sample number of target sequences per query
@@ -121,7 +130,8 @@ AA_aln <- function(queseq, tarseq, nsims=10000){
   sam <- aln_xy(
     queseq[simids] %>% set_names(simnames),
     tarseq %>% base::sample(length(simnames), replace=TRUE) %>% reverse
-  )
+  ) %>% 
+  dplyr::select(-target)
 
   gum <- fit.gumbel(sam)
 
@@ -133,6 +143,14 @@ AA_aln <- function(queseq, tarseq, nsims=10000){
     simnames <- levels(sam$query) %>% sample(nlevels(map$query))
     sam <- subset(sam, query %in% simnames) %>% droplevels
   }
+
+  # Assert the query to target mapping has not changed
+  stopifnot(
+    map            %>% arrange(query, target) %$% target ==
+    original.pairs %>% arrange(query, target) %$% target
+  )
+  # Assert table length has not changed
+  stopifnot(nrow(map) == original.length)
 
   list(
     map   = map,
@@ -296,12 +314,15 @@ add_logmn <- function(d){
 
 get_dna2dna <- function(query, target, maxspace=1e8){
   genseq <- LoadFASTA(target$dna.file, isAA=FALSE)
-  # Get orphan intervals
+
+  # Orphan intervals
+  orfgff <- target$si$target[target$si$query$seqid %in% query$orphans] 
+
+  # Load orphan genes
+  ogen <- LoadFASTA(query$genefile, isAA=FALSE)[target$si$query[orfgff$id]$seqid]
 
   set.seed(42)
 
-  orfgff <- target$si$target[target$si$query$seqid %in% query$orphans] 
-  ogen <- query$genes[target$si$query[orfgff$id]$seqid]
   too.big <- log(width(orfgff)) + log(width(ogen)) > log(maxspace)
   if(any(too.big)){
     warning(sprintf('%d(%.1f%%) query / SI pairs are very large, N*M>%d. These
@@ -368,23 +389,36 @@ get_dna2dna <- function(query, target, maxspace=1e8){
 get_query2orf <- function(target, query){
   require(GenomicRanges)
   
+  subject <- MakeGI_fromGFF(target$orfgff.file)
+
+  # I'm not sure if running this is necessary, but it drops a huge chunk off
+  # memory usage. (e.g. 1Gb for my G. max, G. soja data)
+  gc()
+
+  # orphan ids
+  orp.ids <- subset(target$si$query, seqid %in% query$orphans)$id
+  # orphan search interval positions target-side
+  orp.rng <- subset(target$si$target, id %in% orp.ids)
+
   # o.orf is a list, where:
   #  - o.orf indices -> si indices
   #  - o.orf values  -> orf indices
   o.orf <- findOverlaps(
-    query=target$si$target,
-    subject=LoadGFF(target$orfgff.file)
+    query=orp.rng,
+    subject=subject
   )
 
-  # extract the orphans
-  o.orf <- o.orf[target$si$query$seqid[from(o.orf)] %in% query$orphans] 
+  back.ids = orp.rng[from(o.orf)]$id
 
-  data.frame(
-    query = target$si$query$seqid[from(o.orf)],
+  out <- data.frame(
+    query = target$si$query[back.ids]$seqid,
     siid  = from(o.orf),
     orfid = to(o.orf),
     stringsAsFactors=FALSE
   )
+  stopifnot(out$query %in% query$orphans)
+
+  out
 }
 
 

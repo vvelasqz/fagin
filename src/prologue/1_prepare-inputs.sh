@@ -86,7 +86,7 @@ do
     # No focal versus focal map
     if [[ ! $FOCAL_SPECIES == $s ]]
     then
-        input_syn=$SYN_DIR/$FOCAL_SPECIES.vs.$s.tab
+        input_syn=$SYN_DIR/$FOCAL_SPECIES.vs.$s.syn
         output_syn=$INPUT/syn/$FOCAL_SPECIES.vs.$s.syn
         check-read $input_syn $0
         ln -sf $input_syn $output_syn

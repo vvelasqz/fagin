@@ -61,7 +61,7 @@ nuccomp=$odir/kb-composition.tab
 # 3. scaffold length 
 write-scaffold-lengths () {
     echo species scaffold length | tr ' ' '\t'
-    ls $idir/*fna | parallel "$smof stat -q {} > $odir/{/}.tab "
+    ls $idir/*fna | parallel --will-cite "$smof stat -q {} > $odir/{/}.tab "
     for j in $odir/*fna.tab
     do
         s=${j%.fna.tab}
@@ -82,7 +82,7 @@ write-scaffold-lengths () {
 # 4. n-string stop
 write-nstrings () {
     echo species scaffold start stop | tr ' ' '\t' 
-    ls $idir/*fna | parallel "$smof grep -Poq --gff --gff-type {/.} 'N+' {}" |
+    ls $idir/*fna | parallel --will-cite "$smof grep -Poq --gff --gff-type {/.} 'N+' {}" |
         awk 'BEGIN{FS="\t"; OFS="\t"} {print $3, $1, $4, $5}'
 }
 
@@ -103,7 +103,7 @@ write-nucleotide-composition () {
             -bed /dev/stdin \
             -fo /dev/stdout |
         # e.g. ">foo:23-46(+) stuff" -> ">species:foo:23:+"
-        perl -pe "s/>([^:]+):(\d+)-\d+\((.)\).*/>$s:$1:$2:$3/" |
+        perl -pe 's/>([^:]+):(\d+)-\d+\((.)\).*/>'$s':$1:$2:$3/' |
         sed "/>/s/::.*//"
     done                      |
         $smof clean -xru -t n |

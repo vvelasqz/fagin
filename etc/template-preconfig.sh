@@ -6,15 +6,23 @@
 # ===================================================================
 
 # -----------------------------------------------------------------------------
+
 # GFF_DIR is a directory containing a GFF file for each species used in the
 # pipeline. This GFF file must contain at minimum mRNA and coding sequence
-# (CDS) features. The last column must contain a unique id for the specific
-# gene model (mRNA). All start and stop positions must be relative to the
+# (CDS) features. All start and stop positions must be relative to the
 # reference genomes in FNA_DIR (see argument -n).
+#
+# The following must be true of all GFF files:
+#  1. Contain CDS, exon and mRNA entries
+#  2. All CDS and exon fields contain Parent tags in the 9th column
+#  3. All features contain an ID or Name field
 # 
-# Chr1   .   mRNA   3631   5899   .   +   .   AT1G01010.1 Chr1   .   CDS 3760
-# 3913   .   +   .   AT1G01010.1 Chr1   .   CDS    3996   4276   .   + .
-# AT1G01010.1
+# Example:
+# Chr1   .   mRNA   3631   5899   .   +   .   ID=AT1G01010.1
+# Chr1   .    CDS   3760   3913   .   +   .   ID=AT1G01010.1.CDS-1;Parent=AT1G01010.1
+# Chr1   .    CDS   3996   4276   .   +   .   ID=AT1G01010.1.CDS-2;Parent=AT1G01010.1
+#
+# Expected extension: *.gff
 # -----------------------------------------------------------------------------
 GFF_DIR=
 
@@ -22,6 +30,9 @@ GFF_DIR=
 # -----------------------------------------------------------------------------
 # FNA_DIR is a directory containing a single genome sequence file for each
 # species used in the pipeline. The files must be in FASTA format.
+#
+# Expected extension *.fna
+#
 # -----------------------------------------------------------------------------
 FNA_DIR=
 
@@ -29,7 +40,7 @@ FNA_DIR=
 # -----------------------------------------------------------------------------
 # syn_dir should be the name of directory containing one synteny map for each
 # species that will be compared. each synteny map should consist of a single
-# file named according to the pattern "<query>.vs.<target>.tab", for example,
+# file named according to the pattern "<query>.vs.<target>.syn", for example,
 # "arabidopsis_thaliana.vs.arabidopsis_lyrata.tab". these files should contain
 # the following columns:
 #
@@ -42,19 +53,22 @@ FNA_DIR=
 # 7. score (not necessarily used)
 # 8. strand relative to query
 #
-# here is an example:
+# Example:
 #
-# chr2	193631	201899	tchr2	193631	201899	100	+
-# chr2	225899	235899	tchr2	201999	202999	100	+
-# chr1	5999	6099	tchr1	6099	6199	100	+
-# chr1	5999	6099	tchr1	8099	8199	100	+
-# chr1	17714	18714	tchr2	17714	18714	100	+
-# chr2	325899	335899	tchr2	301999	302999	100	+
+# chr2   193631   201899   tchr2   193631   201899   100   +
+# chr2   225899   235899   tchr2   201999   202999   100   +
+# chr1   5999     6099     tchr1   6099     6199     100   +
+# chr1   5999     6099     tchr1   8099     8199     100   +
+# chr1   17714    18714    tchr2   17714    18714    100   +
+# chr2   325899   335899   tchr2   301999   302999   100   +
 #
 # a synteny map like this can be created using a whole genome synteny program,
 # such as satsuma (highly recommended). building a single synteny map requires
 # hundreds of cpu hours, so it is best done on a cluster. an example pbs script
 # is provided, see src/satsuma.pbs.
+#
+# Expected filename format: <query_sciname>.vs.<target_sciname>.syn
+#
 # -----------------------------------------------------------------------------
 SYN_DIR=
 

@@ -231,7 +231,7 @@ LoadGFF <- function(gfffile, features=NULL, ...){
     stops     = g$stop,
     scaffolds = g$scaffold,
     strands   = g$strand,
-    metadata  = g[metadata_cols],
+    metadata  = dplyr::select(g, type, seqid, parent),
     ...
   ) 
 }

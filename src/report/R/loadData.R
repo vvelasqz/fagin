@@ -154,6 +154,13 @@ LoadSeqinfoList <- function(config){
   ) %>% set_names(config$species)
 }
 
+MakeGI_fromGFF <- function(gfffile){
+  g <- read.table(gfffile, comment="#", sep="\t", quote='', stringsAsFactors=FALSE)
+  if(ncol(g) != 9){
+    warning("GFF format requires 9 columns in '%gfffile'", gfffile)
+  }
+  MakeGI(g[[4]], g[[5]], g[[1]], g[[7]])
+}
 MakeGI <- function(starts, stops, scaffolds, strands=NULL, metadata=NULL, seqinfo=NULL){
   require(GenomicRanges)
   if(is.null(strands)){
@@ -162,10 +169,10 @@ MakeGI <- function(starts, stops, scaffolds, strands=NULL, metadata=NULL, seqinf
     strands <- gsub('\\.', '*', strands)
   }
   g <- GRanges(
-    seqnames=scaffolds,
-    ranges=IRanges(starts, stops),
-    strand=strands,
-    seqinfo=seqinfo
+    seqnames = scaffolds,
+    ranges   = IRanges(starts, stops),
+    strand   = strands,
+    seqinfo  = seqinfo
   )
   if(!is.null(metadata)){
     mcols(g) <- metadata
@@ -224,7 +231,7 @@ LoadGFF <- function(gfffile, features=NULL, ...){
     stops     = g$stop,
     scaffolds = g$scaffold,
     strands   = g$strand,
-    metadata  = dplyr::select(g, type, seqid, parent),
+    metadata  = g[metadata_cols],
     ...
   ) 
 }
@@ -586,7 +593,7 @@ LoadQuery <- function(config, l_seqinfo)
   # all orphans should be associated with a protein sequence
   stopifnot(orphans %in% names(aa))
 
-  list(aa=aa, gff=gff, genes=genes, orphans=orphans)
+  list(aa=aa, gff=gff, genefile=genefile, orphans=orphans)
 }
 
 

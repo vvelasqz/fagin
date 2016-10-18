@@ -296,12 +296,15 @@ add_logmn <- function(d){
 
 get_dna2dna <- function(query, target, maxspace=1e8){
   genseq <- LoadFASTA(target$dna.file, isAA=FALSE)
-  # Get orphan intervals
+
+  # Orphan intervals
+  orfgff <- target$si$target[target$si$query$seqid %in% query$orphans] 
+
+  # Load orphan genes
+  ogen <- LoadFASTA(query$genefile, isAA=FALSE)[target$si$query[orfgff$id]$seqid]
 
   set.seed(42)
 
-  orfgff <- target$si$target[target$si$query$seqid %in% query$orphans] 
-  ogen <- query$genes[target$si$query[orfgff$id]$seqid]
   too.big <- log(width(orfgff)) + log(width(ogen)) > log(maxspace)
   if(any(too.big)){
     warning(sprintf('%d(%.1f%%) query / SI pairs are very large, N*M>%d. These
@@ -368,23 +371,36 @@ get_dna2dna <- function(query, target, maxspace=1e8){
 get_query2orf <- function(target, query){
   require(GenomicRanges)
   
+  subject <- MakeGI_fromGFF(target$orfgff.file)
+
+  # I'm not sure if running this is necessary, but it drops a huge chunk off
+  # memory usage. (e.g. 1Gb for my G. max, G. soja data)
+  gc()
+
+  # orphan ids
+  orp.ids <- subset(target$si$query, seqid %in% query$orphans)$id
+  # orphan search interval positions target-side
+  orp.rng <- subset(target$si$target, id %in% orp.ids)
+
   # o.orf is a list, where:
   #  - o.orf indices -> si indices
   #  - o.orf values  -> orf indices
   o.orf <- findOverlaps(
-    query=target$si$target,
-    subject=LoadGFF(target$orfgff.file)
+    query=orp.rng,
+    subject=subject
   )
 
-  # extract the orphans
-  o.orf <- o.orf[target$si$query$seqid[from(o.orf)] %in% query$orphans] 
+  back.ids = orp.rng[from(o.orf)]$id
 
-  data.frame(
-    query = target$si$query$seqid[from(o.orf)],
+  out <- data.frame(
+    query = target$si$query[back.ids]$seqid,
     siid  = from(o.orf),
     orfid = to(o.orf),
     stringsAsFactors=FALSE
   )
+  stopifnot(out$query %in% query$orphans)
+
+  out
 }
 
 

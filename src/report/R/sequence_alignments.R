@@ -319,7 +319,8 @@ get_dna2dna <- function(query, target, maxspace=1e8){
   orfgff <- target$si$target[target$si$query$seqid %in% query$orphans] 
 
   # Load orphan genes
-  ogen <- LoadFASTA(query$genefile, isAA=FALSE)[target$si$query[orfgff$id] %$% seqid]
+  qgenes <- LoadFASTA(query$genefile, isAA=FALSE) 
+  ogen <- qgenes[target$si$query[orfgff$id] %$% seqid]
 
   set.seed(42)
 
@@ -351,7 +352,7 @@ get_dna2dna <- function(query, target, maxspace=1e8){
   stopifnot(target$si$target$id == target$si$query$id)
 
   small <- log(width(target$si$target)) +
-           log(width(query$genes[target$si$query$seqid])) < log(maxspace)
+           log(width(qgenes[target$si$query$seqid])) < log(maxspace)
   sample.targets <- target$si$target[small] %>% sample(length(ogen))
 
   ctrl <- alignToGenome(

@@ -32,8 +32,6 @@ getTargetResults <- function(species, query, config, l_seqinfo, use_cache){
 
   # (CDS and mRNA overlaps)
   message('--processing feature overlaps')
-  # TODO: I do not currently use features other than CDS and mRNA, so I could
-  # save memory by filtering them out
   features <- cache(analyzeTargetFeature, query, target)
 
   # Queries whose protein seq matches a target protein in the SI

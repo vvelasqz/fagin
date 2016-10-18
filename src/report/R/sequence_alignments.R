@@ -319,7 +319,7 @@ get_dna2dna <- function(query, target, maxspace=1e8){
   orfgff <- target$si$target[target$si$query$seqid %in% query$orphans] 
 
   # Load orphan genes
-  ogen <- LoadFASTA(query$genefile, isAA=FALSE)[target$si$query[orfgff$id]$seqid]
+  ogen <- LoadFASTA(query$genefile, isAA=FALSE)[target$si$query[orfgff$id] %$% seqid]
 
   set.seed(42)
 

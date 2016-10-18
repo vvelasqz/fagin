@@ -88,20 +88,29 @@ aln_xy <- function(x, y){
       scoreOnly=TRUE
     ),
     qwidth=width(x),
-    twidth=width(y)
+    twidth=width(y),
+    stringsAsFactors=FALSE
   )
   dplyr::group_by(a, query) %>%
     # Calculate adjusted score
     dplyr::summarize(logmn=log2(qwidth[1]) + log2(sum(twidth))) %>%
     base::merge(a) %>%
-    dplyr::select(query, score, logmn)
+    dplyr::select(query, target, score, logmn)
 }
 
 AA_aln <- function(queseq, tarseq, nsims=10000){
   data(BLOSUM80)
 
+  # Store the original query to target mapping for later testing.
+  # The input and output must have the same mapping.
+  original.pairs = data.frame(
+    query=names(queseq),
+    target=names(tarseq),
+    stringsAsFactors=FALSE
+  )
+  original.length = length(queseq)
+
   map <- aln_xy(queseq, tarseq)
-  map$target <- names(tarseq)
 
   # Simulate best hit for each query against randomized and reversed target sequences
   # 1. sample number of target sequences per query
@@ -121,7 +130,8 @@ AA_aln <- function(queseq, tarseq, nsims=10000){
   sam <- aln_xy(
     queseq[simids] %>% set_names(simnames),
     tarseq %>% base::sample(length(simnames), replace=TRUE) %>% reverse
-  )
+  ) %>% 
+  dplyr::select(-target)
 
   gum <- fit.gumbel(sam)
 
@@ -133,6 +143,14 @@ AA_aln <- function(queseq, tarseq, nsims=10000){
     simnames <- levels(sam$query) %>% sample(nlevels(map$query))
     sam <- subset(sam, query %in% simnames) %>% droplevels
   }
+
+  # Assert the query to target mapping has not changed
+  stopifnot(
+    map            %>% arrange(query, target) %$% target ==
+    original.pairs %>% arrange(query, target) %$% target
+  )
+  # Assert table length has not changed
+  stopifnot(nrow(map) == original.length)
 
   list(
     map   = map,

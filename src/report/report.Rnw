@@ -68,8 +68,8 @@ source('R/plot.R')
 source('R/versions.R')
 
 use_cache <- TRUE
-cache     <- cache_factory(config)
 config    <- LoadConfig(configfile='config')
+cache     <- cache_factory(config)
 l_seqinfo <- LoadSeqinfoList(config)
 query     <- cache(LoadQuery, config, l_seqinfo)
 

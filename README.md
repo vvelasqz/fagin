@@ -72,18 +72,27 @@ make load && make test && make run
 
 # TODO
 
-## R Code
-
- - [x] code for importing and iterating through all data
- - [x] classify focal species genes against each search interval
- - [x] merge search interval classifications
- - [x] get final gene class from species class vector
- - [x] statistically summarize results
- - [x] visualize results
- - [ ] **remove hard-coded assumption of depth=3 species trees**
+Content
+ - [ ] remove hard-coded assumption of depth=3 species trees
  - [ ] generalize from 'orphan' to 'query'
  - [ ] prepare report for each query
+ - [ ] create gene pages
  - [ ] add orthology statistics
+ - [ ] print feature table
+ - [ ] print label table
  - [ ] print all intermediate data
- - [ ] modularize analyses, e.g. N-string, indel, CDS overlap, etc.
- - [ ] build graph for assignment tree
+ - [ ] only run functions specified by the function tree
+ - [ ] print classification tree in report
+ - [ ] add RNA-seq input
+ - [ ] implement non-quadratic alignment
+
+Implementation
+ - [ ] ab initio refactor as pure R package
+ - [ ] replace all shellscripts with R code
+ - [ ] full testit coverage
+ - [ ] all data in RSQLite databases (constant memory)
+ - [ ] parallelize everything (divide-analyze-recombine)
+ - [ ] integrate BLAST orphan identification
+ - [ ] integrate phylostratigraphy
+ - [ ] toss knitr, modularize for interactive exploration
+ - [ ] integrate with Trelliscope and datadr

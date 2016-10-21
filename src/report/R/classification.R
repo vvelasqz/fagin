@@ -128,7 +128,7 @@ buildFeatureTable <- function(result, query, config){
   una <- orphans %in% result$unassembled
   # search interval was not processed for technical reasons (e.g. too big)
   tec <- orphans %in% result$skipped
-  
+
   data.frame(
     seqid = orphans,
     scr   = scr,

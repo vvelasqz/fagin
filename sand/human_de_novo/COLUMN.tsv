@@ -1,0 +1,15 @@
+chromosome	reference chromosome
+transcript_start	transcript start position
+transcript_end	transcript end position
+type	CDS type (mCDS / uaCDS)
+score	scaled posterior score (0-10000)
+strand	strand
+CDS_start	CDS start position
+CDS_end	CDS end position
+label	novel CDS label (see Figure 2)
+nexons	number of exons
+exon_lengths	lengths of exons (comma separated)
+exon_starts	starts of exons (comma separated)
+gene_name	gene name
+biotype	GENCODE transcript biotype
+aa_seq	peptide sequence of novel CDS

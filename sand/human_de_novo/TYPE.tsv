@@ -1,0 +1,15 @@
+chromosome	character
+transcript_start	number
+transcript_end	number
+type	character
+score	number
+strand	character
+CDS_start	number
+CDS_end	number
+label	character
+nexons	number
+exon_lengths	character
+exon_starts	character
+gene_name	character
+biotype	character
+aa_seq	character
